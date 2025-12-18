@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Basic Widget</title>
+    <style>
+        /* Reset and base styles */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.5;
+            padding: 16px;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+        }
+
+        /* Light theme (default) */
+        :root {
+            --bg-primary: #ffffff;
+            --bg-secondary: #f5f5f5;
+            --text-primary: #1a1a1a;
+            --text-secondary: #666666;
+            --border-color: #e0e0e0;
+            --accent-color: #0066cc;
+        }
+
+        /* Dark theme */
+        .dark {
+            --bg-primary: #1a1a1a;
+            --bg-secondary: #2d2d2d;
+            --text-primary: #ffffff;
+            --text-secondary: #a0a0a0;
+            --border-color: #404040;
+            --accent-color: #4da6ff;
+        }
+
+        /* Card component */
+        .card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 16px;
+        }
+
+        .card-header {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: var(--text-primary);
+        }
+
+        .card-content {
+            color: var(--text-secondary);
+        }
+
+        /* Data list */
+        .data-list {
+            list-style: none;
+        }
+
+        .data-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .data-item:last-child {
+            border-bottom: none;
+        }
+
+        .data-label {
+            color: var(--text-secondary);
+        }
+
+        .data-value {
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+
+        /* Status badge */
+        .badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .badge-success {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .badge-warning {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .badge-error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        /* Loading state */
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: var(--text-secondary);
+        }
+
+        /* Error state */
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 16px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .dark .badge-success {
+            background: #1e4620;
+            color: #a3d9a5;
+        }
+
+        .dark .badge-warning {
+            background: #5c4813;
+            color: #ffd966;
+        }
+
+        .dark .badge-error {
+            background: #4a1c1c;
+            color: #f5a5a5;
+        }
+
+        .dark .error {
+            background: #4a1c1c;
+            color: #f5a5a5;
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div class="loading">Loading...</div>
+    </div>
+
+    <script>
+        // Apply theme
+        (function() {
+            if (window.openai?.theme === 'dark') {
+                document.body.classList.add('dark');
+            }
+        })();
+
+        // Main render function
+        function render() {
+            const app = document.getElementById('app');
+
+            // Get data from tool response
+            const data = window.openai?.toolOutput?.structuredContent;
+            const meta = window.openai?.toolOutput?._meta;
+
+            if (!data) {
+                app.innerHTML = '<div class="error">No data available</div>';
+                return;
+            }
+
+            // Render based on data type
+            if (data.items && Array.isArray(data.items)) {
+                renderList(app, data);
+            } else if (data.status !== undefined) {
+                renderStatus(app, data);
+            } else {
+                renderGeneric(app, data);
+            }
+
+            // Report height to ChatGPT
+            requestAnimationFrame(() => {
+                window.openai?.notifyIntrinsicHeight(document.body.scrollHeight);
+            });
+        }
+
+        // Render a list of items
+        function renderList(container, data) {
+            const items = data.items.map(item => `
+                <li class="data-item">
+                    <span class="data-label">${escapeHtml(item.name || item.id || 'Item')}</span>
+                    <span class="data-value">${escapeHtml(item.value || item.price || '')}</span>
+                </li>
+            `).join('');
+
+            container.innerHTML = `
+                <div class="card">
+                    <div class="card-header">${escapeHtml(data.title || 'Results')}</div>
+                    <ul class="data-list">${items}</ul>
+                </div>
+            `;
+        }
+
+        // Render status information
+        function renderStatus(container, data) {
+            const badgeClass = getBadgeClass(data.status);
+
+            container.innerHTML = `
+                <div class="card">
+                    <div class="card-header">
+                        Status: <span class="badge ${badgeClass}">${escapeHtml(data.status)}</span>
+                    </div>
+                    <div class="card-content">
+                        ${data.message ? `<p>${escapeHtml(data.message)}</p>` : ''}
+                    </div>
+                </div>
+            `;
+        }
+
+        // Render generic data
+        function renderGeneric(container, data) {
+            const items = Object.entries(data).map(([key, value]) => `
+                <li class="data-item">
+                    <span class="data-label">${escapeHtml(formatKey(key))}</span>
+                    <span class="data-value">${escapeHtml(formatValue(value))}</span>
+                </li>
+            `).join('');
+
+            container.innerHTML = `
+                <div class="card">
+                    <div class="card-header">Data</div>
+                    <ul class="data-list">${items}</ul>
+                </div>
+            `;
+        }
+
+        // Helper functions
+        function getBadgeClass(status) {
+            const s = String(status).toLowerCase();
+            if (['success', 'complete', 'active', 'shipped'].includes(s)) return 'badge-success';
+            if (['pending', 'processing', 'warning'].includes(s)) return 'badge-warning';
+            if (['error', 'failed', 'cancelled'].includes(s)) return 'badge-error';
+            return 'badge-success';
+        }
+
+        function formatKey(key) {
+            return key.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase());
+        }
+
+        function formatValue(value) {
+            if (value === null || value === undefined) return '-';
+            if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+            if (typeof value === 'number') return value.toLocaleString();
+            if (Array.isArray(value)) return value.length + ' items';
+            if (typeof value === 'object') return JSON.stringify(value);
+            return String(value);
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = String(text);
+            return div.innerHTML;
+        }
+
+        // Initialize
+        render();
+    </script>
+</body>
+</html>

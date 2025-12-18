@@ -1,0 +1,19 @@
+{
+  "name": "openai-apps-sdk",
+  "version": "0.1.0",
+  "description": "Comprehensive toolkit for building MCP servers with the OpenAI Apps SDK. Provides skills, commands, and agents for creating ChatGPT apps with Python and TypeScript.",
+  "author": {
+    "name": "Maximilian Bruhn",
+    "email": "noreply@example.com"
+  },
+  "keywords": [
+    "openai",
+    "apps-sdk",
+    "mcp",
+    "model-context-protocol",
+    "chatgpt",
+    "mcp-server",
+    "widgets"
+  ],
+  "license": "MIT"
+}

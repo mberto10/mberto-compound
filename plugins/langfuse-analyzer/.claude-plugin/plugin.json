@@ -1,0 +1,9 @@
+{
+  "name": "langfuse-analyzer",
+  "version": "0.1.0",
+  "description": "Surgical Langfuse trace retrieval with multiple output modes for LLM-friendly debugging",
+  "author": {
+    "name": "Writing Ecosystem Team"
+  },
+  "keywords": ["langfuse", "tracing", "debugging", "observability", "optimization"]
+}

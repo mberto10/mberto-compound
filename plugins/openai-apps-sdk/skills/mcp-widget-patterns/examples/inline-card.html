@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Inline Card Widget</title>
+    <style>
+        /* CSS Variables - ChatGPT Design System */
+        :root {
+            --text-default: #000000;
+            --text-secondary: #666666;
+            --text-subtle: #999999;
+            --text-inverted: #ffffff;
+
+            --surface-primary: #ffffff;
+            --surface-secondary: #f5f5f5;
+
+            --action-primary: #0066cc;
+            --action-primary-hover: #0052a3;
+            --action-secondary: #e0e0e0;
+            --action-secondary-hover: #d0d0d0;
+
+            --status-success: #22c55e;
+            --status-success-bg: #dcfce7;
+            --status-success-text: #166534;
+
+            --border-default: #e0e0e0;
+            --border-subtle: #f0f0f0;
+
+            --radius-md: 8px;
+            --radius-lg: 12px;
+
+            --space-1: 4px;
+            --space-2: 8px;
+            --space-3: 12px;
+            --space-4: 16px;
+
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+
+            --font-sans: system-ui, -apple-system, BlinkMacSystemFont,
+                         'Segoe UI', Roboto, sans-serif;
+        }
+
+        /* Dark mode */
+        .dark {
+            --text-default: #ffffff;
+            --text-secondary: #a0a0a0;
+            --text-subtle: #707070;
+            --text-inverted: #000000;
+
+            --surface-primary: #1a1a1a;
+            --surface-secondary: #2d2d2d;
+
+            --action-primary: #4da6ff;
+            --action-primary-hover: #3d96ef;
+            --action-secondary: #404040;
+            --action-secondary-hover: #505050;
+
+            --status-success-bg: #14532d;
+            --status-success-text: #86efac;
+
+            --border-default: #404040;
+            --border-subtle: #303030;
+        }
+
+        /* Reset */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: var(--font-sans);
+            font-size: 14px;
+            line-height: 1.5;
+            background: var(--surface-primary);
+            color: var(--text-default);
+            padding: var(--space-4);
+        }
+
+        /* Card */
+        .card {
+            background: var(--surface-primary);
+            border: 1px solid var(--border-default);
+            border-radius: var(--radius-lg);
+            overflow: hidden;
+            max-width: 400px;
+        }
+
+        /* Card Header */
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
+            padding: var(--space-3) var(--space-4);
+            border-bottom: 1px solid var(--border-subtle);
+        }
+
+        .card-icon {
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--status-success-bg);
+            color: var(--status-success-text);
+            border-radius: 50%;
+            font-size: 12px;
+        }
+
+        .card-title {
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .card-badge {
+            margin-left: auto;
+            padding: var(--space-1) var(--space-2);
+            background: var(--status-success-bg);
+            color: var(--status-success-text);
+            font-size: 12px;
+            font-weight: 500;
+            border-radius: var(--radius-md);
+        }
+
+        /* Card Body */
+        .card-body {
+            padding: var(--space-4);
+        }
+
+        .detail-row {
+            display: flex;
+            justify-content: space-between;
+            padding: var(--space-2) 0;
+            border-bottom: 1px solid var(--border-subtle);
+        }
+
+        .detail-row:last-child {
+            border-bottom: none;
+        }
+
+        .detail-label {
+            color: var(--text-secondary);
+        }
+
+        .detail-value {
+            font-weight: 500;
+            text-align: right;
+        }
+
+        /* Card Actions */
+        .card-actions {
+            display: flex;
+            gap: var(--space-2);
+            padding: var(--space-3) var(--space-4);
+            border-top: 1px solid var(--border-subtle);
+            background: var(--surface-secondary);
+        }
+
+        .btn {
+            flex: 1;
+            padding: var(--space-2) var(--space-3);
+            border: none;
+            border-radius: var(--radius-md);
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 150ms ease;
+        }
+
+        .btn-primary {
+            background: var(--action-primary);
+            color: var(--text-inverted);
+        }
+
+        .btn-primary:hover {
+            background: var(--action-primary-hover);
+        }
+
+        .btn-secondary {
+            background: var(--action-secondary);
+            color: var(--text-default);
+        }
+
+        .btn-secondary:hover {
+            background: var(--action-secondary-hover);
+        }
+    </style>
+</head>
+<body>
+    <div class="card" id="card">
+        <div class="card-header">
+            <div class="card-icon">✓</div>
+            <span class="card-title">Booking Confirmed</span>
+            <span class="card-badge">Confirmed</span>
+        </div>
+        <div class="card-body">
+            <div class="detail-row">
+                <span class="detail-label">Restaurant</span>
+                <span class="detail-value" id="restaurant">Loading...</span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Date</span>
+                <span class="detail-value" id="date">Loading...</span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Time</span>
+                <span class="detail-value" id="time">Loading...</span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Party Size</span>
+                <span class="detail-value" id="party">Loading...</span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Confirmation #</span>
+                <span class="detail-value" id="confirmation">Loading...</span>
+            </div>
+        </div>
+        <div class="card-actions">
+            <button class="btn btn-secondary" id="modify-btn">Modify</button>
+            <button class="btn btn-primary" id="calendar-btn">Add to Calendar</button>
+        </div>
+    </div>
+
+    <script>
+        // Apply theme
+        (function() {
+            if (window.openai?.theme === 'dark') {
+                document.body.classList.add('dark');
+            }
+        })();
+
+        // Get data from tool output
+        const data = window.openai?.toolOutput?.structuredContent || {
+            restaurant: "Chez Pierre",
+            date: "Thursday, Dec 19",
+            time: "7:30 PM",
+            partySize: 4,
+            confirmationNumber: "ABC123"
+        };
+
+        // Populate card
+        document.getElementById('restaurant').textContent = data.restaurant || 'N/A';
+        document.getElementById('date').textContent = data.date || 'N/A';
+        document.getElementById('time').textContent = data.time || 'N/A';
+        document.getElementById('party').textContent = data.partySize ? `${data.partySize} guests` : 'N/A';
+        document.getElementById('confirmation').textContent = data.confirmationNumber || 'N/A';
+
+        // Handle button clicks
+        document.getElementById('modify-btn').addEventListener('click', async () => {
+            if (window.openai?.callTool) {
+                try {
+                    await window.openai.callTool('modify_booking', {
+                        confirmationNumber: data.confirmationNumber
+                    });
+                } catch (e) {
+                    console.error('Failed to modify:', e);
+                }
+            }
+        });
+
+        document.getElementById('calendar-btn').addEventListener('click', async () => {
+            if (window.openai?.sendFollowUpMessage) {
+                await window.openai.sendFollowUpMessage({
+                    prompt: `Add my ${data.restaurant} reservation on ${data.date} at ${data.time} to my calendar`
+                });
+            }
+        });
+
+        // Report height to ChatGPT
+        requestAnimationFrame(() => {
+            window.openai?.notifyIntrinsicHeight(document.body.scrollHeight);
+        });
+    </script>
+</body>
+</html>

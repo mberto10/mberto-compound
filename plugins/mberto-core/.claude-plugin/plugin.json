@@ -1,0 +1,13 @@
+{
+  "name": "mberto-core",
+  "version": "1.0.0",
+  "description": "Core infrastructure plugin with standard MCP servers (Linear, Context7, Langfuse) for quick project setup",
+  "author": {
+    "name": "Maximilian Bruhn",
+    "email": "puzzle.ai.studio@gmail.com"
+  },
+  "homepage": "https://github.com/mberto10/mberto-compound",
+  "repository": "https://github.com/mberto10/mberto-compound",
+  "license": "MIT",
+  "keywords": ["core", "mcp", "infrastructure", "linear", "context7", "langfuse"]
+}

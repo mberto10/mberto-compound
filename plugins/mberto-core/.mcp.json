@@ -1,0 +1,36 @@
+{
+  "mcpServers": {
+    "context7": {
+      "command": "npx",
+      "args": ["-y", "@upstash/context7-mcp@latest"],
+      "env": {},
+      "description": "Up-to-date library documentation for any package. Use 'use context7' in prompts."
+    },
+    "linear": {
+      "command": "npx",
+      "args": ["-y", "@tacticlaunch/mcp-linear"],
+      "env": {
+        "LINEAR_API_TOKEN": "${LINEAR_API_TOKEN}"
+      },
+      "description": "Linear issue tracking integration. Requires LINEAR_API_TOKEN env var."
+    },
+    "langfuse-docs": {
+      "type": "http",
+      "url": "https://langfuse.com/api/mcp",
+      "description": "Langfuse documentation search and retrieval."
+    },
+    "langfuse": {
+      "type": "http",
+      "url": "https://cloud.langfuse.com/api/public/mcp",
+      "headers": {
+        "Authorization": "Basic ${LANGFUSE_MCP_TOKEN}"
+      },
+      "description": "Langfuse prompt management. Requires LANGFUSE_MCP_TOKEN (base64 of public:secret)."
+    },
+    "playwright": {
+      "command": "npx",
+      "args": ["@playwright/mcp@latest"],
+      "description": "Browser automation via accessibility snapshots. No auth required."
+    }
+  }
+}
