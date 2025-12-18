@@ -3,8 +3,8 @@
   "version": "1.0.0",
   "description": "Example plugin demonstrating the structure for commands, agents, skills, and hooks",
   "author": "Maximilian Bruhn",
-  "homepage": "https://github.com/MB9012/claude-marketplace",
-  "repository": "https://github.com/MB9012/claude-marketplace",
+  "homepage": "https://github.com/mberto10/claude-marketplace",
+  "repository": "https://github.com/mberto10/claude-marketplace",
   "license": "MIT",
   "keywords": ["example", "template", "reference"]
 }

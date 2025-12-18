@@ -24,7 +24,7 @@ claude-marketplace/
 ### Step 1: Clone the Marketplace
 
 ```bash
-git clone https://github.com/MB9012/claude-marketplace.git ~/.claude-marketplace
+git clone https://github.com/mberto10/claude-marketplace.git ~/.claude-marketplace
 ```
 
 ### Step 2: Link Plugins to Your Project
