@@ -9,7 +9,7 @@ Personal collection of Claude Code plugins, commands, agents, skills, and config
 In Claude Code, run:
 
 ```
-/plugin marketplace add mberto10/claude-marketplace
+/plugin marketplace add mberto10/mberto-compound
 ```
 
 ### Install Plugins
@@ -114,7 +114,7 @@ Add to your project's `.claude/settings.json` for automatic installation:
     "mberto-compound": {
       "source": {
         "source": "github",
-        "repo": "mberto10/claude-marketplace"
+        "repo": "mberto10/mberto-compound"
       }
     }
   },
