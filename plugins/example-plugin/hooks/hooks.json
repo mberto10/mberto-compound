@@ -1,0 +1,13 @@
+{
+  "hooks": [
+    {
+      "event": "SessionStart",
+      "command": "echo 'Welcome! Example plugin loaded successfully.'"
+    },
+    {
+      "event": "PostToolUse",
+      "tool": "Write",
+      "command": "echo 'File written: {{file_path}}'"
+    }
+  ]
+}
