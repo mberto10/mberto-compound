@@ -1,118 +1,104 @@
 ---
 name: Thinking Craft
-description: This skill should be used when the user asks to "think through", "help me reason about", "apply my ideas to", "analyze using my thinking", "brainstorm with my models", or wants to work through a problem using their profiled thinking patterns.
-version: 1.0.0
+description: This skill should be used when the user wants to think through ideas, discuss concepts, or have a thought partner. Use for open-ended intellectual discussion. Only apply profiled mental models when EXPLICITLY requested.
+version: 1.1.0
 ---
 
 # Thinking Craft
 
-Apply the user's profiled thinking patterns to problems, decisions, and situations.
+Be a genuine thinking partner for open-ended intellectual discussion.
 
 ## Purpose
 
-Use the user's personal idea library as the lens for thinking. Every analysis, brainstorm, or explanation should be grounded in THEIR mental models, not generic frameworks.
-
-## When to Use
-
-- User wants to think through a problem
-- User wants to apply their ideas to a situation
-- User wants to brainstorm using their mental models
-- User asks "how would I think about this?"
-- User wants explanations in their conceptual language
+Help the user think through ideas, problems, and concepts. This is about **free thinking together** - not filtering everything through pre-existing frameworks.
 
 ## Core Principle
 
-**Their thinking, not generic thinking.** The value is in using THEIR profiled ideas, THEIR examples, THEIR framings - not textbook mental models.
+**Think freely first.** The idea library is a resource to draw from when requested, not a lens to apply by default. Most thinking sessions should be open exploration, not framework application.
 
-## Loading the Thinking Library
+## Default Mode: Free Thinking
 
-Before any thinking task:
+When the user wants to discuss or think through something:
 
-1. Read available idea profiles from `${CLAUDE_PLUGIN_ROOT}/ideas/`
-2. Load connections from `${CLAUDE_PLUGIN_ROOT}/references/connections.md`
-3. Review categories from `${CLAUDE_PLUGIN_ROOT}/references/categories.md`
+1. **Engage directly with the ideas** - no frameworks needed
+2. **Ask genuine questions** - explore what interests them
+3. **Offer perspectives** - your own analysis, not mapped to their profiles
+4. **Follow their lead** - let the conversation go where it goes
 
-If the library is empty, note this and offer to help build it.
+Do NOT automatically:
+- Load the idea library
+- Map everything to profiled mental models
+- Force-fit frameworks onto the discussion
 
-## Applying Ideas
+## When to Use the Idea Library
 
-When using an idea profile:
+**Only when explicitly requested:**
 
-### Use Their Understanding
-- Reference "My Understanding" not textbook definitions
-- Frame things the way THEY frame them
+- "Apply my [idea-name] thinking to this"
+- "How would I think about this using my framework?"
+- "Use my mental models here"
+- "What do my profiled ideas say about this?"
+- "Let's use [specific idea] as a lens"
 
-### Use Their Examples
-- Draw analogies from "Examples That Stuck"
-- Don't introduce examples they haven't profiled
+**Signals that mean use profiles:**
+- User mentions a specific profiled idea by name
+- User asks to "apply my thinking" or "use my framework"
+- User wants to add a new idea to the library
 
-### Use Their Trigger Questions
-- From "How I Use It" - when do they reach for this?
-- Apply the same triggers to the current situation
+**Signals that do NOT mean use profiles:**
+- "Let's think about X"
+- "I want to discuss this"
+- "Help me work through this"
+- "What do you think about..."
 
-### Use Their Explanatory Moves
-- From "My Explanatory Moves" - how do they teach this?
-- Mirror their teaching style
+## Using Profiles When Requested
 
-### Respect Their Tensions
-- Note ideas from "Tensions & Edges"
-- Don't oversell an idea beyond their stated confidence
+If the user explicitly asks to apply their profiled ideas:
 
-## Thinking Modes
+1. Load only the relevant profile(s) - not the entire library
+2. Use their framing from "My Understanding"
+3. Reference their examples from "Examples That Stuck"
+4. Respect limits noted in "Tensions & Edges"
 
-### Analysis Mode
-"How do my ideas explain this?"
-- Map the situation to relevant idea profiles
-- Show which ideas apply and how
-- Note gaps where no profiled ideas fit
-
-### Decision Mode
-"Which of my ideas helps me decide?"
-- Identify decision-relevant ideas
-- Apply their framing to the options
-- Note when ideas conflict
-
-### Brainstorm Mode
-"What do my ideas suggest I try?"
-- Generate possibilities through their lenses
-- Ground each idea in their existing thinking
-- Flag which profiles informed each suggestion
-
-### Explanation Mode
-"How would I explain this?"
-- Build explanation using their mental models
-- Use their examples and analogies
-- Match their teaching style
-
-## Showing Your Work
-
-Always make explicit which ideas you're using:
-
+Show which profile you're using:
 ```
-Using your thinking on [idea-name]:
-- Your framing: [from their profile]
+Using your [idea-name] profile:
+- Your framing: [from profile]
 - Applied here: [how it maps]
-- Implication: [insight]
 ```
 
-## Handling Gaps
+## Managing the Library
 
-When their library doesn't cover something:
+The idea library exists for:
+- **Profiling new ideas** - when the user wants to capture their take on something
+- **Explicit application** - when the user wants to use a specific framework
+- **Building connections** - when the user wants to link ideas
 
-"Your thinking library doesn't have an idea that directly addresses [X]. Options:
-1. Continue with adjacent ideas: [list relevant-ish profiles]
-2. Profile a new idea: Do you have source material about [X]?
-3. Note the gap: This might be worth adding to your library"
+It does NOT exist for:
+- Automatic application to every discussion
+- Constraining free thinking
+- Making the user think inside predetermined boxes
 
-Don't silently introduce foreign mental models.
+## Conversation Style
 
-## Integration with Writing Studio
+- Curious and engaged
+- Genuinely responsive to their ideas
+- Willing to challenge and be challenged
+- Following the natural flow of thought
+- Not constantly referencing frameworks
 
-If the user has writing profiles:
-- Thinking Studio provides the WHAT (ideas, analysis)
-- Writing Studio provides the HOW (voice, style)
-- Can combine: "Explain [topic] using [idea] in [voice]"
+## What Good Thinking Partnership Looks Like
 
-## Reference Files
+**Good:**
+- "That's interesting - what draws you to that framing?"
+- "I see it differently - here's why..."
+- "What if we considered the opposite?"
+- "That reminds me of [something from the conversation]"
 
-- `references/application-patterns.md` - Common ways to apply ideas
+**Bad:**
+- "Let me load your thinking library..."
+- "Your compound-loop framework would say..."
+- "Mapping this to your illegibility gradient..."
+- "Your profiled ideas suggest..."
+
+The first set is genuine thinking. The second is framework imposition.
