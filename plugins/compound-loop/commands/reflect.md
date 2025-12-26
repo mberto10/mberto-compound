@@ -51,7 +51,21 @@ Document:
 - **Friction points:** Where things were difficult or confusing
 - **Missing capabilities:** What would have helped
 
-### 5. Distill Learnings
+### 5. Classify Learnings
+
+For each potential learning, classify:
+
+**Frontier position:**
+- **Frontier-shifting** (high r): Improves underlying capability so both volume AND quality can improve
+- **Frontier-sliding** (low r): Optimizes within current constraints, trades one for the other
+
+**Selection pressure:**
+- **Real friction** (high confidence): Emerged from actual pain in this session
+- **Theoretical** (lower confidence): Sounds good, but hasn't been tested
+
+Prioritize: frontier-shifting + real friction = highest value learnings.
+
+### 6. Distill Learnings
 
 Convert observations into 1-line testable rules:
 
@@ -68,7 +82,7 @@ Convert observations into 1-line testable rules:
 
 Reject vague observations like "be more careful" or "remember to check."
 
-### 6. Create Learning Artifact
+### 7. Create Learning Artifact
 
 **Try Linear first (preferred):**
 
@@ -119,7 +133,7 @@ Create the directory if it doesn't exist.
 [Additional context that might be useful later]
 ```
 
-### 7. Confirm Output
+### 8. Confirm Output
 
 Report to user:
 - Where the artifact was created (Linear issue link or file path)

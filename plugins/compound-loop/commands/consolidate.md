@@ -68,6 +68,23 @@ Your decision: (a)pprove / (d)efer / (r)eject / (m)odify?
 
 Wait for user decision before proceeding to next.
 
+### 3b. Evolvability Review
+
+For each proposed change, assess:
+
+```
+**Evolvability Check:**
+- [ ] Modular: Can this skill/command change independently?
+- [ ] Loosely coupled: No hidden dependencies?
+- [ ] Adaptable: Does this make future changes easier?
+
+**Cross-Pollination Check:**
+- [ ] Could this apply to other plugins/domains?
+- [ ] Should this be a shared pattern instead?
+```
+
+If a change reduces evolvability, flag it in the recommendation. Sometimes worth it, but should be conscious.
+
 ### 4. Handle User Decision
 
 **Approve:** Proceed to implementation (Step 5)

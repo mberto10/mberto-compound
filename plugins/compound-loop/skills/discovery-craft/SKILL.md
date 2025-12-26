@@ -110,7 +110,21 @@ Examine what happened:
 - What should have happened automatically but didn't?
 - What could have been delegated to a specialist?
 
-### 2. Pattern Extraction
+### 2. Parallel Search (Optional)
+
+For complex pattern spaces, use parallel exploration. Evolution's power comes from testing many variants simultaneously.
+
+```
+Launch Task with subagent_type='Explore':
+"Find patterns similar to [X] in other parts of the codebase"
+
+Launch Task with subagent_type='Explore':
+"How do other plugins/tools solve [problem Y]?"
+```
+
+Go wide before deep. When you hit a problem, the instinct is to go deep on one approach. Evolution says: explore multiple approaches, then double down on what shows promise.
+
+### 3. Pattern Extraction
 
 For each pattern, document:
 
@@ -123,7 +137,7 @@ Outputs: What does it produce?
 Knowledge: What expertise is embedded?
 ```
 
-### 3. Component Type Selection
+### 4. Component Type Selection
 
 Apply the decision matrix:
 
@@ -144,7 +158,7 @@ Apply the decision matrix:
   → Design combination (e.g., command that uses skill and launches agents)
 ```
 
-### 4. Modularizability Assessment
+### 5. Modularizability Assessment
 
 | Criterion | Question |
 |-----------|----------|
@@ -154,7 +168,29 @@ Apply the decision matrix:
 | **Consistent** | Should it work the same way each time? |
 | **Value** | Is packaging worth the effort? |
 
-### 5. Specification Generation
+### 6. Exaptation Scan
+
+Features evolved for one purpose often get repurposed for another. For each discovered pattern:
+
+- Was this built for a specific use case?
+- Could it apply to unexpected domains?
+- Is there a more general pattern hiding here?
+
+Example: A Langfuse trace analysis pattern might generalize to any trace-based debugging. German email templates might inform any formal communication.
+
+Don't over-specialize. Look for the general capability.
+
+### 7. Recombination Opportunities
+
+Sexual reproduction accelerates evolution by mixing genes. Deliberate recombination of skills can create novel capabilities.
+
+- Could patterns from different plugins combine?
+- What would writing-studio + work-toolkit patterns produce?
+- Look for capabilities at intersections of domains.
+
+We can do this intentionally. Evolution does it by accident.
+
+### 8. Specification Generation
 
 Based on component type, generate the appropriate spec.
 

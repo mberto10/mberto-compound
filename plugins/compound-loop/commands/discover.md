@@ -42,6 +42,20 @@ Examine what happened:
 
 If user provided focus text, prioritize that area.
 
+### 2b. Parallel Exploration (Optional)
+
+For complex pattern spaces, launch parallel agents:
+
+```
+Launch Task with subagent_type='Explore':
+"Find patterns similar to [X] in other parts of the codebase"
+
+Launch Task with subagent_type='Explore':
+"How do other plugins/tools solve [problem Y]?"
+```
+
+Evolution's power is testing many variants simultaneously. Go wide before deep. Synthesize findings before pattern extraction.
+
 ### 3. Pattern Extraction
 
 For each potential pattern:

@@ -57,7 +57,23 @@ For each learning, present:
 
 Group by plugin for easier review when multiple learnings exist.
 
-### 3. Get Approval
+### 3. Evolvability & Cross-Pollination Check
+
+Before presenting for approval, evaluate each proposed change:
+
+**Evolvability Check:**
+- [ ] **Modular:** Can this skill/command change independently?
+- [ ] **Loosely coupled:** No hidden dependencies on other skills?
+- [ ] **Adaptable:** Does this make future changes easier or harder?
+
+If a change reduces evolvability, flag it. Sometimes worth it, but should be conscious.
+
+**Cross-Pollination Check:**
+- Could this learning apply to other plugins/domains?
+- Should we create a shared pattern instead of plugin-specific?
+- Is there a more general capability hiding in this specific learning?
+
+### 4. Get Approval
 
 For each learning, user can:
 - **Approve** - Implement the change
@@ -67,7 +83,7 @@ For each learning, user can:
 
 Wait for explicit approval before making changes. Never auto-implement.
 
-### 4. Implement Approved Changes
+### 5. Implement Approved Changes
 
 For approved learnings, implement based on type:
 
@@ -91,7 +107,7 @@ For approved learnings, implement based on type:
 - Add/remove directories
 - Modify plugin.json if needed
 
-### 5. Propose Changes with Reasoning
+### 6. Propose Changes with Reasoning
 
 Before implementing, present the specific change:
 
@@ -116,7 +132,7 @@ Adding explicit trigger phrases improves skill activation. The learning from 202
 **Approve this change? [y/n/modify]**
 ```
 
-### 6. Close the Loop
+### 7. Close the Loop
 
 After implementing approved changes:
 
@@ -128,7 +144,7 @@ After implementing approved changes:
 - Move processed file to `./compound-learnings/archived/`
 - Or delete if not needed for history
 
-### 7. Verify Implementation
+### 8. Verify Implementation
 
 After changes:
 - Confirm files were updated correctly

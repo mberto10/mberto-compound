@@ -68,6 +68,18 @@ Answer these questions:
 
 Load `references/compounding-methodology.md` for the full framework on what makes learning worth encoding and the heuristics format.
 
+**Frontier Check:** For each potential learning, ask:
+- Does this shift the frontier (improves underlying capability so both volume AND quality can improve)?
+- Or does this slide along the frontier (trades one for the other)?
+
+Prioritize frontier-shifting learnings. They have higher r.
+
+**Selection Pressure Check:**
+- Did this learning emerge from actual friction? (High confidence — real selection pressure)
+- Or is this a theoretical improvement? (Lower confidence — test before encoding)
+
+Evolution never fools itself. Prioritize learnings from real pain over elegant theories.
+
 Convert observations into 1-line testable rules:
 
 **Format:**
