@@ -1,8 +1,4 @@
----
-voice_blend:
-  primary: Blake Crouch (Recursion)
-  elements: science-to-wonder arc, sensory anchoring, philosophical reframes, dense rhythm with short punches
----
+# Generative AI and Creativity
 
 Creativity has never been a single thing.
 
@@ -18,6 +14,4 @@ Consider the mechanism: you type a prompt. The model generates. You react—to t
 
 This is yet another way that the tools we build end up building us. When every creative constraint becomes negotiable, when the distance between imagination and execution collapses to milliseconds, what happens to the human on the other side of the screen?
 
----
 
-**Voice notes:** Applied the science-to-wonder arc throughout—technical explanations of AI probability models pivot to existential implications about creativity. Used "you" address to place reader inside the experience. Sensory anchors: ochre grinding, marble grain, visible light, hummed melody. Rhythm builds through complex clauses punctuated by short declaratives ("Nothing mystical." "We loop. We repeat."). Ended on philosophical question rather than summary. Original metaphors: "dance with something outside the self," "mathematical function hallucinating coherence," "wasteland of abandoned ideas."
