@@ -1,0 +1,147 @@
+{
+  "name": "mberto-compound",
+  "owner": {
+    "name": "Maximilian Bruhn",
+    "email": "puzzle.ai.studio@gmail.com"
+  },
+  "metadata": {
+    "description": "Personal collection of Claude Code plugins, commands, and configurations",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "mberto-core",
+      "source": "./mberto-core",
+      "description": "Core infrastructure with standard MCP servers (Linear, Context7, Langfuse) for quick project setup",
+      "version": "1.0.0",
+      "author": {
+        "name": "Maximilian Bruhn",
+        "email": "puzzle.ai.studio@gmail.com"
+      },
+      "homepage": "https://github.com/mberto10/mberto-compound",
+      "repository": "https://github.com/mberto10/mberto-compound",
+      "license": "MIT",
+      "keywords": ["core", "mcp", "infrastructure", "linear", "context7", "langfuse"],
+      "category": "infrastructure"
+    },
+    {
+      "name": "example-plugin",
+      "source": "./example-plugin",
+      "description": "Example plugin demonstrating the structure for commands, agents, skills, and hooks",
+      "version": "1.0.0",
+      "author": {
+        "name": "Maximilian Bruhn",
+        "email": "puzzle.ai.studio@gmail.com"
+      },
+      "homepage": "https://github.com/mberto10/mberto-compound",
+      "repository": "https://github.com/mberto10/mberto-compound",
+      "license": "MIT",
+      "keywords": ["example", "template"],
+      "category": "utility"
+    },
+    {
+      "name": "langfuse-analyzer",
+      "source": "./langfuse-analyzer",
+      "description": "Surgical Langfuse trace retrieval with multiple output modes for LLM-friendly debugging and optimization workflows",
+      "version": "0.1.0",
+      "author": {
+        "name": "Writing Ecosystem Team"
+      },
+      "homepage": "https://github.com/mberto10/mberto-compound",
+      "repository": "https://github.com/mberto10/mberto-compound",
+      "license": "MIT",
+      "keywords": ["langfuse", "tracing", "debugging", "observability", "optimization"],
+      "category": "observability"
+    },
+    {
+      "name": "langdock-dev",
+      "source": "./langdock-dev",
+      "description": "Build Langdock integration actions and use Langdock APIs with live documentation fetching",
+      "version": "0.1.0",
+      "author": {
+        "name": "Maximilian Bruhn",
+        "email": "puzzle.ai.studio@gmail.com"
+      },
+      "homepage": "https://github.com/mberto10/mberto-compound",
+      "repository": "https://github.com/mberto10/mberto-compound",
+      "license": "MIT",
+      "keywords": ["langdock", "integrations", "actions", "api", "development"],
+      "category": "development"
+    },
+    {
+      "name": "writing-studio",
+      "source": "./writing-studio",
+      "description": "Comprehensive writing assistant with style learning, brainstorming, planning, drafting, and editing workflows that maintain your personal voice",
+      "version": "1.0.0",
+      "author": {
+        "name": "Maximilian Bruhn",
+        "email": "puzzle.ai.studio@gmail.com"
+      },
+      "homepage": "https://github.com/mberto10/mberto-compound",
+      "repository": "https://github.com/mberto10/mberto-compound",
+      "license": "MIT",
+      "keywords": ["writing", "style", "drafting", "editing", "brainstorming", "content", "workflow"],
+      "category": "writing"
+    },
+    {
+      "name": "work-toolkit",
+      "source": "./work-toolkit",
+      "description": "Personal management plugin for daily planning with Linear, German business communication, and YouTrack documentation",
+      "version": "0.1.0",
+      "author": {
+        "name": "Maximilian Bruhn",
+        "email": "puzzle.ai.studio@gmail.com"
+      },
+      "homepage": "https://github.com/mberto10/mberto-compound",
+      "repository": "https://github.com/mberto10/mberto-compound",
+      "license": "MIT",
+      "keywords": ["productivity", "planning", "linear", "youtrack", "communication", "german", "documentation"],
+      "category": "productivity"
+    },
+    {
+      "name": "thinking-studio",
+      "source": "./thinking-studio",
+      "description": "Personal thinking patterns and resonant ideas - your mental model fingerprint",
+      "version": "0.1.0",
+      "author": {
+        "name": "Maximilian Bruhn",
+        "email": "puzzle.ai.studio@gmail.com"
+      },
+      "homepage": "https://github.com/mberto10/mberto-compound",
+      "repository": "https://github.com/mberto10/mberto-compound",
+      "license": "MIT",
+      "keywords": ["thinking", "mental-models", "ideas", "patterns", "personal"],
+      "category": "personal"
+    },
+    {
+      "name": "openai-apps-sdk",
+      "source": "./openai-apps-sdk",
+      "description": "Comprehensive toolkit for building MCP servers with the OpenAI Apps SDK. Provides skills, commands, and agents for creating ChatGPT apps with Python and TypeScript.",
+      "version": "0.1.0",
+      "author": {
+        "name": "Maximilian Bruhn",
+        "email": "puzzle.ai.studio@gmail.com"
+      },
+      "homepage": "https://github.com/mberto10/mberto-compound",
+      "repository": "https://github.com/mberto10/mberto-compound",
+      "license": "MIT",
+      "keywords": ["openai", "apps-sdk", "mcp", "model-context-protocol", "chatgpt", "mcp-server", "widgets"],
+      "category": "development"
+    },
+    {
+      "name": "compound-loop",
+      "source": "./compound-loop",
+      "description": "Structured feedback loop for capturing learnings from plugin usage anywhere and consolidating them into improvements",
+      "version": "0.1.0",
+      "author": {
+        "name": "Maximilian Bruhn",
+        "email": "puzzle.ai.studio@gmail.com"
+      },
+      "homepage": "https://github.com/mberto10/mberto-compound",
+      "repository": "https://github.com/mberto10/mberto-compound",
+      "license": "MIT",
+      "keywords": ["compounding", "feedback-loop", "learning", "meta", "self-improvement"],
+      "category": "meta"
+    }
+  ]
+}
