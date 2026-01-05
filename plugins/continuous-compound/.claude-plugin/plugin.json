@@ -1,0 +1,9 @@
+{
+  "name": "continuous-compound",
+  "version": "1.0.0",
+  "description": "Long-running agent continuity via Linear + compound loop learning extraction",
+  "author": {
+    "name": "Maximilian Bruhn"
+  },
+  "keywords": ["linear", "continuity", "compound-loop", "long-running-tasks"]
+}

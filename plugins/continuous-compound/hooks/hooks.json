@@ -1,0 +1,69 @@
+{
+  "description": "Long-running agent continuity via Linear",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "mcp__linear-server__update_issue",
+        "hooks": [
+          {
+            "type": "prompt",
+            "prompt": "BLOCKED: You are attempting to update a Linear issue.\n\nIf you are marking this issue as Done:\n1. List EVERY acceptance criterion from the issue description\n2. For each criterion, state: '✅ Completed: [evidence]' or '❌ Not completed'\n3. If ANY criterion is not completed, DO NOT mark as Done\n\nOnly proceed if ALL criteria are verified complete with evidence."
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "mcp__linear-server__get_issue",
+        "hooks": [
+          {
+            "type": "prompt",
+            "prompt": "STOP. You just retrieved a Linear issue.\n\nBefore proceeding:\n1. Read ALL acceptance criteria in the description\n2. Compare your planned approach to the MANDATORY PROCESS in the project ledger (if present)\n3. State explicitly: 'My approach: [X]. This matches criteria because [Y].'\n4. If your approach skips any required step, STOP and correct it\n\nDo NOT proceed until you have verified alignment."
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__linear-server__update_project",
+        "hooks": [
+          {
+            "type": "prompt",
+            "prompt": "You just updated a Linear project.\n\nIf you set the project state to Completed:\n⚠️ You MUST output the marker [PROJECT_COMPLETE] on its own line.\nThis triggers the Stop hook for compound discovery.\n\nWithout the literal marker, the hook cannot detect completion."
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo \"[$(date)] SessionStart hook fired\" >> /tmp/claude-hooks-debug.log && bash ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/linear-load-context.sh",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo \"[$(date)] Stop hook fired\" >> /tmp/claude-hooks-debug.log && bash ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/milestone-detector.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo \"[$(date)] PreCompact hook fired\" >> /tmp/claude-hooks-debug.log && bash ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/linear-save-state.sh",
+            "timeout": 60
+          }
+        ]
+      }
+    ]
+  }
+}
