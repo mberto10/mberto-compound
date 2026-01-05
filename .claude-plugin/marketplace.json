@@ -25,21 +25,6 @@
       "category": "infrastructure"
     },
     {
-      "name": "example-plugin",
-      "source": "./plugins/example-plugin",
-      "description": "Example plugin demonstrating the structure for commands, agents, skills, and hooks",
-      "version": "1.0.0",
-      "author": {
-        "name": "Maximilian Bruhn",
-        "email": "puzzle.ai.studio@gmail.com"
-      },
-      "homepage": "https://github.com/mberto10/mberto-compound",
-      "repository": "https://github.com/mberto10/mberto-compound",
-      "license": "MIT",
-      "keywords": ["example", "template"],
-      "category": "utility"
-    },
-    {
       "name": "langfuse-analyzer",
       "source": "./plugins/langfuse-analyzer",
       "description": "Surgical Langfuse trace retrieval with multiple output modes for LLM-friendly debugging and optimization workflows",
@@ -142,6 +127,36 @@
       "license": "MIT",
       "keywords": ["compounding", "feedback-loop", "learning", "meta", "self-improvement"],
       "category": "meta"
+    },
+    {
+      "name": "continuous-compound",
+      "source": "./plugins/continuous-compound",
+      "description": "Long-running agent continuity via Linear + compound loop learning extraction",
+      "version": "1.0.0",
+      "author": {
+        "name": "Maximilian Bruhn",
+        "email": "puzzle.ai.studio@gmail.com"
+      },
+      "homepage": "https://github.com/mberto10/mberto-compound",
+      "repository": "https://github.com/mberto10/mberto-compound",
+      "license": "MIT",
+      "keywords": ["linear", "continuity", "compound-loop", "long-running-tasks"],
+      "category": "productivity"
+    },
+    {
+      "name": "daily-metrics",
+      "source": "./plugins/daily-metrics",
+      "description": "Personal tracking and goal management system with Supabase integration",
+      "version": "0.1.0",
+      "author": {
+        "name": "Maximilian Bruhn",
+        "email": "puzzle.ai.studio@gmail.com"
+      },
+      "homepage": "https://github.com/mberto10/mberto-compound",
+      "repository": "https://github.com/mberto10/mberto-compound",
+      "license": "MIT",
+      "keywords": ["habits", "tracking", "goals", "metrics", "personal-development"],
+      "category": "personal"
     }
   ]
 }
