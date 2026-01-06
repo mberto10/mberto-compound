@@ -1,7 +1,7 @@
 {
   "name": "langfuse-analyzer",
-  "version": "0.5.0",
-  "description": "Complete Langfuse toolkit for instrumentation setup, trace analysis, prompt management, dataset curation, experiment evaluation, score analytics, session analysis, and human annotation",
+  "version": "0.7.0",
+  "description": "Complete Langfuse toolkit for AI agent engineering: instrumentation, trace analysis, prompt management, dataset curation, experiments, evaluations, and expert optimization advice",
   "author": {
     "name": "Mberto"
   },

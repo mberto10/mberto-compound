@@ -1,11 +1,13 @@
 ---
 name: langfuse-experiment-runner
-description: This skill should be used when the user asks to "run experiment", "evaluate dataset", "test prompts on dataset", "compare experiment runs", "analyze experiment results", or needs to execute and analyze experiments on Langfuse datasets with custom evaluators.
+description: This skill should be used when the user asks to "run experiment", "evaluate dataset", "test prompts on dataset", "compare experiment runs", "analyze experiment results", "use langfuse judges", or needs to execute and analyze experiments on Langfuse datasets with LLM-as-judge evaluators stored in Langfuse.
 ---
 
 # Langfuse Experiment Runner
 
-Run experiments on datasets with custom task and evaluator scripts. Analyze results and compare runs.
+Run experiments on datasets with evaluators stored in Langfuse or custom scripts. Analyze results and compare runs.
+
+**Key Feature:** Judge prompts can be stored in Langfuse for versioning and reuse across experiments.
 
 ## When to Use
 
@@ -19,7 +21,44 @@ Run experiments on datasets with custom task and evaluator scripts. Analyze resu
 
 ### Run Experiment
 
-Execute a task on every item in a dataset with optional evaluators:
+Execute a task on every item in a dataset with evaluators.
+
+#### Using Langfuse Judges (Recommended)
+
+Store judge prompts in Langfuse for versioning and reuse:
+
+```bash
+# Auto-discover all judge-* prompts in Langfuse
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/experiment-runner/helpers/experiment_runner.py \
+  run \
+  --dataset "my-regression-tests" \
+  --run-name "v2.1-test" \
+  --task-script /path/to/my_task.py \
+  --use-langfuse-judges
+
+# Or specify which judges to use
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/experiment-runner/helpers/experiment_runner.py \
+  run \
+  --dataset "my-regression-tests" \
+  --run-name "v2.1-test" \
+  --task-script /path/to/my_task.py \
+  --judges judge-accuracy judge-helpfulness
+```
+
+**How it works:**
+1. Judge prompts are stored in Langfuse (created via `/setup-dataset` or prompt-management)
+2. Prompts use `{{input}}`, `{{output}}`, `{{expected_output}}` placeholders
+3. Prompts return JSON: `{"score": 0-10, "reasoning": "..."}`
+4. The experiment runner loads prompts and creates evaluators automatically
+
+**Judge discovery order:**
+1. If `--judges` specified, use those exact prompt names
+2. If dataset has `judge_prompts` in metadata, use those
+3. Otherwise, auto-discover all prompts starting with `judge-`
+
+#### Using Local Evaluator Scripts
+
+For custom evaluation logic not suited for LLM judges:
 
 ```bash
 python3 ${CLAUDE_PLUGIN_ROOT}/skills/experiment-runner/helpers/experiment_runner.py \
@@ -31,13 +70,25 @@ python3 ${CLAUDE_PLUGIN_ROOT}/skills/experiment-runner/helpers/experiment_runner
   --max-concurrency 5
 ```
 
-**Required:**
-- `--dataset` - Name of the Langfuse dataset
-- `--run-name` - Unique name for this run
-- `--task-script` - Python script with `task()` function
+#### Combined: Both Langfuse Judges and Local Evaluators
 
-**Optional:**
-- `--evaluator-script` - Python script with evaluator functions
+```bash
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/experiment-runner/helpers/experiment_runner.py \
+  run \
+  --dataset "my-regression-tests" \
+  --run-name "v2.1-test" \
+  --task-script /path/to/my_task.py \
+  --use-langfuse-judges \
+  --evaluator-script /path/to/custom_checks.py
+```
+
+**Arguments:**
+- `--dataset` - Name of the Langfuse dataset (required)
+- `--run-name` - Unique name for this run (required)
+- `--task-script` - Python script with `task()` function (required)
+- `--use-langfuse-judges` - Auto-discover and use judge prompts from Langfuse
+- `--judges` - Specific Langfuse judge prompt names to use
+- `--evaluator-script` - Local Python script with evaluator functions
 - `--max-concurrency` - Parallel executions (default: 5)
 - `--description` - Run description
 

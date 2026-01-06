@@ -3,9 +3,17 @@
 Langfuse Experiment Runner
 
 Run experiments on datasets with custom evaluators and analyze results.
+Supports both local evaluator scripts and Langfuse-stored judge prompts.
 
 USAGE:
-    python experiment_runner.py run --dataset "my-tests" --run-name "v1" --task-script task.py
+    # With local evaluator script
+    python experiment_runner.py run --dataset "my-tests" --run-name "v1" --task-script task.py --evaluator-script evals.py
+
+    # With Langfuse judge prompts (recommended)
+    python experiment_runner.py run --dataset "my-tests" --run-name "v1" --task-script task.py --use-langfuse-judges
+    python experiment_runner.py run --dataset "my-tests" --run-name "v1" --task-script task.py --judges judge-accuracy judge-helpfulness
+
+    # Other commands
     python experiment_runner.py list-runs --dataset "my-tests"
     python experiment_runner.py get-run --dataset "my-tests" --run-name "v1"
     python experiment_runner.py compare --dataset "my-tests" --runs "v1" "v2"
@@ -15,6 +23,7 @@ USAGE:
 import argparse
 import importlib.util
 import json
+import re
 import sys
 from pathlib import Path
 from typing import Optional, List, Dict, Any, Callable
@@ -23,6 +32,159 @@ from datetime import datetime
 # Add parent directories to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "data-retrieval" / "helpers"))
 from langfuse_client import get_langfuse_client
+
+
+def create_langfuse_judge_evaluator(prompt_name: str, client) -> Callable:
+    """
+    Create an evaluator function from a Langfuse prompt.
+
+    The prompt should use {{input}}, {{output}}, and optionally {{expected_output}} placeholders.
+    It should return JSON with {"score": <0-10>, "reasoning": "<explanation>"}.
+    """
+    try:
+        from langfuse import Evaluation
+        from openai import OpenAI
+    except ImportError as e:
+        raise ImportError(f"Required packages not installed: {e}")
+
+    # Fetch the prompt from Langfuse
+    prompt_obj = client.get_prompt(prompt_name, label="production")
+    if not prompt_obj:
+        raise ValueError(f"Judge prompt '{prompt_name}' not found in Langfuse")
+
+    prompt_template = prompt_obj.prompt
+    config = prompt_obj.config or {}
+    model = config.get("model", "gpt-4o")
+    temperature = config.get("temperature", 0)
+    max_tokens = config.get("max_tokens", 150)
+
+    # Extract score name from prompt name (e.g., "judge-accuracy" -> "accuracy")
+    score_name = prompt_name.replace("judge-", "").replace("_", "-")
+
+    def evaluator(*, input, output, expected_output=None, **kwargs) -> "Evaluation":
+        """Evaluator generated from Langfuse prompt: {prompt_name}"""
+        openai_client = OpenAI()
+
+        # Fill in the template
+        filled_prompt = prompt_template
+        filled_prompt = filled_prompt.replace("{{input}}", str(input) if input else "")
+        filled_prompt = filled_prompt.replace("{{output}}", str(output) if output else "")
+        filled_prompt = filled_prompt.replace(
+            "{{expected_output}}",
+            str(expected_output) if expected_output else "Not provided"
+        )
+
+        try:
+            response = openai_client.chat.completions.create(
+                model=model,
+                messages=[
+                    {"role": "system", "content": "You are an evaluation judge. Follow the instructions exactly."},
+                    {"role": "user", "content": filled_prompt}
+                ],
+                temperature=temperature,
+                max_tokens=max_tokens
+            )
+
+            result_text = response.choices[0].message.content.strip()
+
+            # Try to parse JSON response
+            try:
+                # Find JSON in response
+                json_match = re.search(r'\{[^}]+\}', result_text)
+                if json_match:
+                    result = json.loads(json_match.group())
+                    score = float(result.get("score", 0)) / 10.0  # Normalize to 0-1
+                    score = max(0.0, min(1.0, score))
+                    reasoning = result.get("reasoning", "")
+                    return Evaluation(name=score_name, value=score, comment=reasoning)
+            except (json.JSONDecodeError, ValueError):
+                pass
+
+            # Fallback: try to extract just a number
+            numbers = re.findall(r'\b(\d+(?:\.\d+)?)\b', result_text)
+            if numbers:
+                score = float(numbers[0]) / 10.0
+                score = max(0.0, min(1.0, score))
+                return Evaluation(name=score_name, value=score, comment=result_text[:100])
+
+            # If all parsing fails, return 0
+            return Evaluation(name=score_name, value=0.0, comment=f"Failed to parse: {result_text[:100]}")
+
+        except Exception as e:
+            return Evaluation(name=score_name, value=0.0, comment=f"Error: {str(e)[:100]}")
+
+    # Set a meaningful name for the function
+    evaluator.__name__ = f"judge_{score_name}"
+    evaluator.__doc__ = f"Evaluator generated from Langfuse prompt: {prompt_name}"
+
+    return evaluator
+
+
+def load_langfuse_judges(
+    client,
+    judge_names: Optional[List[str]] = None,
+    dataset_name: Optional[str] = None
+) -> List[Callable]:
+    """
+    Load judge evaluators from Langfuse prompts.
+
+    If judge_names is provided, load those specific judges.
+    If dataset_name is provided, try to get judge names from dataset metadata.
+    Otherwise, auto-discover prompts starting with "judge-".
+    """
+    evaluators = []
+
+    # Option 1: Explicit judge names provided
+    if judge_names:
+        for name in judge_names:
+            try:
+                evaluator = create_langfuse_judge_evaluator(name, client)
+                evaluators.append(evaluator)
+                print(f"Loaded judge: {name}", file=sys.stderr)
+            except Exception as e:
+                print(f"Warning: Failed to load judge '{name}': {e}", file=sys.stderr)
+        return evaluators
+
+    # Option 2: Get from dataset metadata
+    if dataset_name:
+        try:
+            dataset = client.get_dataset(dataset_name)
+            if dataset and hasattr(dataset, 'metadata') and dataset.metadata:
+                metadata = dataset.metadata
+                if 'judge_prompts' in metadata:
+                    for name in metadata['judge_prompts']:
+                        try:
+                            evaluator = create_langfuse_judge_evaluator(name, client)
+                            evaluators.append(evaluator)
+                            print(f"Loaded judge from dataset metadata: {name}", file=sys.stderr)
+                        except Exception as e:
+                            print(f"Warning: Failed to load judge '{name}': {e}", file=sys.stderr)
+                    if evaluators:
+                        return evaluators
+        except Exception as e:
+            print(f"Warning: Could not read dataset metadata: {e}", file=sys.stderr)
+
+    # Option 3: Auto-discover judge prompts
+    # List all prompts and find ones starting with "judge-"
+    try:
+        prompts = client.get_prompts()
+        if prompts:
+            for prompt in prompts:
+                name = prompt.name if hasattr(prompt, 'name') else str(prompt)
+                if name.startswith("judge-"):
+                    try:
+                        evaluator = create_langfuse_judge_evaluator(name, client)
+                        evaluators.append(evaluator)
+                        print(f"Auto-discovered judge: {name}", file=sys.stderr)
+                    except Exception as e:
+                        print(f"Warning: Failed to load judge '{name}': {e}", file=sys.stderr)
+    except Exception as e:
+        print(f"Warning: Could not auto-discover judges: {e}", file=sys.stderr)
+
+    if not evaluators:
+        print("Warning: No Langfuse judges found. Create prompts starting with 'judge-'.", file=sys.stderr)
+
+    return evaluators
 
 
 def load_module_from_path(script_path: str, module_name: str):
@@ -92,21 +254,43 @@ def run_experiment(
     run_name: str,
     task_script: str,
     evaluator_script: Optional[str] = None,
+    use_langfuse_judges: bool = False,
+    judge_names: Optional[List[str]] = None,
     max_concurrency: int = 5,
     run_description: Optional[str] = None,
     metadata: Optional[Dict[str, Any]] = None
 ) -> Dict[str, Any]:
-    """Run an experiment on a dataset with custom task and evaluators."""
+    """Run an experiment on a dataset with custom task and evaluators.
+
+    Evaluators can come from:
+    1. Local script file (--evaluator-script)
+    2. Langfuse prompts (--use-langfuse-judges or --judges)
+
+    Langfuse judges are prompts named 'judge-*' that define LLM-as-judge evaluation.
+    """
     client = get_langfuse_client()
 
     try:
         # Load task function
         task_fn = load_task(task_script)
 
-        # Load evaluators if provided
+        # Load evaluators
         evaluators = []
+
+        # Option 1: Load from local script
         if evaluator_script:
             evaluators = load_evaluators(evaluator_script)
+            print(f"Loaded {len(evaluators)} evaluators from script", file=sys.stderr)
+
+        # Option 2: Load from Langfuse judge prompts
+        if use_langfuse_judges or judge_names:
+            langfuse_evaluators = load_langfuse_judges(
+                client,
+                judge_names=judge_names,
+                dataset_name=dataset_name
+            )
+            evaluators.extend(langfuse_evaluators)
+            print(f"Loaded {len(langfuse_evaluators)} Langfuse judges", file=sys.stderr)
 
         # Get dataset
         dataset = client.get_dataset(dataset_name)
@@ -542,6 +726,10 @@ def main():
                            help="Path to Python script with task() function")
     run_parser.add_argument("--evaluator-script",
                            help="Path to Python script with evaluator functions")
+    run_parser.add_argument("--use-langfuse-judges", action="store_true",
+                           help="Use judge prompts stored in Langfuse (auto-discovers 'judge-*' prompts)")
+    run_parser.add_argument("--judges", nargs="+",
+                           help="Specific Langfuse judge prompt names to use (e.g., judge-accuracy judge-helpfulness)")
     run_parser.add_argument("--max-concurrency", type=int, default=5,
                            help="Maximum concurrent executions (default: 5)")
     run_parser.add_argument("--description", help="Run description")
@@ -578,6 +766,8 @@ def main():
             args.run_name,
             args.task_script,
             evaluator_script=args.evaluator_script,
+            use_langfuse_judges=args.use_langfuse_judges,
+            judge_names=args.judges,
             max_concurrency=args.max_concurrency,
             run_description=args.description
         )
