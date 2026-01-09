@@ -1,0 +1,43 @@
+---
+# Product Context for UX Evaluation
+# Copy this file to .claude/ux-evaluator.local.md and fill in your values
+
+product_name: "Your Product Name"
+value_proposition: "Brief description of the core problem your product solves"
+target_user: "Description of your primary user persona"
+core_loop: "The main workflow users repeat (e.g., 'Create post → Review → Publish')"
+success_metrics: "How you measure success (e.g., 'Time to first published content')"
+dev_server_url: "http://localhost:3000"
+---
+
+# Additional Product Context
+
+Add any additional context that would help with UX evaluation:
+
+## Key User Goals
+
+1. [Primary goal users are trying to accomplish]
+2. [Secondary goal]
+3. [Tertiary goal]
+
+## Known Pain Points
+
+- [Any existing UX issues you're aware of]
+- [Areas you want special focus on]
+
+## Brand Voice
+
+- Tone: [Professional, casual, playful, etc.]
+- Key words to use: [...]
+- Words to avoid: [...]
+
+## Design System Notes
+
+- Primary colors: [#hex]
+- Font family: [font name]
+- Component library: [if applicable]
+
+## Recent Changes
+
+- [Any recent changes that might affect UX]
+- [Features in development]

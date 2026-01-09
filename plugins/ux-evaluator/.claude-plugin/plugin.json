@@ -1,0 +1,9 @@
+{
+  "name": "ux-evaluator",
+  "version": "0.1.0",
+  "description": "Frontend UX evaluation using User Lifecycle Framework and Playwright browser automation",
+  "author": {
+    "name": "Dispatch Team"
+  },
+  "keywords": ["ux", "frontend", "evaluation", "playwright", "user-lifecycle", "testing"]
+}
