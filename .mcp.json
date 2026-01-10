@@ -3,6 +3,17 @@
     "supabase": {
       "type": "http",
       "url": "https://mcp.supabase.com/mcp?project_ref=ezwdpxbbqmsqqmafqxpw"
+    },
+    "obsidian": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "/Users/maximilianbruhn/obsidian-mcp-server.js"
+      ],
+      "env": {
+        "OBSIDIAN_URL": "http://localhost:27123",
+        "OBSIDIAN_API_KEY": "${OBSIDIAN_API_KEY}"
+      }
     }
   }
 }
