@@ -287,6 +287,11 @@ dev_server_url: "http://localhost:3000"
 - Improvement layer categorization
 - Intent derivation from product concepts
 
+`backend-readiness-framework` - Backend production readiness knowledge including:
+- Infrastructure reality validation
+- Security, performance, reliability, observability, and data integrity layers
+- Scoring guidance and report templates
+
 ## Output Examples
 
 ### UX Evaluation Report
@@ -360,6 +365,12 @@ ux-evaluator/
 │           ├── failure-patterns.md
 │           ├── improvement-layers.md
 │           └── intent-derivation.md
+│   └── backend-readiness-framework/
+│       ├── SKILL.md
+│       └── references/
+│           ├── layer-checklists.md
+│           ├── report-template.md
+│           └── scoring-guidance.md
 ├── examples/
 │   └── ux-evaluator.local.md.example
 └── README.md

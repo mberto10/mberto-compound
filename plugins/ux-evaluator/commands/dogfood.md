@@ -6,7 +6,7 @@ allowed-tools: Read, Glob, Grep, AskUserQuestion, Task, mcp__playwright__*, mcp_
 
 # Dogfood Command
 
-Experience the product as a real user would, investigate technical issues, and verify infrastructure is actually connected.
+Experience the product as a real user would, investigate technical issues, and verify backend readiness is production-ready.
 
 ## Three-Stage Evaluation
 
@@ -25,11 +25,11 @@ Stage 2: TECHNICAL DEBUGGER (Developer Perspective)
                  Technical Analysis
                            │
                            ▼
-Stage 3: INFRASTRUCTURE AUDITOR (Backend Verification)
-        "Is the backend actually implemented or just UI facades?"
+Stage 3: BACKEND READINESS AUDITOR (Backend Verification)
+        "Is the backend real, secure, reliable, and observable?"
                            │
                            ▼
-               Infrastructure Audit
+               Backend Readiness Audit
 ```
 
 ## Step 1: Gather Inputs
@@ -51,8 +51,8 @@ Options:
 Default: http://localhost:3000
 
 **Question 4:** "What evaluation depth do you need?"
-- Full evaluation - UX + Code + Infrastructure (Recommended)
-- UX + Code - Skip infrastructure audit
+- Full evaluation - UX + Code + Backend Readiness (Recommended)
+- UX + Code - Skip backend readiness audit
 - UX only - Quick experience check
 
 ## Step 2: Load Product Concept
@@ -117,7 +117,7 @@ Save your analysis to: technical-analysis-[flow].md
 
 Wait for technical-debugger to complete.
 
-## Step 6: Launch Infrastructure Auditor (If Selected)
+## Step 6: Launch Backend Readiness Auditor (If Selected)
 
 If user selected "Full evaluation":
 
@@ -130,18 +130,19 @@ Previous Reports:
 - Experience Report: [path]
 - Technical Analysis: [path]
 
-Your mission: Verify that the backend infrastructure is actually implemented.
+Your mission: Verify backend production readiness across all layers.
 
 Check:
-1. DATABASE: Are tables/collections created? Is data persisting?
-2. AUTH: Does signup actually create user records in YOUR database?
-3. APIs: Do endpoints return real data or mocks/stubs?
-4. INTEGRATIONS: Are external services (Supabase, Stripe, etc.) connected?
-5. STATE: Is localStorage the only "database"? What survives a refresh?
+1. INFRASTRUCTURE REALITY: Are tables/collections created? Is data persisting?
+2. SECURITY READINESS: Are authz, validation, and secrets handled properly?
+3. PERFORMANCE & SCALABILITY: Are latency and query patterns acceptable?
+4. RELIABILITY & RESILIENCE: Are retries, timeouts, and fallbacks in place?
+5. OBSERVABILITY & OPERABILITY: Are logs/metrics/traces and health checks present?
+6. DATA INTEGRITY & LIFECYCLE: Are migrations, backups, and idempotency handled?
 
-Key question: If a user goes through this flow, what actually gets saved vs. what disappears?
+Key question: If a user goes through this flow, what actually gets saved and kept safe vs. what disappears or fails under load?
 
-Save your audit to: infrastructure-audit-[flow].md
+Save your audit to: backend-readiness-audit-[flow].md
 ```
 
 Wait for infrastructure-auditor to complete.
@@ -158,7 +159,7 @@ If yes:
 4. Create issues organized by category:
    - **UX Issues** (from dogfooding report) - label: `ux`, `dogfooding`
    - **Code Issues** (from technical analysis) - label: `bug`, `dogfooding`
-   - **Infrastructure Gaps** (from audit) - label: `infrastructure`, `dogfooding`
+   - **Backend Readiness Gaps** (from audit) - label: `infrastructure`, `dogfooding`
 
 ## Step 8: Final Summary
 
@@ -178,7 +179,7 @@ PRODUCTION READINESS ASSESSMENT
 ├─────────────────┼────────┤
 │ User Experience │ [X]%   │
 │ Code Quality    │ [X]%   │
-│ Infrastructure  │ [X]%   │
+│ Backend Readiness │ [X]% │
 ├─────────────────┼────────┤
 │ OVERALL         │ [X]%   │
 └─────────────────┴────────┘
@@ -187,24 +188,26 @@ FINDINGS BY LAYER
 ─────────────────
 UX Issues:           [N] (Critical: X, High: X, Medium: X, Low: X)
 Code Issues:         [N] (Critical: X, High: X, Medium: X, Low: X)
-Infrastructure Gaps: [N] (Critical: X, High: X, Medium: X, Low: X)
+Backend Readiness Gaps: [N] (Critical: X, High: X, Medium: X, Low: X)
 
-INFRASTRUCTURE STATUS
+BACKEND READINESS STATUS
 ─────────────────────
-Database:      [Connected/Partial/Missing]
-Auth Persist:  [Connected/Partial/Missing]
-API Endpoints: [Real/Stubbed/Missing]
-Integrations:  [Connected/Partial/Missing]
+Infrastructure Reality: [Connected/Partial/Missing]
+Security:              [Pass/Partial/Fail]
+Performance:           [Pass/Partial/Fail]
+Reliability:           [Pass/Partial/Fail]
+Observability:         [Pass/Partial/Fail]
+Data Integrity:        [Pass/Partial/Fail]
 
 REPORTS GENERATED
 ─────────────────
 • Experience Report:    [path]
 • Technical Analysis:   [path]
-• Infrastructure Audit: [path]
+• Backend Readiness Audit: [path]
 
 TOP PRIORITIES
 ──────────────
-1. [Most critical infrastructure gap - nothing works without this]
+1. [Most critical backend readiness gap - nothing works without this]
 2. [Highest impact UX fix]
 3. [Critical code issue]
 
