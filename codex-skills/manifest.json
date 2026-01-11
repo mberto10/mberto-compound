@@ -1,0 +1,16 @@
+{
+  "skills": [
+    {
+      "name": "skill-template",
+      "path": "codex-skills/skill-template",
+      "version": "0.1.0",
+      "description": "Starter template for new Codex skills"
+    },
+    {
+      "name": "alpha-production-readiness-trace",
+      "path": "codex-skills/alpha-production-readiness-trace",
+      "version": "0.1.0",
+      "description": "Production readiness evaluation for alpha via UI-to-backend tracing and gap reporting"
+    }
+  ]
+}
