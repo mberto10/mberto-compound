@@ -321,6 +321,11 @@ Plugin: [where it goes]
 ═══════════════════════════════════════════════════════════════
 ```
 
+## Outputs
+
+- A discovery artifact (Linear issue or `./compound-discoveries/YYYY-MM-DD-HHMMSS-[name].md`).
+- A prioritized component specification ready for implementation.
+
 ## Prompting for Depth
 
 If session context is thin, ask:

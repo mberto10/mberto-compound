@@ -187,6 +187,11 @@ Closes: [issue IDs]
 ═══════════════════════════════════════════════════════════════
 ```
 
+## Outputs
+
+- Implemented changes for approved learnings (or a deferral/rejection record).
+- A summary of processed learnings and any follow-up actions.
+
 ## Important Notes
 
 - **Never auto-implement** - always show change and get confirmation

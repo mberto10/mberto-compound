@@ -141,6 +141,11 @@ Report to user:
 - Highest priority item
 - Next step: "Run `/compound:consolidate` in your workstation to implement these"
 
+## Outputs
+
+- A structured learning artifact (Linear issue or `./compound-learnings/YYYY-MM-DD-HHMMSS.md`).
+- A concise summary of learnings with counts and a highest-priority item.
+
 ## Important Notes
 
 - If user provided focus text, make that the PRIMARY learning
