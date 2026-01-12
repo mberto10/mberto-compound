@@ -78,12 +78,13 @@ def get_ticket_comments(ticket_id: str):
 
 def filter_kw_comments(comments: list, kw: int):
     """Filter comments that contain KW update for specified week."""
-    kw_pattern = re.compile(rf'\bKW\s*{kw}\b', re.IGNORECASE)
+    # Match both "KW2" and "KW 02" formats (with/without space, with/without leading zero)
+    kw_pattern = re.compile(rf'\bKW\s*0?{kw}\b|\bKW\s*{kw:02d}\b', re.IGNORECASE)
     matching = []
 
     for comment in comments:
-        text = comment.get("text", "")
-        if kw_pattern.search(text):
+        text = comment.get("text") or ""
+        if text and kw_pattern.search(text):
             matching.append({
                 "text": text,
                 "author": comment.get("author", {}).get("name") if comment.get("author") else None,

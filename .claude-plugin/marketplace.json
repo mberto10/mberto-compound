@@ -226,6 +226,27 @@
         "testing"
       ],
       "category": "testing"
+    },
+    {
+      "name": "agentic-optimization-loop",
+      "source": "./plugins/agentic-optimization-loop",
+      "description": "Iterative optimization loops for AI agents with hypothesis-driven improvement cycles. Guides you through Build -> Evaluate -> Analyze -> Improve -> Compound cycles with persistent state.",
+      "version": "0.1.0",
+      "author": {
+        "name": "Maximilian Bruhn",
+        "email": "puzzle.ai.studio@gmail.com"
+      },
+      "homepage": "https://github.com/mberto10/mberto-compound",
+      "repository": "https://github.com/mberto10/mberto-compound",
+      "license": "MIT",
+      "keywords": [
+        "optimization",
+        "agentic",
+        "hypothesis-driven",
+        "improvement-cycles",
+        "evaluation"
+      ],
+      "category": "development"
     }
   ]
 }
