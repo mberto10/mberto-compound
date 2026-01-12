@@ -3,13 +3,13 @@
   "version": "0.1.0",
   "description": "Iterative optimization loops for AI agents with hypothesis-driven improvement cycles. Guides you through Build -> Evaluate -> Analyze -> Improve -> Compound cycles with persistent state.",
   "commands": [
-    "commands/optimize.md",
-    "commands/optimize-status.md"
+    "./commands/optimize.md",
+    "./commands/optimize-status.md"
   ],
   "skills": [
-    "skills/optimization-craft"
+    "./skills/optimization-craft"
   ],
   "agents": [
-    "agents/optimization-analyst.md"
+    "./agents/optimization-analyst.md"
   ]
 }
