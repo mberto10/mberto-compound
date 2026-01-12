@@ -95,6 +95,16 @@ iterations:
       duration: string | null     # How long it took (optional)
       notes: string | null        # Any issues during experiment
 
+      # Grader configuration snapshot - CRITICAL for score comparisons
+      # Without this, score deltas between iterations may be misleading
+      grader_config:
+        version: string | null    # Grader version identifier (e.g., "v2.1")
+        changes_from_previous: string | null  # What changed from last iteration
+        scoring_weights:          # Optional: document weighted scoring
+          - category: string      # e.g., "timeline_compliance", "source_integrity"
+            weight: number        # Relative weight in final score
+        notes: string | null      # Any grader formula changes to explain score deltas
+
     # ─────────────────────────────────────────────────────────────
     # RESULTS (filled in EXPERIMENT phase)
     # ─────────────────────────────────────────────────────────────
@@ -357,6 +367,10 @@ iterations:
       dataset: "writer-regression-v1"
       date: "2024-01-16"
       items_run: 50
+      grader_config:
+        version: "v1.0"
+        changes_from_previous: null  # First iteration, no previous
+        notes: null
 
     results:
       accuracy: 0.78
@@ -420,6 +434,17 @@ iterations:
       dataset: "writer-regression-v1"
       date: "2024-01-18"
       items_run: 53
+      grader_config:
+        version: "v1.1"
+        changes_from_previous: "Added weighted scoring for error categories"
+        scoring_weights:
+          - category: "timeline_compliance"
+            weight: 2.0
+          - category: "source_integrity"
+            weight: 1.5
+          - category: "query_coverage"
+            weight: 1.0
+        notes: "Score drop from 7.2 to 3.0 reflects new weighted formula correctly penalizing timeline violations, not a regression"
 
     results:
       accuracy: 0.85
