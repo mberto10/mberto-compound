@@ -33,13 +33,12 @@ Recommend a mix of:
 
 If no production data exists, propose synthetic data generation and then add real traces over time.
 
-## Improvement Loop
+## Improvement Loop (HYPOTHESIZE → EXPERIMENT → ANALYZE → COMPOUND)
 
-1. Document failure patterns.
-2. Build or expand eval cases that cover them.
-3. Measure baseline with Langfuse experiments.
-4. Apply minimal fixes.
-5. Re-run and compare.
+1. **HYPOTHESIZE:** Require a *testable hypothesis* before suggesting fixes. Specify the change and the metric impact you expect.
+2. **EXPERIMENT:** Implement the change and run the evaluation in Langfuse.
+3. **ANALYZE:** Compare results, identify why it worked or failed, and capture lessons.
+4. **COMPOUND:** Persist decisions and outcomes in `.claude/optimization-loops/<agent>/journal.yaml`, and expand the evaluation set.
 
 ## Output
 
