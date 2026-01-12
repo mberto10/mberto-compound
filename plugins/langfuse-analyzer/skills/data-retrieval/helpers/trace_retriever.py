@@ -18,6 +18,11 @@ RETRIEVAL:
     --case ID         Filter by case_id metadata
     --tags TAG...     Filter by tags
 
+ENVIRONMENT:
+    LANGFUSE_SDK_TIMEOUT  SDK timeout in seconds before HTTP fallback (default: 30)
+                          When SDK operations time out, falls back to direct HTTP
+                          calls via httpx for more reliable batch operations.
+
 EXAMPLES:
     python trace_retriever.py --last 2
     python trace_retriever.py --trace-id abc123 --mode prompts
@@ -25,6 +30,7 @@ EXAMPLES:
 """
 
 import argparse
+import os
 import sys
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -32,6 +38,98 @@ from typing import Any, Dict, List, Optional
 
 sys.path.insert(0, str(Path(__file__).parent))
 from langfuse_client import get_langfuse_client
+
+
+# =============================================================================
+# HTTP FALLBACK FOR SDK TIMEOUTS
+# =============================================================================
+
+# Default timeout for SDK operations (seconds)
+SDK_TIMEOUT = int(os.getenv("LANGFUSE_SDK_TIMEOUT", "30"))
+
+
+def _get_httpx_client():
+    """Get or create httpx client for fallback operations."""
+    try:
+        import httpx
+        host = os.getenv("LANGFUSE_HOST", "https://cloud.langfuse.com")
+        public_key = os.getenv("LANGFUSE_PUBLIC_KEY", "")
+        secret_key = os.getenv("LANGFUSE_SECRET_KEY", "")
+
+        return httpx.Client(
+            base_url=host,
+            auth=(public_key, secret_key),
+            timeout=60.0,  # Longer timeout for fallback
+            headers={"Content-Type": "application/json"}
+        )
+    except ImportError:
+        return None
+
+
+def _fetch_traces_via_http(limit: int, from_timestamp: datetime, to_timestamp: datetime, tags: Optional[List[str]] = None) -> List[Dict]:
+    """
+    Fallback: fetch traces via direct HTTP when SDK times out.
+
+    This is more reliable for batch operations as it bypasses SDK overhead.
+    """
+    client = _get_httpx_client()
+    if not client:
+        print("Warning: httpx not available for fallback", file=sys.stderr)
+        return []
+
+    try:
+        params = {
+            "limit": limit,
+            "fromTimestamp": from_timestamp.isoformat(),
+            "toTimestamp": to_timestamp.isoformat(),
+        }
+        if tags:
+            params["tags"] = tags
+
+        response = client.get("/api/public/traces", params=params)
+        response.raise_for_status()
+        data = response.json()
+        return data.get("data", [])
+    except Exception as e:
+        print(f"HTTP fallback failed: {e}", file=sys.stderr)
+        return []
+    finally:
+        client.close()
+
+
+def _fetch_observations_via_http(trace_id: str) -> List[Dict]:
+    """
+    Fallback: fetch observations via direct HTTP when SDK times out.
+    """
+    client = _get_httpx_client()
+    if not client:
+        return []
+
+    try:
+        all_observations = []
+        page = 1
+
+        while True:
+            params = {"traceId": trace_id, "limit": 100, "page": page}
+            response = client.get("/api/public/observations", params=params)
+            response.raise_for_status()
+            data = response.json()
+
+            observations = data.get("data", [])
+            if not observations:
+                break
+
+            all_observations.extend(observations)
+            if len(observations) < 100:
+                break
+            page += 1
+
+        return all_observations
+    except Exception as e:
+        print(f"HTTP fallback for observations failed: {e}", file=sys.stderr)
+        return []
+    finally:
+        client.close()
 
 
 # =============================================================================
@@ -163,57 +261,110 @@ def retrieve_last_traces(
     if tags:
         params["tags"] = tags
 
+    # Try SDK first, fall back to HTTP on timeout
+    raw_traces = None
     try:
+        import signal
+
+        def timeout_handler(signum, frame):
+            raise TimeoutError("SDK operation timed out")
+
+        # Set timeout (Unix only, graceful degradation on Windows)
+        try:
+            signal.signal(signal.SIGALRM, timeout_handler)
+            signal.alarm(SDK_TIMEOUT)
+        except (AttributeError, ValueError):
+            pass  # Windows or threading context
+
         response = client.api.trace.list(**params)
-        traces = []
+
+        try:
+            signal.alarm(0)  # Cancel timeout
+        except (AttributeError, ValueError):
+            pass
+
         if hasattr(response, "data") and response.data:
-            for trace in response.data:
-                trace_dict = trace.dict() if hasattr(trace, "dict") else dict(trace)
+            raw_traces = [t.dict() if hasattr(t, "dict") else dict(t) for t in response.data]
 
-                # Filter by metadata field if specified (client-side filter)
-                if filter_field and filter_value:
-                    metadata = trace_dict.get("metadata", {}) or {}
-                    if str(metadata.get(filter_field)) != str(filter_value):
-                        continue
+    except (TimeoutError, Exception) as e:
+        if "timeout" in str(e).lower() or isinstance(e, TimeoutError):
+            print(f"SDK timeout, falling back to HTTP: {e}", file=sys.stderr)
+            raw_traces = _fetch_traces_via_http(fetch_limit, start_time, end_time, tags)
+        else:
+            print(f"Error fetching traces: {e}", file=sys.stderr)
+            return []
 
-                # Filter by score if specified (client-side filter)
-                if min_score is not None or max_score is not None:
-                    score_value = get_trace_score(trace_dict["id"], score_name)
-                    if score_value is None:
-                        continue  # Skip traces without the specified score
-                    if min_score is not None and score_value < min_score:
-                        continue
-                    if max_score is not None and score_value > max_score:
-                        continue
-                    # Store score in trace dict for display
-                    trace_dict["_filtered_score"] = {
-                        "name": score_name,
-                        "value": score_value
-                    }
-
-                traces.append(trace_dict)
-                if len(traces) >= limit:
-                    break
-        return traces
-    except Exception as e:
-        print(f"Error fetching traces: {e}", file=sys.stderr)
+    if not raw_traces:
         return []
+
+    # Process traces with filters
+    traces = []
+    for trace_dict in raw_traces:
+        # Filter by metadata field if specified (client-side filter)
+        if filter_field and filter_value:
+            metadata = trace_dict.get("metadata", {}) or {}
+            if str(metadata.get(filter_field)) != str(filter_value):
+                continue
+
+        # Filter by score if specified (client-side filter)
+        if min_score is not None or max_score is not None:
+            score_value = get_trace_score(trace_dict["id"], score_name)
+            if score_value is None:
+                continue  # Skip traces without the specified score
+            if min_score is not None and score_value < min_score:
+                continue
+            if max_score is not None and score_value > max_score:
+                continue
+            # Store score in trace dict for display
+            trace_dict["_filtered_score"] = {
+                "name": score_name,
+                "value": score_value
+            }
+
+        traces.append(trace_dict)
+        if len(traces) >= limit:
+            break
+
+    return traces
 
 
 def retrieve_observations_for_trace(trace_id: str) -> List[Dict]:
-    """Fetch all observations for a single trace."""
+    """Fetch all observations for a single trace with timeout fallback."""
     client = get_langfuse_client()
 
     all_observations = []
     page = 1
+    use_http_fallback = False
 
     while True:
         try:
+            if use_http_fallback:
+                # Already switched to HTTP fallback
+                break
+
+            import signal
+
+            def timeout_handler(signum, frame):
+                raise TimeoutError("SDK operation timed out")
+
+            # Set timeout (Unix only)
+            try:
+                signal.signal(signal.SIGALRM, timeout_handler)
+                signal.alarm(SDK_TIMEOUT)
+            except (AttributeError, ValueError):
+                pass
+
             response = client.api.observations.get_many(
                 trace_id=trace_id,
                 limit=100,
                 page=page
             )
+
+            try:
+                signal.alarm(0)
+            except (AttributeError, ValueError):
+                pass
+
             if not hasattr(response, "data") or not response.data:
                 break
 
@@ -225,9 +376,15 @@ def retrieve_observations_for_trace(trace_id: str) -> List[Dict]:
                 break
             page += 1
 
-        except Exception as e:
-            print(f"Error fetching observations for {trace_id}: {e}", file=sys.stderr)
-            break
+        except (TimeoutError, Exception) as e:
+            if "timeout" in str(e).lower() or isinstance(e, TimeoutError):
+                print(f"SDK timeout on observations, falling back to HTTP: {e}", file=sys.stderr)
+                all_observations = _fetch_observations_via_http(trace_id)
+                use_http_fallback = True
+                break
+            else:
+                print(f"Error fetching observations for {trace_id}: {e}", file=sys.stderr)
+                break
 
     # Sort by start_time for execution order
     all_observations.sort(key=lambda x: x.get("start_time") or "")
