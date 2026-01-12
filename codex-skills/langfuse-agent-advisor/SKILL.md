@@ -46,4 +46,30 @@ If no production data exists, propose synthetic data generation and then add rea
 Deliver a concise plan with:
 - Proposed dimensions and thresholds
 - Dataset source and size
-- Suggested Langfuse skills to run next
+- Current phase of the optimization loop
+- Hypothesis statement for the next iteration
+- Baseline metric + target outcome
+- Next Langfuse command to run (`/optimize` or `/optimize-status`)
+- Output template (record iteration outcomes in `.claude/optimization-loops/<agent>/journal.yaml`)
+- Short phase-aligned Langfuse checklist (e.g., "run experiment", "compare traces")
+
+### Output Template
+
+```
+Phase: <current phase>
+Hypothesis: <one-sentence change hypothesis>
+Baseline + Target: <metric> is <baseline> → target <goal>
+Next Command: /optimize | /optimize-status
+
+Iteration Outcome Journal
+File: .claude/optimization-loops/<agent>/journal.yaml
+- Iteration: <number or date>
+- Change summary: <what changed>
+- Result: <metric delta + pass/fail>
+- Notes: <key trace findings or follow-ups>
+
+Langfuse Checklist (phase-aligned)
+- <action mapped to phase, e.g., run experiment>
+- <action mapped to phase, e.g., compare traces>
+- <action mapped to phase, e.g., tag best prompt>
+```
