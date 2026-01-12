@@ -43,18 +43,46 @@ Explicitly call out **compounding**: turn failures into new test cases and link 
 
 If no production data exists, propose synthetic data generation and then add real traces over time.
 
-## Improvement Loop
+## Improvement Loop (HYPOTHESIZE → EXPERIMENT → ANALYZE → COMPOUND)
 
-1. Document failure patterns.
-2. Build or expand eval cases that cover them.
-3. Measure baseline with Langfuse experiments.
-4. Apply minimal fixes.
-5. Re-run and compare.
+1. **HYPOTHESIZE:** Require a *testable hypothesis* before suggesting fixes. Specify the change and the metric impact you expect.
+2. **EXPERIMENT:** Implement the change and run the evaluation in Langfuse.
+3. **ANALYZE:** Compare results, identify why it worked or failed, and capture lessons.
+4. **COMPOUND:** Persist decisions and outcomes in `.claude/optimization-loops/<agent>/journal.yaml`, and expand the evaluation set.
 
 ## Output
 
 Deliver a concise plan with:
 - Proposed dimensions and thresholds
 - Dataset source and size
+
 - A step to update the dataset after each iteration (capture failures → new eval cases)
 - Suggested Langfuse skills to run next
+- Current phase of the optimization loop
+- Hypothesis statement for the next iteration
+- Baseline metric + target outcome
+- Next Langfuse command to run (`/optimize` or `/optimize-status`)
+- Output template (record iteration outcomes in `.claude/optimization-loops/<agent>/journal.yaml`)
+- Short phase-aligned Langfuse checklist (e.g., "run experiment", "compare traces")
+
+### Output Template
+
+```
+Phase: <current phase>
+Hypothesis: <one-sentence change hypothesis>
+Baseline + Target: <metric> is <baseline> → target <goal>
+Next Command: /optimize | /optimize-status
+
+Iteration Outcome Journal
+File: .claude/optimization-loops/<agent>/journal.yaml
+- Iteration: <number or date>
+- Change summary: <what changed>
+- Result: <metric delta + pass/fail>
+- Notes: <key trace findings or follow-ups>
+
+Langfuse Checklist (phase-aligned)
+- <action mapped to phase, e.g., run experiment>
+- <action mapped to phase, e.g., compare traces>
+- <action mapped to phase, e.g., tag best prompt>
+```
+

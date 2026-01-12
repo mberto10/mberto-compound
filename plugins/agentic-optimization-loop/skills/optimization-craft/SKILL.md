@@ -7,6 +7,47 @@ description: Use this skill when the user invokes /optimize, asks to "improve my
 
 A systematic methodology for iterative AI agent improvement through hypothesis-driven experimentation. This skill guides you through the complete optimization loop with persistent state.
 
+---
+
+## Before You Start: Choose Your Entry Point
+
+Not all optimization starts at the same place. Use this decision tree to find the right entry point:
+
+```
+What do you have?
+│
+├─▶ Dataset + automated graders + clear target metric
+│   └─▶ ✅ Use /optimize (full loop) — You're ready for systematic iteration
+│
+├─▶ Human annotations/feedback but NO automated graders
+│   └─▶ Use /optimize-bootstrap — Build graders from your human labels first
+│
+├─▶ Production traces but NO dataset or annotations
+│   └─▶ Use /optimize-bootstrap — Curate a dataset from traces first
+│
+├─▶ Specific failing trace or issue to debug
+│   └─▶ Use langfuse-analyzer trace-analysis skill — Investigate before optimizing
+│
+└─▶ Annotation queue to process
+    └─▶ Use langfuse-analyzer annotation-manager skill — Triage feedback first
+```
+
+### Prerequisites for the Full Optimization Loop
+
+The `/optimize` command works best when you have:
+
+| Prerequisite | Required? | If Missing |
+|--------------|-----------|------------|
+| Langfuse tracing active | **Yes** | Set up instrumentation first |
+| Evaluation dataset (20+ items) | **Yes** | Use `/optimize-bootstrap` to create one |
+| Automated graders/judges | Recommended | Use `/optimize-bootstrap` to build from human labels |
+| Clear target metric | **Yes** | Define before starting |
+| Baseline measurement | No | Created in INITIALIZE phase |
+
+If you're missing prerequisites, `/optimize-bootstrap` will help you build the infrastructure needed for the full loop.
+
+---
+
 ## The Core Philosophy
 
 **Evaluation-first development:** Create evaluations BEFORE making changes. This prevents solving imaginary problems and provides clear signal on whether changes helped.

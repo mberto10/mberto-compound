@@ -9,5 +9,17 @@
   "homepage": "https://github.com/mberto10/mberto-compound",
   "repository": "https://github.com/mberto10/mberto-compound",
   "license": "MIT",
-  "keywords": ["langdock", "integrations", "actions", "api", "development"]
+  "keywords": ["langdock", "integrations", "actions", "api", "development"],
+  "commands": [
+    "./commands/create-action.md"
+  ],
+  "agents": [
+    "./agents/action-builder.md"
+  ],
+  "skills": [
+    "./skills/action-patterns",
+    "./skills/langdock-api",
+    "./skills/langdock-api-operations",
+    "./skills/parallel-actions"
+  ]
 }

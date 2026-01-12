@@ -5,5 +5,22 @@
   "author": {
     "name": "Mberto"
   },
-  "keywords": ["langfuse", "tracing", "debugging", "observability", "analysis", "datasets", "prompts", "experiments", "evaluation", "scores", "analytics", "sessions", "annotation", "instrumentation", "setup"]
+  "keywords": ["langfuse", "tracing", "debugging", "observability", "analysis", "datasets", "prompts", "experiments", "evaluation", "scores", "analytics", "sessions", "annotation", "instrumentation", "setup"],
+  "commands": [
+    "./commands/agent-eval-setup.md",
+    "./commands/agent-eval.md",
+    "./commands/setup-dataset.md"
+  ],
+  "skills": [
+    "./skills/agent-advisor",
+    "./skills/annotation-manager",
+    "./skills/data-retrieval",
+    "./skills/dataset-management",
+    "./skills/experiment-runner",
+    "./skills/instrumentation-setup",
+    "./skills/prompt-management",
+    "./skills/score-analytics",
+    "./skills/session-analysis",
+    "./skills/trace-analysis"
+  ]
 }

@@ -5,5 +5,25 @@
   "author": {
     "name": "Maximilian Bruhn"
   },
-  "keywords": ["habits", "tracking", "goals", "metrics", "personal-development"]
+  "keywords": ["habits", "tracking", "goals", "metrics", "personal-development"],
+  "commands": [
+    "./commands/cycle-status.md",
+    "./commands/goals.md",
+    "./commands/log.md",
+    "./commands/metrics.md",
+    "./commands/progress.md",
+    "./commands/review.md"
+  ],
+  "agents": [
+    "./agents/entry-parser.md"
+  ],
+  "skills": [
+    "./skills/ascii-charts",
+    "./skills/behavior-mapping",
+    "./skills/failure-diagnosis",
+    "./skills/friction-audit",
+    "./skills/goal-methodology",
+    "./skills/metrics-review",
+    "./skills/target-definition"
+  ]
 }

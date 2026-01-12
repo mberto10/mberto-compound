@@ -5,5 +5,12 @@
   "author": {
     "name": "Maximilian Bruhn"
   },
-  "keywords": ["linear", "continuity", "compound-loop", "long-running-tasks"]
+  "keywords": ["linear", "continuity", "compound-loop", "long-running-tasks"],
+  "commands": [
+    "./commands/init-project.md",
+    "./commands/start-project.md"
+  ],
+  "skills": [
+    "./skills/resume-project"
+  ]
 }

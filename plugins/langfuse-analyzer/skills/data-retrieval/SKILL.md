@@ -192,6 +192,30 @@ python3 ${CLAUDE_PLUGIN_ROOT}/skills/data-retrieval/helpers/trace_retriever.py \
 
 Look for span observations to see which operations were performed and their outputs.
 
+### Find Traces Pending Annotation
+
+Use the **annotation-manager** skill for annotation queue workflows:
+
+```bash
+# Find traces missing human review (last 7 days)
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/annotation-manager/helpers/annotation_manager.py \
+  pending --score-name "human_review" --days 7 --limit 20
+
+# Find traces missing quality scores for a specific trace type
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/annotation-manager/helpers/annotation_manager.py \
+  pending --score-name "quality" --trace-name "chat-completion" --days 3
+```
+
+Once you identify traces needing review, use this skill's retrieval to inspect them:
+
+```bash
+# Get full details of a trace pending annotation
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/data-retrieval/helpers/trace_retriever.py \
+  --trace-id <pending_trace_id> --mode io
+```
+
+**Tip:** For high-volume annotation queues, consider increasing the timeout by running the annotation-manager helper with longer wait times, or process in smaller batches.
+
 ### Curate Regression Dataset
 
 Identify failing traces for dataset curation:

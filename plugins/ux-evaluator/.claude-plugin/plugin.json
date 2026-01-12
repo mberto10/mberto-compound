@@ -5,5 +5,21 @@
   "author": {
     "name": "Dispatch Team"
   },
-  "keywords": ["ux", "frontend", "evaluation", "playwright", "user-lifecycle", "testing"]
+  "keywords": ["ux", "frontend", "evaluation", "playwright", "user-lifecycle", "testing"],
+  "commands": [
+    "./commands/dogfood.md",
+    "./commands/mcp-eval.md",
+    "./commands/ux-eval.md"
+  ],
+  "agents": [
+    "./agents/dogfooding-evaluator.md",
+    "./agents/infrastructure-auditor.md",
+    "./agents/mcp-evaluator.md",
+    "./agents/technical-debugger.md",
+    "./agents/ux-evaluator.md"
+  ],
+  "skills": [
+    "./skills/mcp-evaluation-framework",
+    "./skills/user-lifecycle-framework"
+  ]
 }

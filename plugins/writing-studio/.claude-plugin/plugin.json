@@ -5,5 +5,35 @@
   "author": {
     "name": "Maximilian Bruhn"
   },
-  "keywords": ["writing", "style", "drafting", "editing", "brainstorming", "content", "critique", "voice", "quality-loop"]
+  "keywords": ["writing", "style", "drafting", "editing", "brainstorming", "content", "critique", "voice", "quality-loop"],
+  "commands": [
+    "./commands/brainstorm.md",
+    "./commands/draft.md",
+    "./commands/edit.md",
+    "./commands/generate-assistant.md",
+    "./commands/plan.md",
+    "./commands/profile-humor.md",
+    "./commands/profile-writer.md",
+    "./commands/qualityloop.md",
+    "./commands/setup-style.md",
+    "./commands/voice-write.md",
+    "./commands/write-loop.md",
+    "./commands/write.md"
+  ],
+  "agents": [
+    "./agents/brainstormer.md",
+    "./agents/critic.md",
+    "./agents/drafter.md",
+    "./agents/editor.md",
+    "./agents/ideator.md",
+    "./agents/iterator.md",
+    "./agents/planner.md"
+  ],
+  "skills": [
+    "./skills/humor-profiler",
+    "./skills/voice-writer",
+    "./skills/writer-profiler",
+    "./skills/writing-craft",
+    "./skills/writing-critique"
+  ]
 }

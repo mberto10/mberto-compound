@@ -9,5 +9,23 @@
   "homepage": "https://github.com/mberto10/mberto-compound",
   "repository": "https://github.com/mberto10/mberto-compound",
   "license": "MIT",
-  "keywords": ["productivity", "planning", "linear", "youtrack", "communication", "german", "documentation"]
+  "keywords": ["productivity", "planning", "linear", "youtrack", "communication", "german", "documentation"],
+  "commands": [
+    "./commands/add-kw-update.md",
+    "./commands/draft-communication.md",
+    "./commands/linear.md",
+    "./commands/prepare-jf-team.md",
+    "./commands/prepare-update.md",
+    "./commands/review-epics.md",
+    "./commands/sync-to-youtrack.md",
+    "./commands/update-youtrack-epic.md",
+    "./commands/weekly-email.md"
+  ],
+  "skills": [
+    "./skills/communication",
+    "./skills/linear-workflow",
+    "./skills/meetings-workflow",
+    "./skills/structuring",
+    "./skills/youtrack-dashboard"
+  ]
 }

@@ -15,5 +15,22 @@
     "mcp-server",
     "widgets"
   ],
-  "license": "MIT"
+  "license": "MIT",
+  "commands": [
+    "./commands/scaffold.md",
+    "./commands/validate.md"
+  ],
+  "agents": [
+    "./agents/mcp-server-reviewer.md"
+  ],
+  "skills": [
+    "./skills/mcp-authentication",
+    "./skills/mcp-deployment-testing",
+    "./skills/mcp-server-architecture",
+    "./skills/mcp-state-management",
+    "./skills/mcp-tool-design",
+    "./skills/mcp-ux-brainstorming",
+    "./skills/mcp-widget-development",
+    "./skills/mcp-widget-patterns"
+  ]
 }
