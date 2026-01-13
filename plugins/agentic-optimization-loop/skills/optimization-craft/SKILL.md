@@ -561,6 +561,43 @@ Results:
 
 **Reference:** `${CLAUDE_PLUGIN_ROOT}/skills/optimization-craft/references/analysis-framework.md`
 
+### Step 0: Fetch Human Annotation Comments
+
+**Before quantitative comparison, fetch ALL human annotation comments from the dataset run.**
+
+Human annotation comments contain the "why" behind scores and often reveal the real issues that quantitative metrics miss. In one analysis, 64% of comments cited a content quality issue (missing Kernaussage) that was invisible in the score values alone.
+
+**Fetch comments:**
+```bash
+# List all scores with comments for the run
+python3 ${LANGFUSE_ANALYZER_ROOT}/skills/annotation-manager/helpers/annotation_manager.py \
+  list-scores --name "<score_name>" --limit 100
+```
+
+**Categorize by theme:**
+1. Group comments by keyword/theme (scan for repeated words/phrases)
+2. Count frequency of each theme
+3. Prioritize themes by frequency
+
+**Example output:**
+```
+Theme Analysis from Annotation Comments:
+- "Missing Kernaussage/core message" - 7/11 comments (64%)
+- "Incorrect format" - 2/11 comments (18%)
+- "Technical error" - 2/11 comments (18%)
+
+→ Primary issue is content quality, not technical failures
+```
+
+**Why this matters:**
+- Scores tell you WHAT failed; comments tell you WHY
+- Human annotators often identify issues that automated metrics miss
+- Theme frequency often reframes the entire analysis priority
+
+This step should PRECEDE quantitative analysis to prevent confirmation bias from metrics.
+
+---
+
 ### Step 1: Compare Results
 
 Create comparison table:

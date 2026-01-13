@@ -66,6 +66,30 @@ failures:
     # ...
 ```
 
+**1.3 Fetch human annotation comments**
+
+**Critical:** Before diving into trace investigation, fetch ALL human annotation comments. Comments contain the "why" behind scores and often reveal issues invisible in metrics.
+
+```bash
+# Get all scores with comments
+python3 ${LANGFUSE_ANALYZER_ROOT}/skills/annotation-manager/helpers/annotation_manager.py \
+  list-scores --name "<score_name>" --limit 100
+```
+
+**Categorize comments by theme:**
+1. Scan all comments for repeated keywords/phrases
+2. Group and count by theme
+3. Prioritize themes by frequency
+
+```
+Example theme analysis:
+- "Missing Kernaussage" - 7/11 comments (64%)
+- "Wrong format" - 2/11 comments (18%)
+- "Technical issue" - 2/11 comments (18%)
+```
+
+**Why this matters:** In one optimization analysis, initial investigation focused on 2 technical failures found in traces. After fetching annotation comments, 64% mentioned a content quality issue (missing Kernaussage) - completely reframing the analysis priority. Human feedback frequency often trumps technical trace patterns.
+
 ### Phase 2: Categorize Failures
 
 **2.1 Group by symptom type**

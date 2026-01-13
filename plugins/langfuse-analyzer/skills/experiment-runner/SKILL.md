@@ -142,6 +142,31 @@ python3 ${CLAUDE_PLUGIN_ROOT}/skills/experiment-runner/helpers/experiment_runner
   --score-threshold 0.7
 ```
 
+### Analyze Run with Annotation Comments
+
+For optimization workflows, **always include human annotation comments** in the analysis. Comments often reveal issues invisible in score values.
+
+```bash
+# Step 1: Get run failures
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/experiment-runner/helpers/experiment_runner.py \
+  analyze \
+  --dataset "my-regression-tests" \
+  --run-name "v2.1-test" \
+  --show-failures
+
+# Step 2: Fetch annotation comments for deeper insight
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/annotation-manager/helpers/annotation_manager.py \
+  list-scores --name "<score_name>" --limit 50
+```
+
+**Why include comments:**
+- Human annotation comments contain the "why" behind scores
+- Categorize comments by theme before investigating individual failures
+- Theme frequency (e.g., "7/11 comments mentioned X") often reveals the real issue
+- This frequently reframes the entire analysis priority
+
+**Best practice:** Fetch and categorize ALL annotation comments BEFORE diving into technical trace investigation.
+
 ## Writing Task Scripts
 
 The task script defines what to execute for each dataset item. It must contain a `task` function:
