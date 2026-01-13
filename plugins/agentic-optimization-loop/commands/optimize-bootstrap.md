@@ -161,7 +161,9 @@ dataset = lf.create_dataset(
 # Add items from selected traces
 for trace_id in selected_traces:
     trace = lf.get_trace(trace_id)
-    dataset.create_item(
+    # Note: use lf.create_dataset_item(), not dataset.create_item()
+    lf.create_dataset_item(
+        dataset_name="<agent>-eval-v1",
         input=trace.input,
         expected_output=trace.output,  # Or manually corrected output
         metadata={"source_trace": trace_id}

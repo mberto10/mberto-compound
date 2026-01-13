@@ -43,6 +43,42 @@ meta:
     run_name: string              # Langfuse run name (usually "baseline")
     date: date                    # When baseline was measured
 
+  # Agent-specific optimization layers
+  # Different agents have different architectures - define yours here
+  # The pattern (map errors to pipeline phases) is generalizable; the layers are not
+  pipeline_layers:                # Optional: define your agent's optimization surface
+    - name: string                # Layer identifier (e.g., "retrieval", "generation")
+      description: string         # What this layer does
+      targets:                    # What can be optimized at this layer
+        - string                  # e.g., "prompts", "tool_chain", "model", "embeddings"
+
+  # Example for a research agent:
+  # pipeline_layers:
+  #   - name: "search"
+  #     description: "Query formulation and source retrieval"
+  #     targets: ["queries", "tool_chain", "embeddings"]
+  #   - name: "synthesis"
+  #     description: "Combining sources into coherent response"
+  #     targets: ["prompts", "model", "temperature"]
+  #   - name: "validation"
+  #     description: "Output quality checks"
+  #     targets: ["output_schema", "guardrails", "citations"]
+  #
+  # Example for a coding agent:
+  # pipeline_layers:
+  #   - name: "retrieval"
+  #     description: "Finding relevant code context"
+  #     targets: ["embeddings", "chunking", "reranking"]
+  #   - name: "planning"
+  #     description: "Determining approach and steps"
+  #     targets: ["prompts", "reasoning"]
+  #   - name: "generation"
+  #     description: "Writing code"
+  #     targets: ["prompts", "model", "temperature"]
+  #   - name: "validation"
+  #     description: "Checking output correctness"
+  #     targets: ["linters", "tests", "type_checks"]
+
 # ══════════════════════════════════════════════════════════════════
 # CURRENT STATE - Updated after each phase
 # ══════════════════════════════════════════════════════════════════

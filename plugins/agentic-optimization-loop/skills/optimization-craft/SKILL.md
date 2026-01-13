@@ -759,10 +759,10 @@ Add failure cases as new test items:
 from langfuse import Langfuse
 lf = Langfuse()
 
-dataset = lf.get_dataset("<dataset_name>")
-
 for failure in new_failure_cases:
-    dataset.create_item(
+    # Note: use lf.create_dataset_item(), not dataset.create_item()
+    lf.create_dataset_item(
+        dataset_name="<dataset_name>",
         input=failure.input,
         expected_output=failure.expected_output,
         metadata={

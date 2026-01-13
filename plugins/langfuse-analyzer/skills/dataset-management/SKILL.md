@@ -85,6 +85,29 @@ python3 ${CLAUDE_PLUGIN_ROOT}/skills/dataset-management/helpers/dataset_manager.
   --name "checkout_regressions"
 ```
 
+## Python SDK Note
+
+When using the Langfuse Python SDK directly (not via CLI), use the correct method for adding items:
+
+```python
+from langfuse import Langfuse
+lf = Langfuse()
+
+# Correct: use lf.create_dataset_item()
+lf.create_dataset_item(
+    dataset_name="checkout_regressions",
+    input={"query": "example input"},
+    expected_output={"min_score": 9.0},
+    metadata={"source_trace_id": "abc123"}
+)
+
+# Incorrect: dataset.create_item() does not exist in the SDK
+# dataset = lf.get_dataset("checkout_regressions")
+# dataset.create_item(...)  # ← This will fail!
+```
+
+**Key difference:** The SDK method is `lf.create_dataset_item()` with `dataset_name` as a parameter, not `dataset.create_item()` on a dataset object.
+
 ## Dataset Item Structure
 
 When adding a trace to a dataset, the tool extracts:
