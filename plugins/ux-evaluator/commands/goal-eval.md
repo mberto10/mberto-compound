@@ -151,185 +151,150 @@ Stage 4: CONFIG FIDELITY TESTER (Round-Trip Verification)
 
 **Stage 1: UX Evaluation**
 
-Invoke the Task tool with these exact parameters:
-```yaml
-subagent_type: "general-purpose"
-description: "UX evaluation for [goal_id]"
-prompt: |
-  First, read and internalize the agent instructions from:
-  plugins/ux-evaluator/agents/ux-evaluator.md
+Use the **ux-evaluator** agent to perform the UX evaluation:
 
-  Then execute the UX evaluation with this context:
+```
+Use the ux-evaluator agent to evaluate this goal:
 
-  GOAL: [statement]
-  STARTING URL: [url]
-  SUCCESS CRITERIA:
-  [criteria list]
+GOAL: [statement]
+STARTING URL: [url]
+SUCCESS CRITERIA:
+[criteria list]
 
-  Your mission: Walk the user journey for this goal.
-  Document:
-  - Can the goal be achieved via UI?
-  - What friction points exist?
-  - What feedback is missing?
-  - Any errors encountered?
+Walk the user journey for this goal and document:
+- Can the goal be achieved via UI?
+- What friction points exist?
+- What feedback is missing?
+- Any errors encountered?
 
-  Save your report to: goal-eval-[goal_id]-ux.md
-
-  Return a summary of findings when complete.
+Save your report to: goal-eval-[goal_id]-ux.md
 ```
 
-Wait for the Task to complete and capture the UX report path.
+Wait for the agent to complete and capture the UX report path.
 
 **Stage 2: Technical Analysis** (if code layer selected)
 
-Invoke the Task tool with these exact parameters:
-```yaml
-subagent_type: "general-purpose"
-description: "Technical debugging for [goal_id]"
-prompt: |
-  First, read and internalize the agent instructions from:
-  plugins/ux-evaluator/agents/technical-debugger.md
+Use the **technical-debugger** agent to analyze code issues:
 
-  Then execute the technical analysis with this context:
+```
+Use the technical-debugger agent to investigate:
 
-  GOAL: [statement]
-  UX REPORT: [path to stage 1 report]
-  SUCCESS CRITERIA:
-  [criteria list]
+GOAL: [statement]
+UX REPORT: [path to stage 1 report]
+SUCCESS CRITERIA:
+[criteria list]
 
-  Your mission: Trace the code path for this goal.
-  For each UX issue found, determine:
-  - Is there a code cause?
-  - Are handlers implemented correctly?
-  - Do transforms work as expected?
+Trace the code path for this goal.
+For each UX issue found, determine:
+- Is there a code cause?
+- Are handlers implemented correctly?
+- Do transforms work as expected?
 
-  Save your analysis to: goal-eval-[goal_id]-code.md
-
-  Return a summary of findings when complete.
+Save your analysis to: goal-eval-[goal_id]-code.md
 ```
 
-Wait for the Task to complete and capture the technical analysis path.
+Wait for the agent to complete and capture the technical analysis path.
 
 **Stage 3: Infrastructure Audit** (if infra layer selected)
 
-Invoke the Task tool with these exact parameters:
-```yaml
-subagent_type: "general-purpose"
-description: "Infrastructure audit for [goal_id]"
-prompt: |
-  First, read and internalize the agent instructions from:
-  plugins/ux-evaluator/agents/infrastructure-auditor.md
+Use the **infrastructure-auditor** agent to verify backend:
 
-  Then execute the infrastructure audit with this context:
+```
+Use the infrastructure-auditor agent to audit:
 
-  GOAL: [statement]
-  PREVIOUS REPORTS:
-  - UX: [path]
-  - Code: [path]
-  SUCCESS CRITERIA:
-  [criteria list]
+GOAL: [statement]
+PREVIOUS REPORTS:
+- UX: [path]
+- Code: [path]
+SUCCESS CRITERIA:
+[criteria list]
 
-  Your mission: Verify infrastructure supports this goal:
-  - Do required endpoints exist?
-  - Does data persist correctly?
-  - Can data be retrieved?
+Verify infrastructure supports this goal:
+- Do required endpoints exist?
+- Does data persist correctly?
+- Can data be retrieved?
 
-  Save your audit to: goal-eval-[goal_id]-infra.md
-
-  Return a summary of findings when complete.
+Save your audit to: goal-eval-[goal_id]-infra.md
 ```
 
-Wait for the Task to complete and capture the infrastructure audit path.
+Wait for the agent to complete and capture the infrastructure audit path.
 
 **Stage 4: Fidelity Testing** (for configuration goals, optional)
 
-Invoke the Task tool with these exact parameters:
-```yaml
-subagent_type: "general-purpose"
-description: "Config fidelity testing for [goal_id]"
-prompt: |
-  First, read and internalize the agent instructions from:
-  plugins/ux-evaluator/agents/config-fidelity-tester.md
+Use the **config-fidelity-tester** agent to test round-trip:
 
-  Then execute the fidelity test with this context:
+```
+Use the config-fidelity-tester agent to test:
 
-  GOAL: [statement]
-  FIELDS TO TEST: [from success criteria]
-  URL: [url]
+GOAL: [statement]
+FIELDS TO TEST: [from success criteria]
+URL: [url]
 
-  Your mission: Test configuration round-trip:
-  UI → State → API → Database → API → State → UI
+Test configuration round-trip:
+UI → State → API → Database → API → State → UI
 
-  Report fidelity metrics and any data loss.
+Report fidelity metrics and any data loss.
 
-  Save your report to: goal-eval-[goal_id]-fidelity.md
-
-  Return a summary of findings when complete.
+Save your report to: goal-eval-[goal_id]-fidelity.md
 ```
 
-Wait for the Task to complete and capture the fidelity report path.
+Wait for the agent to complete and capture the fidelity report path.
 
 ### For Navigation Goals
 
-Only invoke Stage 1 (UX Evaluation Task).
+Only use the ux-evaluator agent (Stage 1).
 
 ### For Recovery Goals
 
-Invoke Stage 1 and Stage 2 Tasks sequentially.
+Use ux-evaluator then technical-debugger agents sequentially.
 
 ### For Generation Goals
 
-Invoke all stage Tasks sequentially, plus AI trace analysis (if available).
+Use all stage agents sequentially, plus AI trace analysis (if available).
 
 ## Step 4: Synthesize Findings
 
-Invoke the Task tool to correlate findings across all layers:
+Use the **goal-orchestrator** agent to correlate findings across all layers:
 
-```yaml
-subagent_type: "general-purpose"
-description: "Root cause synthesis for [goal_id]"
-prompt: |
-  First, read and internalize the agent instructions from:
-  plugins/ux-evaluator/agents/goal-orchestrator.md
+```
+Use the goal-orchestrator agent to synthesize findings:
 
-  Then synthesize findings from these reports:
-  - UX Report: [path to ux report]
-  - Technical Analysis: [path to code report]
-  - Infrastructure Audit: [path to infra report]
-  - Fidelity Report: [path to fidelity report, if exists]
+REPORTS TO ANALYZE:
+- UX Report: [path to ux report]
+- Technical Analysis: [path to code report]
+- Infrastructure Audit: [path to infra report]
+- Fidelity Report: [path to fidelity report, if exists]
 
-  GOAL: [statement]
+GOAL: [statement]
 
-  Your mission: For each issue found across all reports:
-  1. Identify symptom layer (where it was observed)
-  2. Trace to root cause layer (where it originates)
-  3. Document the chain
+For each issue found across all reports:
+1. Identify symptom layer (where it was observed)
+2. Trace to root cause layer (where it originates)
+3. Document the chain
 
-  Format each issue as:
+Format each issue as:
 
-  ISSUE: [title]
+ISSUE: [title]
 
-  Symptom: [user-facing description]
+Symptom: [user-facing description]
 
-  Layer Trace:
-  | Layer | Finding |
-  |-------|---------|
-  | UX    | [observation] |
-  | Code  | [observation] |
-  | Infra | [observation] |
+Layer Trace:
+| Layer | Finding |
+|-------|---------|
+| UX    | [observation] |
+| Code  | [observation] |
+| Infra | [observation] |
 
-  Root Cause:
-  - Layer: [origin layer]
-  - Location: [file:line or endpoint]
-  - Issue: [specific problem]
+Root Cause:
+- Layer: [origin layer]
+- Location: [file:line or endpoint]
+- Issue: [specific problem]
 
-  Fix: [recommendation]
-  Priority: [Critical/High/Medium/Low]
-
-  Return the complete synthesis with all issues traced to root cause.
+Fix: [recommendation]
+Priority: [Critical/High/Medium/Low]
 ```
 
-Wait for the Task to complete and use the synthesis for the final report.
+Wait for the agent to complete and use the synthesis for the final report.
 
 ## Step 5: Generate Report
 
