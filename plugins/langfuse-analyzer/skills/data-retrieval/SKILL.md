@@ -138,19 +138,51 @@ python3 ${CLAUDE_PLUGIN_ROOT}/skills/data-retrieval/helpers/trace_retriever.py \
   --last 10 --mode minimal
 ```
 
-## Required Environment Variables
+## Credential Configuration
+
+Credentials are loaded automatically from multiple sources (in priority order):
+
+1. **Environment variables** (if not placeholders)
+2. **Project `.env` file** (current directory)
+3. **User config `~/.langfuse.env`**
+
+### Option 1: User Config (Recommended)
+
+Create `~/.langfuse.env` for global access across all projects:
 
 ```bash
-LANGFUSE_PUBLIC_KEY=pk-...    # Required
-LANGFUSE_SECRET_KEY=sk-...    # Required
-LANGFUSE_HOST=https://cloud.langfuse.com  # Optional, defaults to cloud
+# ~/.langfuse.env
+LANGFUSE_PUBLIC_KEY=pk-lf-your-key-here
+LANGFUSE_SECRET_KEY=sk-lf-your-key-here
+LANGFUSE_HOST=https://cloud.langfuse.com  # Optional
 ```
 
-Test connection:
+### Option 2: Project `.env`
+
+Add to your project's `.env` file for project-specific credentials:
+
+```bash
+# .env
+LANGFUSE_PUBLIC_KEY=pk-lf-your-key-here
+LANGFUSE_SECRET_KEY=sk-lf-your-key-here
+```
+
+### Option 3: Environment Variables
+
+Export in your shell or add to `.zshrc`/`.bashrc`:
+
+```bash
+export LANGFUSE_PUBLIC_KEY=pk-lf-your-key-here
+export LANGFUSE_SECRET_KEY=sk-lf-your-key-here
+```
+
+### Test Connection
 
 ```bash
 python3 ${CLAUDE_PLUGIN_ROOT}/skills/data-retrieval/helpers/langfuse_client.py
 ```
+
+**Note:** Placeholder values like `your_public_key` or `YOUR_SECRET_KEY` are automatically detected and skipped.
 
 ## Common Workflows
 

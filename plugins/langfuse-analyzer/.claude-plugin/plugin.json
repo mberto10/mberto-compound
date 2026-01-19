@@ -5,7 +5,25 @@
   "author": {
     "name": "Mberto"
   },
-  "keywords": ["langfuse", "tracing", "debugging", "observability", "analysis", "datasets", "prompts", "experiments", "evaluation", "scores", "analytics", "sessions", "annotation", "instrumentation", "setup", "schema", "validation"],
+  "keywords": [
+    "langfuse",
+    "tracing",
+    "debugging",
+    "observability",
+    "analysis",
+    "datasets",
+    "prompts",
+    "experiments",
+    "evaluation",
+    "scores",
+    "analytics",
+    "sessions",
+    "annotation",
+    "instrumentation",
+    "setup",
+    "schema",
+    "validation"
+  ],
   "commands": [
     "./commands/agent-eval-init.md",
     "./commands/optimize-bootstrap.md",
