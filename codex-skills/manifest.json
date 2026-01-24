@@ -25,6 +25,12 @@
       "description": "Hypothesis-driven optimization loop for AI agents with persistent state and compounding"
     },
     {
+      "name": "agentic-optimization-loop",
+      "path": "codex-skills/agentic-optimization-loop",
+      "version": "0.1.0",
+      "description": "Three-layer optimization framework and cloud prompt generator"
+    },
+    {
       "name": "evaluation-design",
       "path": "codex-skills/evaluation-design",
       "version": "0.1.0",
