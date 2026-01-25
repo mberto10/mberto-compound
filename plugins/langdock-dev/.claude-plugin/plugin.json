@@ -1,7 +1,7 @@
 {
   "name": "langdock-dev",
-  "version": "0.1.0",
-  "description": "Build Langdock integration actions and use Langdock APIs with live documentation fetching",
+  "version": "0.2.0",
+  "description": "Build Langdock integration actions and use Langdock APIs with live documentation fetching. Includes CLI tools for Agent, Knowledge Folder, and Usage Export APIs.",
   "author": {
     "name": "Maximilian Bruhn",
     "email": "puzzle.ai.studio@gmail.com"
@@ -9,7 +9,7 @@
   "homepage": "https://github.com/mberto10/mberto-compound",
   "repository": "https://github.com/mberto10/mberto-compound",
   "license": "MIT",
-  "keywords": ["langdock", "integrations", "actions", "api", "development"],
+  "keywords": ["langdock", "integrations", "actions", "api", "development", "cli", "agents", "knowledge-folders"],
   "commands": [
     "./commands/create-action.md"
   ],
@@ -18,6 +18,7 @@
   ],
   "skills": [
     "./skills/action-patterns",
+    "./skills/assistant-prompt-craft",
     "./skills/langdock-api",
     "./skills/langdock-api-operations",
     "./skills/parallel-actions"
