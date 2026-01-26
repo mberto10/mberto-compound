@@ -16,7 +16,7 @@ Perplexity Sonar is a grounded LLM API that combines language model capabilities
 | Parameter | Required | Type | Description |
 |-----------|----------|------|-------------|
 | `user_message` | Yes | string | The question or query to answer |
-| `model` | No | enum | Model selection (see below) |
+| `model` | No | enum | Model selection: `sonar` |
 | `search_domain_filter` | No | string[] | Domains to include/exclude (prefix `-` to exclude) |
 | `search_recency_filter` | No | enum | Time filter: `day`, `week`, `month`, `year` |
 
@@ -26,16 +26,12 @@ Perplexity Sonar is a grounded LLM API that combines language model capabilities
 
 | Model | Best For |
 |-------|----------|
-| `sonar` | Fast, general-purpose queries, quick fact checks |
-| `sonar-pro` | Complex queries requiring deeper analysis |
-| `sonar-reasoning-pro` | Multi-step reasoning, complex research |
-| `sonar-deep-research` | Comprehensive research with extensive sources |
+| `sonar` | Fast, general-purpose queries, quick fact checks, topic overviews |
 
 **Model Selection Guidelines:**
-- Default to `sonar` for quick fact-checking
-- Use `sonar-pro` for nuanced questions requiring synthesis
-- Use `sonar-reasoning-pro` for complex analytical questions
-- Reserve `sonar-deep-research` for comprehensive backgrounders
+- Use `sonar` for all Perplexity queries
+- For complex research requiring deeper analysis, use `exa_answer` instead (see Exa integration)
+- For comprehensive backgrounders, combine `sonar` with Exa `Web Recherche` and `exa_get_page`
 
 ---
 
@@ -117,23 +113,26 @@ search_recency_filter: week
 ### Pattern B: Breaking News Context
 ```
 Action: chat_completion
-model: sonar-pro
-user_message: "Was ist der aktuelle Stand bei den Tarifverhandlungen im öffentlichen Dienst und welche Forderungen stehen im Raum?"
+model: sonar
+user_message: "Was ist der aktuelle Stand bei den Tarifverhandlungen im öffentlichen Dienst?"
 search_recency_filter: day
 search_domain_filter: ["reuters.com", "apnews.com", "dpa.com"]
 ```
 
-### Pattern C: Background Research
+### Pattern C: Topic Overview
 ```
 Action: chat_completion
-model: sonar-deep-research
-user_message: "Erkläre die Geschichte und aktuelle Debatte um das Bürgergeld in Deutschland, einschließlich der wichtigsten Kritikpunkte von verschiedenen politischen Seiten."
+model: sonar
+user_message: "Was sind die wichtigsten Punkte in der aktuellen Debatte um das Bürgergeld?"
+search_recency_filter: month
 ```
+
+**Note:** For comprehensive background research with extensive sources, use `exa_answer` instead (see Exa integration reference).
 
 ### Pattern D: Competitor-Free Research
 ```
 Action: chat_completion
-model: sonar-pro
+model: sonar
 user_message: "Welche neuen Entwicklungen gibt es beim Thema KI-Regulierung in der EU?"
 search_domain_filter: ["-eigene-zeitung.de"]
 ```
@@ -142,18 +141,19 @@ search_domain_filter: ["-eigene-zeitung.de"]
 
 ## Comparison: Perplexity vs. Exa
 
-| Aspect | Perplexity | Exa |
-|--------|------------|-----|
-| **Output** | Synthesized answer + citations | Raw search results + optional content |
-| **Best for** | Quick answers, fact synthesis | Source discovery, full article retrieval |
-| **Control** | Less control over sources | Fine-grained filtering |
-| **Speed** | Very fast | Depends on content retrieval |
-| **Use first** | Initial fact check | Deep source research |
+| Aspect | Perplexity (sonar) | Exa (exa_answer) |
+|--------|-------------------|------------------|
+| **Output** | Synthesized answer + citations | Synthesized answer + detailed citations |
+| **Best for** | Quick overviews, simple fact checks | Fact-checking with sources, research questions |
+| **Speed** | Very fast | Fast |
+| **Depth** | Surface-level synthesis | Deeper analysis with source access |
+| **Use when** | Need quick answer | Need reliable sources and citations |
 
 **Recommended workflow:**
-1. Start with Perplexity for quick verification
-2. If more sources needed, use Exa for deeper search
-3. Use Exa's `get_page` to retrieve full article text
+1. Start with Perplexity `sonar` for quick topic overview
+2. Use `exa_answer` for fact-checking requiring reliable sources
+3. Use Exa `Web Recherche` for source discovery
+4. Use Exa `exa_get_page` to retrieve full article text
 
 ---
 
@@ -164,24 +164,23 @@ Use this template when including Perplexity in assistant system prompts:
 ```markdown
 ### Perplexity (Sonar)
 
-**Beschreibung:** Ermöglicht schnelle Faktenprüfung und Recherche mit automatischer Quellensynthese und Zitaten.
+**Beschreibung:** Ermöglicht schnelle Themenübersichten und einfache Faktenprüfung mit automatischer Quellensynthese.
 
 **Verfügbare Aktionen:**
-- `chat_completion`: Recherchiert und beantwortet Fragen mit Quellenangaben - Parameter: user_message, model (sonar/sonar-pro/sonar-deep-research), search_recency_filter (day/week/month/year), search_domain_filter
+- `chat_completion`: Recherchiert und beantwortet Fragen mit Quellenangaben - Parameter: user_message, model (sonar), search_recency_filter (day/week/month/year), search_domain_filter
 
 **Anwendung:**
 Nutze Perplexity, wenn:
-- Schnelle Faktenprüfung einer Behauptung benötigt wird
-- Ein Überblick über ein Thema mit Quellenangaben gebraucht wird
+- Ein schneller Überblick über ein Thema benötigt wird
+- Einfache Faktenfragen beantwortet werden sollen
 - Aktuelle Ereignisse zusammengefasst werden sollen
-- Eine erste Recherche vor tiefergehender Exa-Suche erfolgen soll
 
 **Nicht verwenden für:**
-- Suche nach spezifischen Dokumenten oder PDFs
-- Wenn vollständige Originalquellen benötigt werden (→ Exa verwenden)
-- Reine Auflistung von Quellen ohne Synthese
+- Faktenprüfung mit hohen Quellenanforderungen (→ exa_answer verwenden)
+- Suche nach spezifischen Dokumenten oder PDFs (→ Exa Web Recherche)
+- Tiefergehende Recherche (→ exa_answer oder Exa Web Recherche)
 
-**Hinweis:** Perplexity liefert bereits synthetisierte Antworten mit Zitaten. Für Zugriff auf vollständige Originalartikel zusätzlich Exa nutzen.
+**Hinweis:** Für zuverlässige Faktenprüfung mit Quellenangaben bevorzuge `exa_answer`. Perplexity eignet sich für schnelle Übersichten.
 ```
 
 ---
@@ -190,8 +189,9 @@ Nutze Perplexity, wenn:
 
 | Use Case | Model | Recency Filter | Domain Filter |
 |----------|-------|----------------|---------------|
-| Schnelle Faktenprüfung | `sonar` | - | - |
-| Aktuelle Nachrichten | `sonar-pro` | `day` | Nachrichtenagenturen |
-| Hintergrundrecherche | `sonar-deep-research` | `month` | - |
-| Themenüberblick | `sonar-pro` | `week` | - |
-| Quellenfreie Recherche | `sonar-pro` | - | Konkurrenz ausschließen |
+| Schneller Themenüberblick | `sonar` | `week` | - |
+| Aktuelle Nachrichten | `sonar` | `day` | Nachrichtenagenturen |
+| Einfache Faktenprüfung | `sonar` | - | - |
+| Quellenfreie Recherche | `sonar` | - | Konkurrenz ausschließen |
+
+**For complex research:** Use `exa_answer` instead of Perplexity.
