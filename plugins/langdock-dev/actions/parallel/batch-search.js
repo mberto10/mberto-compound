@@ -7,9 +7,9 @@
 // excerpt_chars = Maximale Zeichen pro Auszug (default: 2000)
 
 const queries = JSON.parse(data.input.queries);
-const daysBack = data.input.days_back || 30;
-const maxResults = data.input.max_results || 5;
-const excerptChars = data.input.excerpt_chars || 2000;
+const daysBack = data.input.daysBack || 30;
+const maxResults = data.input.maxResults || 5;
+const excerptChars = data.input.excerptChars || 2000;
 
 // Validate input
 if (!Array.isArray(queries) || queries.length === 0) {

@@ -9,7 +9,7 @@
 const url = data.input.url;
 const objective = data.input.objective || null;
 const excerpts = data.input.excerpts !== false; // default true
-const fullContent = data.input.full_content === true; // default false
+const fullContent = data.input.fullContent === true; // default false
 
 if (!url) {
   return {

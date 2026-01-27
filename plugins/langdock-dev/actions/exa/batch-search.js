@@ -7,9 +7,9 @@
 // include_summary = Zusammenfassungen einschließen (default: true)
 
 const queries = JSON.parse(data.input.queries);
-const numResults = data.input.num_results || 5;
-const daysBack = data.input.days_back || 30;
-const includeSummary = data.input.include_summary !== false;
+const numResults = data.input.numResults || 5;
+const daysBack = data.input.daysBack || 30;
+const includeSummary = data.input.includeSummary !== false;
 
 // Validate input
 if (!Array.isArray(queries) || queries.length === 0) {

@@ -7,7 +7,7 @@
 
 const queries = JSON.parse(data.input.queries);
 const recency = data.input.recency || 'week';
-const maxPerQuery = data.input.max_per_query || 3;
+const maxPerQuery = data.input.maxPerQuery || 3;
 
 // Validate input
 if (!Array.isArray(queries) || queries.length === 0) {

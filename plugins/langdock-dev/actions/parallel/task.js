@@ -6,7 +6,7 @@
 // processor = Processing tier: base (fast), core (balanced), ultra (thorough) (default: 'base')
 
 const query = data.input.query;
-const outputFormat = data.input.output_format || null;
+const outputFormat = data.input.outputFormat || null;
 const processor = data.input.processor || 'base';
 
 if (!query) {
