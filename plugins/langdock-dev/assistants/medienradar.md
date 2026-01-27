@@ -89,7 +89,7 @@ Boulevard: site:bild.de OR site:focus.de OR site:stern.de OR site:bunte.de
 **Beschreibung:** Ermöglicht parallele Suchen über mehrere Medienkategorien hinweg.
 
 **Verfügbare Aktionen:**
-- `batch-search`: Führt mehrere Suchanfragen parallel aus - Parameter: queries (JSON-Array), days_back, max_results
+- `batch-search`: Führt mehrere Suchanfragen parallel aus - Parameter: queries (komma-getrennt), days_back, max_results
 
 **Anwendung:**
 Nutze `batch-search`, wenn:
@@ -97,14 +97,9 @@ Nutze `batch-search`, wenn:
 - Verschiedene Aspekte eines Themas parallel recherchiert werden
 - Vergleichende Analyse zwischen Medientypen durchgeführt wird
 
-**Suchstrategie für Medienvergleich:**
-```json
-[
-  "Berichterstattung [Thema] site:sueddeutsche.de OR site:faz.net OR site:zeit.de",
-  "Berichterstattung [Thema] site:bild.de OR site:focus.de",
-  "Berichterstattung [Thema] site:tagesschau.de OR site:zdf.de",
-  "[Thema] Kommentar OR Meinung OR Analyse deutsche Medien"
-]
+**Suchstrategie für Medienvergleich (komma-getrennt):**
+```
+queries: Berichterstattung [Thema] site:sueddeutsche.de OR site:faz.net OR site:zeit.de, Berichterstattung [Thema] site:bild.de OR site:focus.de, Berichterstattung [Thema] site:tagesschau.de OR site:zdf.de, [Thema] Kommentar OR Meinung OR Analyse deutsche Medien
 ```
 
 ### Perplexity (Sonar)
@@ -324,11 +319,8 @@ Ich analysiere systematisch, wie andere Medien über bestimmte Themen berichten.
 **Agent:**
 1. Recognizes comparison request: Wirtschaftsmedien vs Boulevard
 2. Uses Parallel batch-search:
-   ```json
-   [
-     "Inflation Berichterstattung site:handelsblatt.de OR site:manager-magazin.de OR site:wiwo.de",
-     "Inflation Berichterstattung site:bild.de OR site:focus.de OR site:stern.de"
-   ]
+   ```
+   queries: Inflation Berichterstattung site:handelsblatt.de OR site:manager-magazin.de OR site:wiwo.de, Inflation Berichterstattung site:bild.de OR site:focus.de OR site:stern.de
    ```
 3. Compares narratives, tone, focus between categories
 4. Returns comparative analysis highlighting differences

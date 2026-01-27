@@ -90,7 +90,7 @@ Der Nutzer kann angeben, welche Quellentypen für die Recherche priorisiert werd
 - `batch-search`: Führt bis zu 10 Suchanfragen parallel aus und gibt strukturierte Ergebnisse zurück
 
 **Parameter:**
-- `queries`: JSON-Array mit natürlichsprachlichen Fragen (max. 10)
+- `queries`: Komma-getrennte natürlichsprachliche Fragen (max. 10)
 - `recency`: Aktualitätsfilter (day, week, month, year) – Standard: "week"
 
 **Suchstrategie – Semantische Formulierung:**
@@ -98,34 +98,18 @@ Der Nutzer kann angeben, welche Quellentypen für die Recherche priorisiert werd
 Formuliere Anfragen als vollständige, natürlichsprachliche Fragen. Perplexity versteht Kontext und Intention besser als Keyword-Suchen.
 
 **Beispiel für Interview mit Christian Lindner (neutral):**
-```json
-[
-  "Welchen beruflichen Werdegang hat Christian Lindner und welche Positionen hatte er vor seiner politischen Karriere?",
-  "Welche politischen Positionen vertritt Christian Lindner aktuell zu Wirtschafts- und Finanzthemen?",
-  "Welche Kontroversen oder kritischen Berichterstattungen gab es über Christian Lindner in den letzten Monaten?",
-  "Was sind die aktuellen Herausforderungen der FDP und wie positioniert sich Lindner dazu?",
-  "Welche konkreten Zitate von Christian Lindner gibt es zum Thema Schuldenbremse?"
-]
+```
+queries: Welchen beruflichen Werdegang hat Christian Lindner und welche Positionen hatte er vor seiner politischen Karriere?, Welche politischen Positionen vertritt Christian Lindner aktuell zu Wirtschafts- und Finanzthemen?, Welche Kontroversen oder kritischen Berichterstattungen gab es über Christian Lindner in den letzten Monaten?, Was sind die aktuellen Herausforderungen der FDP und wie positioniert sich Lindner dazu?, Welche konkreten Zitate von Christian Lindner gibt es zum Thema Schuldenbremse?
 ```
 
 **Beispiel für kritisches Interview (CEO zu Entlassungen):**
-```json
-[
-  "Welche Massenentlassungen hat [Unternehmen] im letzten Jahr durchgeführt und wie wurden diese begründet?",
-  "Wie hat [CEO Name] sich öffentlich zu den Stellenkürzungen geäußert?",
-  "Wie haben Gewerkschaften und Mitarbeiter auf die Entlassungswelle reagiert?",
-  "Wie steht [Unternehmen] finanziell da – rechtfertigen die Zahlen die Einsparungen?",
-  "Welche früheren Aussagen hat [CEO Name] zur Arbeitsplatzsicherheit gemacht?"
-]
+```
+queries: Welche Massenentlassungen hat [Unternehmen] im letzten Jahr durchgeführt und wie wurden diese begründet?, Wie hat [CEO Name] sich öffentlich zu den Stellenkürzungen geäußert?, Wie haben Gewerkschaften und Mitarbeiter auf die Entlassungswelle reagiert?, Wie steht [Unternehmen] finanziell da – rechtfertigen die Zahlen die Einsparungen?, Welche früheren Aussagen hat [CEO Name] zur Arbeitsplatzsicherheit gemacht?
 ```
 
 **Beispiel mit Quellensteuerung (offizielle Quellen):**
-```json
-[
-  "Offizielle Pressemitteilungen von [Name/Organisation] zum Thema [X]",
-  "Parlamentarische Anfragen und Antworten zu [Thema] von [Name]",
-  "Offizielle Statements von [Name] in Regierungsdokumenten"
-]
+```
+queries: Offizielle Pressemitteilungen von [Name/Organisation] zum Thema [X], Parlamentarische Anfragen und Antworten zu [Thema] von [Name], Offizielle Statements von [Name] in Regierungsdokumenten
 ```
 
 **Hinweis:** Nutze einen einzigen batch-search Aufruf mit mehreren Fragen statt mehrerer einzelner Aufrufe. Das ist effizienter und liefert zusammenhängende Ergebnisse.
@@ -141,12 +125,8 @@ Formuliere Anfragen als vollständige, natürlichsprachliche Fragen. Perplexity 
 Suche gezielt nach relevanten früheren Aussagen des Interviewpartners. Diese können als Grundlage für Fragen dienen.
 
 **Suchstrategie für Zitate:**
-```json
-[
-  "Zitate von [Name] zum Thema [X]",
-  "Was hat [Name] in Interviews zu [Thema] gesagt?",
-  "[Name] Aussage [Schlüsselbegriff] Original"
-]
+```
+queries: Zitate von [Name] zum Thema [X], Was hat [Name] in Interviews zu [Thema] gesagt?, [Name] Aussage [Schlüsselbegriff] Original
 ```
 
 **Ausgabe – Zitattabelle:**
@@ -233,31 +213,19 @@ Bei sensiblen Bereichen (Kontroversen, persönliche Themen):
 
 ### Schritt 2: Recherche durchführen
 
-Formuliere 4-6 semantische Fragen als JSON-Array für einen batch-search Aufruf:
+Formuliere 4-6 semantische Fragen (komma-getrennt) für einen batch-search Aufruf:
 
 **Modus A (Breite Recherche):**
-```json
-[
-  "Wer ist [Name] und welchen beruflichen/politischen Werdegang hat er/sie?",
-  "Welche Positionen vertritt [Name] aktuell zu [relevanten Themen]?",
-  "Welche Kontroversen oder kritische Berichterstattung gab es zu [Name] kürzlich?",
-  "In welchem organisatorischen/politischen Kontext agiert [Name] derzeit?",
-  "Welche konkreten Zitate gibt es von [Name] zum Thema [X]?"
-]
+```
+queries: Wer ist [Name] und welchen beruflichen/politischen Werdegang hat er/sie?, Welche Positionen vertritt [Name] aktuell zu [relevanten Themen]?, Welche Kontroversen oder kritische Berichterstattung gab es zu [Name] kürzlich?, In welchem organisatorischen/politischen Kontext agiert [Name] derzeit?, Welche konkreten Zitate gibt es von [Name] zum Thema [X]?
 ```
 
 **Modus B (Ergänzend zu Nutzer-Notizen):**
 Analysiere die Notizen → identifiziere Lücken → formuliere nur Fragen zu fehlenden Aspekten.
 
 **Modus C (Fokussiert auf Winkel):**
-```json
-[
-  "Was ist der Hintergrund zu [spezifisches Thema/Ereignis]?",
-  "Wie hat [Name] sich zu [Thema] positioniert?",
-  "Welche Kritik gibt es an [Name]s Haltung zu [Thema]?",
-  "Welche Gegenpositionen oder Alternativen werden diskutiert?",
-  "Frühere Zitate von [Name] zu [Thema]"
-]
+```
+queries: Was ist der Hintergrund zu [spezifisches Thema/Ereignis]?, Wie hat [Name] sich zu [Thema] positioniert?, Welche Kritik gibt es an [Name]s Haltung zu [Thema]?, Welche Gegenpositionen oder Alternativen werden diskutiert?, Frühere Zitate von [Name] zu [Thema]
 ```
 
 ### Schritt 3: Informationen strukturieren

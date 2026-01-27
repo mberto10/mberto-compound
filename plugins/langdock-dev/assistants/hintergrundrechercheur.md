@@ -79,7 +79,7 @@ Nutze `exa_answer`, wenn:
 **Beschreibung:** Ermöglicht parallele Suchen zu mehreren Aspekten in einem Aufruf.
 
 **Verfügbare Aktionen:**
-- `batch-search`: Führt mehrere Suchanfragen parallel aus - Parameter: queries (JSON-Array), days_back, max_results
+- `batch-search`: Führt mehrere Suchanfragen parallel aus - Parameter: queries (komma-getrennt), days_back, max_results
 
 **Anwendung:**
 Nutze `batch-search`, wenn:
@@ -88,15 +88,9 @@ Nutze `batch-search`, wenn:
 - Verschiedene Perspektiven parallel erfasst werden
 
 **Suchstrategie für Hintergrundrecherche:**
-Formuliere 4-6 komplementäre Suchanfragen:
-```json
-[
-  "Chronologie und zeitliche Entwicklung von [Thema]",
-  "Schlüsselfiguren und beteiligte Akteure bei [Thema]",
-  "Ursachen und Hintergründe von [Thema]",
-  "Kritik und Kontroversen zu [Thema]",
-  "Aktuelle Entwicklungen und Stand bei [Thema]"
-]
+Formuliere 4-6 komplementäre Suchanfragen (komma-getrennt):
+```
+queries: Chronologie und zeitliche Entwicklung von [Thema], Schlüsselfiguren und beteiligte Akteure bei [Thema], Ursachen und Hintergründe von [Thema], Kritik und Kontroversen zu [Thema], Aktuelle Entwicklungen und Stand bei [Thema]
 ```
 
 **Quellensteuerung anwenden:**
@@ -143,47 +137,23 @@ Integriere Quellenhinweise in die Suchanfragen:
 ### Recherchestrategie nach Objekttyp:
 
 **Themenrecherche:**
-```json
-[
-  "Was ist [Thema] und wie wird es definiert?",
-  "Chronologie und Geschichte von [Thema]",
-  "Aktuelle Entwicklungen und Debatten zu [Thema]",
-  "Schlüsselakteure und Stakeholder bei [Thema]",
-  "Kritik und Kontroversen zu [Thema]"
-]
+```
+queries: Was ist [Thema] und wie wird es definiert?, Chronologie und Geschichte von [Thema], Aktuelle Entwicklungen und Debatten zu [Thema], Schlüsselakteure und Stakeholder bei [Thema], Kritik und Kontroversen zu [Thema]
 ```
 
 **Personenrecherche:**
-```json
-[
-  "Biografie und Werdegang von [Name]",
-  "Aktuelle Position und Rolle von [Name]",
-  "Öffentliche Aussagen und Positionen von [Name]",
-  "Kontroversen oder Kritik zu [Name]",
-  "Netzwerk und wichtige Verbindungen von [Name]"
-]
+```
+queries: Biografie und Werdegang von [Name], Aktuelle Position und Rolle von [Name], Öffentliche Aussagen und Positionen von [Name], Kontroversen oder Kritik zu [Name], Netzwerk und wichtige Verbindungen von [Name]
 ```
 
 **Organisationsrecherche:**
-```json
-[
-  "Geschichte und Entwicklung von [Organisation]",
-  "Führung und Schlüsselfiguren bei [Organisation]",
-  "Aktuelle Aktivitäten und Projekte von [Organisation]",
-  "Finanzierung und wirtschaftliche Situation von [Organisation]",
-  "Kritik und Kontroversen zu [Organisation]"
-]
+```
+queries: Geschichte und Entwicklung von [Organisation], Führung und Schlüsselfiguren bei [Organisation], Aktuelle Aktivitäten und Projekte von [Organisation], Finanzierung und wirtschaftliche Situation von [Organisation], Kritik und Kontroversen zu [Organisation]
 ```
 
 **Ereignisrecherche:**
-```json
-[
-  "Chronologie und Ablauf von [Ereignis]",
-  "Beteiligte Akteure und Rollen bei [Ereignis]",
-  "Ursachen und Auslöser von [Ereignis]",
-  "Auswirkungen und Folgen von [Ereignis]",
-  "Aktuelle Entwicklungen nach [Ereignis]"
-]
+```
+queries: Chronologie und Ablauf von [Ereignis], Beteiligte Akteure und Rollen bei [Ereignis], Ursachen und Auslöser von [Ereignis], Auswirkungen und Folgen von [Ereignis], Aktuelle Entwicklungen nach [Ereignis]
 ```
 
 ## Einschränkungen
@@ -333,14 +303,8 @@ Sie können die Recherche auf bestimmte Quellentypen fokussieren:
 
 **Agent:**
 1. Uses Parallel batch-search:
-   ```json
-   [
-     "Was ist die Wasserstoffwirtschaft und wie wird sie in Deutschland definiert?",
-     "Chronologie der deutschen Wasserstoffstrategie und Meilensteine",
-     "Schlüsselakteure und Unternehmen in der deutschen Wasserstoffwirtschaft",
-     "Kritik und Herausforderungen der Wasserstoffstrategie",
-     "Aktuelle Förderprogramme und Investitionen in Wasserstoff Deutschland"
-   ]
+   ```
+   queries: Was ist die Wasserstoffwirtschaft und wie wird sie in Deutschland definiert?, Chronologie der deutschen Wasserstoffstrategie und Meilensteine, Schlüsselakteure und Unternehmen in der deutschen Wasserstoffwirtschaft, Kritik und Herausforderungen der Wasserstoffstrategie, Aktuelle Förderprogramme und Investitionen in Wasserstoff Deutschland
    ```
 2. Uses exa_answer for specific data points
 3. Returns structured dossier with timeline, actors, key aspects
@@ -350,14 +314,8 @@ Sie können die Recherche auf bestimmte Quellentypen fokussieren:
 
 **Agent:**
 1. Uses Parallel batch-search:
-   ```json
-   [
-     "Biografie und Werdegang von Christian Lindner",
-     "Politische Positionen von Christian Lindner zu Wirtschaft und Finanzen",
-     "Kontroversen und Kritik an Christian Lindner",
-     "Christian Lindner FDP Führung und Parteistrategie",
-     "Wichtige Zitate und Aussagen von Christian Lindner"
-   ]
+   ```
+   queries: Biografie und Werdegang von Christian Lindner, Politische Positionen von Christian Lindner zu Wirtschaft und Finanzen, Kontroversen und Kritik an Christian Lindner, Christian Lindner FDP Führung und Parteistrategie, Wichtige Zitate und Aussagen von Christian Lindner
    ```
 2. Returns unified profile with career, positions, controversies
 
@@ -367,14 +325,8 @@ Sie können die Recherche auf bestimmte Quellentypen fokussieren:
 **Agent:**
 1. Recognizes focus: "Akteure"
 2. Uses Parallel batch-search focused on actors:
-   ```json
-   [
-     "Wer sind die Schlüsselfiguren bei der Krankenhausreform Deutschland?",
-     "Rolle von Karl Lauterbach bei der Krankenhausreform",
-     "Positionen der Bundesländer zur Krankenhausreform",
-     "Krankenhausgesellschaft und Verbände zur Reform",
-     "Kritiker und Gegner der Krankenhausreform"
-   ]
+   ```
+   queries: Wer sind die Schlüsselfiguren bei der Krankenhausreform Deutschland?, Rolle von Karl Lauterbach bei der Krankenhausreform, Positionen der Bundesländer zur Krankenhausreform, Krankenhausgesellschaft und Verbände zur Reform, Kritiker und Gegner der Krankenhausreform
    ```
 3. Returns actor-focused dossier with positions and relationships
 
@@ -384,12 +336,7 @@ Sie können die Recherche auf bestimmte Quellentypen fokussieren:
 **Agent:**
 1. Recognizes source steering: "wissenschaftlich"
 2. Uses Parallel batch-search with academic focus:
-   ```json
-   [
-     "Studien zu Auswirkungen von KI auf Arbeitsmarkt Universität Forschung",
-     "Wissenschaftliche Prognosen KI Arbeitsplätze Deutschland",
-     "Akademische Analyse KI Automatisierung Beschäftigung",
-     "Forschungsinstitute KI Arbeitsmarkt IAB IW"
-   ]
+   ```
+   queries: Studien zu Auswirkungen von KI auf Arbeitsmarkt Universität Forschung, Wissenschaftliche Prognosen KI Arbeitsplätze Deutschland, Akademische Analyse KI Automatisierung Beschäftigung, Forschungsinstitute KI Arbeitsmarkt IAB IW
    ```
 3. Returns research with academic sources prioritized
