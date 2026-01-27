@@ -6,41 +6,15 @@ Die folgende Beschreibung muss in **jedem** Langdock-Agenten als Teil der System
 
 ---
 
-> **Hinweis:** Dieser Agent wird vom GenAI Team verwaltet und regelmäßig auf Basis von Feedback weiterentwickelt. Jegliche AI-Funktionalitäten unterliegen dem **Human-First/Human-Last Prinzip** und müssen vor Verwendung auf Richtigkeit geprüft werden. Bei Fragen oder Feedback schreiben Sie uns gerne an **team-genai@faz.de**
+> **Hinweis:** Dieser Agent wird vom GenAI Team verwaltet und regelmäßig auf Basis von Feedback weiterentwickelt. Jegliche AI-Funktionalitäten unterliegen dem **Human-First/Human-Last Prinzip** und müssen vor Verwendung auf Richtigkeit geprüft werden (vor allem bei Assistenten die mit **Test** markiert sind). Bei Fragen oder Feedback schreiben Sie uns gerne an **team-genai@faz.de**
 
 ---
 
 ## Kopiervorlage
 
 ```
-Dieser Agent wird vom GenAI Team verwaltet und regelmäßig auf Basis von Feedback weiterentwickelt. Jegliche AI-Funktionalitäten unterliegen dem Human-First/Human-Last Prinzip und müssen vor Verwendung auf Richtigkeit geprüft werden. Bei Fragen oder Feedback schreiben Sie uns gerne an team-genai@faz.de
+Dieser Agent wird vom GenAI Team verwaltet und regelmäßig auf Basis von Feedback weiterentwickelt. Jegliche AI-Funktionalitäten unterliegen dem Human-First/Human-Last Prinzip und müssen vor Verwendung auf Richtigkeit geprüft werden (vor allem bei Assistenten die mit Test markiert sind). Bei Fragen oder Feedback schreiben Sie uns gerne an team-genai@faz.de
 ```
-
----
-
-## Optionaler Zusatz für Test-Assistenten
-
-Falls der Agent Teil einer **Testphase** ist und die Antworten zur Verbesserung ausgewertet werden, kann folgender Hinweis ergänzend hinzugefügt werden:
-
----
-
-> **Test-Hinweis:** Dieser Assistent befindet sich derzeit in einer Testphase. Ihre Eingaben und die generierten Antworten werden anonymisiert ausgewertet, um den Assistenten kontinuierlich zu verbessern.
-
----
-
-### Kopiervorlage (Test-Zusatz)
-
-```
-Dieser Assistent befindet sich derzeit in einer Testphase. Ihre Eingaben und die generierten Antworten werden anonymisiert ausgewertet, um den Assistenten kontinuierlich zu verbessern.
-```
-
-### Wann verwenden?
-
-- Agent ist neu und wird evaluiert
-- Antworten werden für Qualitätsverbesserungen analysiert
-- Nutzer sollen über die Datenverwendung informiert werden
-
----
 
 ## Human-First/Human-Last Prinzip
 
