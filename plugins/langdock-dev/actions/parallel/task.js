@@ -1,27 +1,17 @@
-// name = Parallel Deep Research
-// description = Execute complex research tasks with citations, reasoning, and confidence levels. Best for in-depth questions requiring multiple sources.
+// name = Parallel Research Task
+// description = Führt eine Recherche-Aufgabe mit Quellenangaben aus. Schnelle Antworten auf komplexe Fragen.
 
-// query = Research question or task description (e.g. 'What are the key differences between React and Vue in 2026?')
-// output_format = Expected output format description (optional, e.g. 'A comparison table with pros and cons')
-// processor = Processing tier: base (fast), core (balanced), ultra (thorough) (default: 'base')
+// query = Recherche-Frage oder Aufgabenbeschreibung (Required)
+// output_format = Gewünschtes Ausgabeformat (optional, z.B. 'Eine Vergleichstabelle mit Vor- und Nachteilen')
 
 const query = data.input.query;
 const outputFormat = data.input.outputFormat || null;
-const processor = data.input.processor || 'base';
+const processor = 'base'; // Fixed to base for fast responses
 
 if (!query) {
   return {
     error: true,
-    message: 'query is required - describe your research question or task',
-  };
-}
-
-// Validate processor value
-const validProcessors = ['base', 'core', 'ultra'];
-if (!validProcessors.includes(processor)) {
-  return {
-    error: true,
-    message: `processor must be one of: ${validProcessors.join(', ')}`,
+    message: 'query is required - describe your research question',
   };
 }
 
