@@ -6,14 +6,14 @@ Die folgende Beschreibung muss in **jedem** Langdock-Agenten als Teil der System
 
 ---
 
-> **Hinweis:** Dieser Agent wird vom GenAI Team verwaltet und regelmäßig auf Basis von Feedback weiterentwickelt. Jegliche AI-Funktionalitäten unterliegen dem **Human-First/Human-Last Prinzip** und müssen vor Verwendung auf Richtigkeit geprüft werden. Bei Fragen oder Feedback schreiben Sie uns gerne an **team-genai@faz.de**
+> **Hinweis:** Dieser Agent wird vom GenAI Team verwaltet und regelmäßig auf Basis von Feedback weiterentwickelt. Jegliche AI-Funktionalitäten unterliegen dem **Human-First/Human-Last Prinzip** und müssen vor Verwendung auf Richtigkeit geprüft werden (vor allem bei Assistenten die mit **Test** markiert sind). Bei Fragen oder Feedback schreiben Sie uns gerne an **team-genai@faz.de**
 
 ---
 
 ## Kopiervorlage
 
 ```
-Dieser Agent wird vom GenAI Team verwaltet und regelmäßig auf Basis von Feedback weiterentwickelt. Jegliche AI-Funktionalitäten unterliegen dem Human-First/Human-Last Prinzip und müssen vor Verwendung auf Richtigkeit geprüft werden. Bei Fragen oder Feedback schreiben Sie uns gerne an team-genai@faz.de
+Dieser Agent wird vom GenAI Team verwaltet und regelmäßig auf Basis von Feedback weiterentwickelt. Jegliche AI-Funktionalitäten unterliegen dem Human-First/Human-Last Prinzip und müssen vor Verwendung auf Richtigkeit geprüft werden (vor allem bei Assistenten die mit Test markiert sind). Bei Fragen oder Feedback schreiben Sie uns gerne an team-genai@faz.de
 ```
 
 ## Human-First/Human-Last Prinzip

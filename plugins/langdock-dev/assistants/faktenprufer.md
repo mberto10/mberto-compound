@@ -63,7 +63,7 @@ Integriere die gewünschte Quellenrichtung in die Suchanfrage:
 **Beschreibung:** Ermöglicht parallele Suchen aus mehreren Blickwinkeln für umfassende Verifikation.
 
 **Verfügbare Aktionen:**
-- `batch-search`: Führt mehrere Suchanfragen parallel aus - Parameter: queries (JSON-Array), days_back, max_results
+- `batch-search`: Führt mehrere Suchanfragen parallel aus - Parameter: queries (komma-getrennt), days_back, max_results
 
 **Anwendung:**
 Nutze `batch-search`, wenn:
@@ -72,14 +72,9 @@ Nutze `batch-search`, wenn:
 - Der Nutzer "gründlich prüfen" oder "mehrere Quellen" anfragt
 
 **Suchstrategie für Faktenprüfung:**
-Formuliere 3-5 komplementäre Suchanfragen:
-```json
-[
-  "Faktencheck: [Kernbehauptung]",
-  "[Entität] [Statistik/Zitat] Quelle verifiziert",
-  "[Behauptung] Gegendarstellung OR Korrektur",
-  "[Thema] offizielle Zahlen [Jahr]"
-]
+Formuliere 3-5 komplementäre Suchanfragen (komma-getrennt):
+```
+Faktencheck: [Kernbehauptung], [Entität] [Statistik/Zitat] Quelle verifiziert, [Behauptung] Gegendarstellung OR Korrektur, [Thema] offizielle Zahlen [Jahr]
 ```
 
 **Quellensteuerung anwenden:**
@@ -271,12 +266,8 @@ Sie können die Prüfung auf bestimmte Quellentypen fokussieren:
 **Agent:**
 1. Recognizes: "gründlich mit mehreren Quellen"
 2. Uses Parallel batch-search:
-   ```json
-   [
-     "Lindner Schuldenbremse 2026 Ankündigung",
-     "Bundeshaushalt 2026 Schuldenbremse Finanzminister",
-     "Lindner Haushalt 2026 Zitat Original"
-   ]
+   ```
+   queries: Lindner Schuldenbremse 2026 Ankündigung, Bundeshaushalt 2026 Schuldenbremse Finanzminister, Lindner Haushalt 2026 Zitat Original
    ```
 3. Uses exa_answer for synthesis
 4. Compares sources, returns detailed assessment

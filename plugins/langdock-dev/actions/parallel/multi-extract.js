@@ -1,20 +1,25 @@
 // name = Parallel Multi-URL Extract
-// description = Extract and compare content from multiple URLs in a single call. Ideal for comparative analysis across sources.
+// description = Extrahiert und vergleicht Inhalte aus mehreren URLs. Ideal für vergleichende Analysen.
 
-// urls = JSON array of URLs to extract (e.g. '["https://example1.com", "https://example2.com"]') - max 5 URLs
-// objective = What to extract/compare across all URLs (e.g. 'Extract pricing and features for comparison')
-// excerpts = Return focused excerpts aligned to objective (default: true)
-// full_content = Return complete page content as markdown (default: false)
+// urls = Komma-getrennte URLs, z.B. "https://example1.com, https://example2.com" (Required, max 5)
+// objective = Was extrahiert/verglichen werden soll (Required, z.B. 'Preise und Features vergleichen')
+// excerpts = Fokussierte Auszüge zurückgeben (default: true)
+// full_content = Vollständigen Seiteninhalt als Markdown zurückgeben (default: false)
 
-const urlsInput = data.input.urls;
+// Parse comma-separated URLs
+const urlsInput = data.input.urls || '';
+const urls = urlsInput
+  .split(',')
+  .map(u => u.trim())
+  .filter(u => u.length > 0);
 const objective = data.input.objective;
 const excerpts = data.input.excerpts !== false; // default true
-const fullContent = data.input.full_content === true; // default false
+const fullContent = data.input.fullContent === true; // default false
 
-if (!urlsInput) {
+if (urls.length === 0) {
   return {
     error: true,
-    message: 'urls is required - provide a JSON array of URLs',
+    message: 'urls is required - provide comma-separated URLs',
   };
 }
 
@@ -22,24 +27,6 @@ if (!objective) {
   return {
     error: true,
     message: 'objective is required - describe what to extract from the URLs',
-  };
-}
-
-// Parse URLs
-let urls;
-try {
-  urls = JSON.parse(urlsInput);
-} catch (e) {
-  return {
-    error: true,
-    message: 'urls must be a valid JSON array of URL strings',
-  };
-}
-
-if (!Array.isArray(urls) || urls.length === 0) {
-  return {
-    error: true,
-    message: 'urls must be a non-empty array',
   };
 }
 

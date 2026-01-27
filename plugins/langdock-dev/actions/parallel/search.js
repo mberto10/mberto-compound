@@ -7,9 +7,9 @@
 // days_back = Only include results from the last X days (default: 30)
 
 const objective = data.input.objective;
-const maxResults = data.input.max_results || 5;
-const maxCharsPerResult = data.input.max_chars_per_result || 1500;
-const daysBack = data.input.days_back || 30;
+const maxResults = data.input.maxResults || 5;
+const maxCharsPerResult = data.input.maxCharsPerResult || 1500;
+const daysBack = data.input.daysBack || 30;
 
 if (!objective) {
   return {
