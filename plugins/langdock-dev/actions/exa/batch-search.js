@@ -36,78 +36,97 @@ const startDate = new Date();
 startDate.setDate(startDate.getDate() - daysBack);
 const startPublishedDate = startDate.toISOString().split('T')[0];
 
-// Build parallel search requests
-const searchRequests = queries.map(async (query) => {
-  const response = await ld.request({
-    url: 'https://api.exa.ai/search',
-    method: 'POST',
-    headers: {
-      'x-api-key': data.auth.apikey,
-      'Content-Type': 'application/json',
-    },
-    body: {
-      query: query,
-      type: 'auto',
-      numResults: numResults,
-      startPublishedDate: startPublishedDate,
-      contents: {
-        text: { maxCharacters: 1500 },
-        summary: includeSummary,
+try {
+  // Build parallel search requests
+  const searchRequests = queries.map(async (query) => {
+    const response = await ld.request({
+      url: 'https://api.exa.ai/search',
+      method: 'POST',
+      headers: {
+        'x-api-key': data.auth.apikey,
+        'Content-Type': 'application/json',
       },
-    },
+      body: {
+        query: query,
+        type: 'auto',
+        numResults: numResults,
+        startPublishedDate: startPublishedDate,
+        contents: {
+          text: { maxCharacters: 1500 },
+          summary: includeSummary,
+        },
+      },
+    });
+    return response;
   });
-  return response;
-});
 
-// Execute all searches in parallel
-const results = await Promise.allSettled(searchRequests);
+  // Execute all searches in parallel
+  const results = await Promise.allSettled(searchRequests);
 
-// Process and structure results
-const searchResults = queries.map((query, index) => {
-  const result = results[index];
+  // Process and structure results with safe parsing
+  const searchResults = queries.map((query, index) => {
+    try {
+      const result = results[index];
 
-  if (result.status === 'fulfilled') {
-    const response = result.value.json;
-    const articles = (response.results || []).map(r => ({
-      title: r.title,
-      url: r.url,
-      publishedDate: r.publishedDate,
-      excerpt: r.text?.substring(0, 500) || '',
-      summary: r.summary || null,
-    }));
+      if (result.status === 'fulfilled' && result.value) {
+        const response = result.value.json || {};
+        const articles = (response.results || []).map(r => ({
+          title: r.title || '',
+          url: r.url || '',
+          publishedDate: r.publishedDate || null,
+          excerpt: r.text ? r.text.substring(0, 500) : '',
+          summary: r.summary || null,
+        }));
 
-    return {
-      index: index,
-      query: query,
-      status: 'success',
-      articles: articles,
-      articleCount: articles.length,
-    };
-  } else {
-    return {
-      index: index,
-      query: query,
-      status: 'error',
-      articles: [],
-      articleCount: 0,
-      error: result.reason?.message || 'Search request failed',
-    };
-  }
-});
+        return {
+          index: index,
+          query: query,
+          status: 'success',
+          articles: articles,
+          articleCount: articles.length,
+        };
+      } else {
+        return {
+          index: index,
+          query: query,
+          status: 'error',
+          articles: [],
+          articleCount: 0,
+          error: result.reason?.message || 'Search request failed',
+        };
+      }
+    } catch (parseError) {
+      return {
+        index: index,
+        query: query,
+        status: 'error',
+        articles: [],
+        articleCount: 0,
+        error: `Parse error: ${parseError.message}`,
+      };
+    }
+  });
 
-// Summary statistics
-const successful = searchResults.filter(r => r.status === 'success').length;
-const failed = searchResults.filter(r => r.status === 'error').length;
-const totalArticles = searchResults.reduce((sum, r) => sum + r.articleCount, 0);
+  // Summary statistics
+  const successful = searchResults.filter(r => r.status === 'success').length;
+  const failed = searchResults.filter(r => r.status === 'error').length;
+  const totalArticles = searchResults.reduce((sum, r) => sum + r.articleCount, 0);
 
-return {
-  results: searchResults,
-  summary: {
-    total_queries: queries.length,
-    successful: successful,
-    failed: failed,
-    total_articles: totalArticles,
-    date_filter: `Last ${daysBack} days`,
-  },
-  timestamp: new Date().toISOString(),
-};
+  return {
+    results: searchResults,
+    summary: {
+      total_queries: queries.length,
+      successful: successful,
+      failed: failed,
+      total_articles: totalArticles,
+      date_filter: `Last ${daysBack} days`,
+    },
+    timestamp: new Date().toISOString(),
+  };
+} catch (error) {
+  return {
+    error: true,
+    message: 'Batch search failed',
+    details: error.message,
+  };
+}
