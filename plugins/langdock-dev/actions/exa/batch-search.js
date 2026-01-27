@@ -1,21 +1,26 @@
 // name = Batch Exa Search
 // description = Führt mehrere Exa-Suchanfragen parallel aus für tiefere Quellenrecherche. Gibt Artikel-URLs und Auszüge zurück.
 
-// queries = JSON Array mit Suchanfragen (e.g. '["Thema 1", "Recherche 2"]') (Required)
+// queries = Komma-getrennte Suchanfragen, z.B. "Frage 1, Frage 2, Frage 3" (Required)
 // num_results = Ergebnisse pro Anfrage (default: 5)
 // days_back = Nur Artikel der letzten X Tage (default: 30)
 // include_summary = Zusammenfassungen einschließen (default: true)
 
-const queries = JSON.parse(data.input.queries);
+// Parse comma-separated queries
+const queriesInput = data.input.queries || '';
+const queries = queriesInput
+  .split(',')
+  .map(q => q.trim())
+  .filter(q => q.length > 0);
 const numResults = data.input.numResults || 5;
 const daysBack = data.input.daysBack || 30;
 const includeSummary = data.input.includeSummary !== false;
 
 // Validate input
-if (!Array.isArray(queries) || queries.length === 0) {
+if (queries.length === 0) {
   return {
     error: true,
-    message: 'queries must be a non-empty JSON array of strings',
+    message: 'queries is required - provide comma-separated search queries',
   };
 }
 
@@ -32,8 +37,8 @@ startDate.setDate(startDate.getDate() - daysBack);
 const startPublishedDate = startDate.toISOString().split('T')[0];
 
 // Build parallel search requests
-const searchRequests = queries.map(query =>
-  ld.request({
+const searchRequests = queries.map(async (query) => {
+  const response = await ld.request({
     url: 'https://api.exa.ai/search',
     method: 'POST',
     headers: {
@@ -50,8 +55,9 @@ const searchRequests = queries.map(query =>
         summary: includeSummary,
       },
     },
-  })
-);
+  });
+  return response;
+});
 
 // Execute all searches in parallel
 const results = await Promise.allSettled(searchRequests);

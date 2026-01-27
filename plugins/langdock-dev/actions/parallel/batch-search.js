@@ -1,21 +1,26 @@
 // name = Batch Search Parallel
 // description = Führt mehrere Suchanfragen mit der Parallel API aus. Nutzt natürliche Sprache als Suchziel und liefert LLM-optimierte Auszüge.
 
-// queries = JSON Array mit Suchanfragen (e.g. '["Faktencheck: X", "Recherche zu Y"]') (Required)
+// queries = Komma-getrennte Suchanfragen, z.B. "Frage 1, Frage 2, Frage 3" (Required)
 // days_back = Nur Ergebnisse der letzten X Tage (default: 30)
 // max_results = Ergebnisse pro Anfrage (default: 5)
 // excerpt_chars = Maximale Zeichen pro Auszug (default: 2000)
 
-const queries = JSON.parse(data.input.queries);
+// Parse comma-separated queries
+const queriesInput = data.input.queries || '';
+const queries = queriesInput
+  .split(',')
+  .map(q => q.trim())
+  .filter(q => q.length > 0);
 const daysBack = data.input.daysBack || 30;
 const maxResults = data.input.maxResults || 5;
 const excerptChars = data.input.excerptChars || 2000;
 
 // Validate input
-if (!Array.isArray(queries) || queries.length === 0) {
+if (queries.length === 0) {
   return {
     error: true,
-    message: 'queries must be a non-empty JSON array of strings',
+    message: 'queries is required - provide comma-separated search queries',
   };
 }
 
@@ -32,8 +37,8 @@ afterDate.setDate(afterDate.getDate() - daysBack);
 const afterDateStr = afterDate.toISOString().split('T')[0];
 
 // Build parallel search requests using Parallel API
-const searchRequests = queries.map(query =>
-  ld.request({
+const searchRequests = queries.map(async (query) => {
+  const response = await ld.request({
     url: 'https://api.parallel.ai/v1beta/search',
     method: 'POST',
     headers: {
@@ -53,8 +58,9 @@ const searchRequests = queries.map(query =>
         max_chars_total: excerptChars * maxResults,
       },
     },
-  })
-);
+  });
+  return response;
+});
 
 // Execute all searches in parallel
 const results = await Promise.allSettled(searchRequests);

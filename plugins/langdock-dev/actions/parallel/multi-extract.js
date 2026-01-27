@@ -25,15 +25,19 @@ if (!objective) {
   };
 }
 
-// Parse URLs
+// Parse URLs - handle both string (needs parsing) and array (already parsed by platform)
 let urls;
-try {
-  urls = JSON.parse(urlsInput);
-} catch (e) {
-  return {
-    error: true,
-    message: 'urls must be a valid JSON array of URL strings',
-  };
+if (typeof urlsInput === 'string') {
+  try {
+    urls = JSON.parse(urlsInput);
+  } catch (e) {
+    return {
+      error: true,
+      message: 'urls must be a valid JSON array of URL strings',
+    };
+  }
+} else {
+  urls = urlsInput;
 }
 
 if (!Array.isArray(urls) || urls.length === 0) {

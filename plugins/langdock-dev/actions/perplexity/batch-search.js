@@ -1,19 +1,24 @@
 // name = Batch Web Search
 // description = Führt mehrere Suchanfragen parallel aus und gibt alle Ergebnisse zurück. Ideal für Faktenprüfung mehrerer Behauptungen.
 
-// queries = JSON Array mit Suchanfragen (e.g. '["Behauptung 1 prüfen", "Ist X wahr?", "Faktencheck Y"]') (Required)
+// queries = Komma-getrennte Suchanfragen, z.B. "Frage 1, Frage 2, Frage 3" (Required)
 // recency = Aktualitätsfilter: day, week, month, year (default: 'week')
 // max_per_query = Maximale Ergebnisse pro Anfrage (default: 3)
 
-const queries = JSON.parse(data.input.queries);
+// Parse comma-separated queries
+const queriesInput = data.input.queries || '';
+const queries = queriesInput
+  .split(',')
+  .map(q => q.trim())
+  .filter(q => q.length > 0);
 const recency = data.input.recency || 'week';
 const maxPerQuery = data.input.maxPerQuery || 3;
 
 // Validate input
-if (!Array.isArray(queries) || queries.length === 0) {
+if (queries.length === 0) {
   return {
     error: true,
-    message: 'queries must be a non-empty JSON array of strings',
+    message: 'queries is required - provide comma-separated search queries',
   };
 }
 
