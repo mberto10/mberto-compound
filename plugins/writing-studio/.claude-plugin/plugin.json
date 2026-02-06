@@ -1,39 +1,20 @@
 {
   "name": "writing-studio",
-  "version": "2.0.0",
-  "description": "A comprehensive writing assistant with quality loop workflow: deep discovery, voice profiles, iterative self-critique, and publication-ready output",
+  "version": "3.0.0",
+  "description": "A writing assistant built around the plan-work-review-compound loop with taste profiles that evolve through use",
   "author": {
     "name": "Maximilian Bruhn"
   },
-  "keywords": ["writing", "style", "drafting", "editing", "brainstorming", "content", "critique", "voice", "quality-loop"],
+  "keywords": ["writing", "taste-profiles", "voice", "compound-loop", "review"],
   "commands": [
-    "./commands/brainstorm.md",
-    "./commands/draft.md",
-    "./commands/edit.md",
-    "./commands/generate-assistant.md",
-    "./commands/plan.md",
-    "./commands/profile-humor.md",
-    "./commands/profile-writer.md",
-    "./commands/qualityloop.md",
-    "./commands/setup-style.md",
-    "./commands/voice-write.md",
-    "./commands/write-loop.md",
-    "./commands/write.md"
+    "./commands/write.md",
+    "./commands/review.md",
+    "./commands/profile.md"
   ],
-  "agents": [
-    "./agents/brainstormer.md",
-    "./agents/critic.md",
-    "./agents/drafter.md",
-    "./agents/editor.md",
-    "./agents/ideator.md",
-    "./agents/iterator.md",
-    "./agents/planner.md"
-  ],
+  "agents": [],
   "skills": [
-    "./skills/humor-profiler",
-    "./skills/voice-writer",
-    "./skills/writer-profiler",
-    "./skills/writing-craft",
-    "./skills/writing-critique"
+    "./skills/taste-writer",
+    "./skills/taste-reviewer",
+    "./skills/taste-profiler"
   ]
 }

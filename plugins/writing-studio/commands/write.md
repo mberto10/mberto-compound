@@ -1,73 +1,73 @@
 ---
-description: Start a complete writing session with guided workflow
-argument-hint: <topic or goal>
+description: Write content using a taste profile
+argument-hint: [what to write]
 allowed-tools: Read, Write, Edit, Glob, Grep, Task, AskUserQuestion
 ---
 
-Start a comprehensive writing session for: $ARGUMENTS
+Start a writing session for: $ARGUMENTS
 
 ## Setup
 
-First, check for the user's style configuration:
-1. Look for `.claude/writing-studio.local.md` in the project
-2. If found, load and internalize the style preferences
-3. If not found, ask if the user wants to set up their style guide first with `/setup-style`
+1. Load all taste profiles from `plugins/writing-studio/taste-profiles/`
+2. For each profile, extract name, executive summary, and key distinctive markers
+3. Present the available profiles
 
-## Workflow
+## Session Flow
 
-Guide the user through the complete writing workflow with structured checkpoints:
+This is a **conversational** writing session. You are the "work" step — the user has already planned what they want. Your job is to write it.
 
-### Stage 1: Brainstorming
-Use the brainstormer agent via Task tool to:
-- Clarify the topic and intended audience
-- Generate diverse angles and approaches
-- Ask probing questions to uncover hidden aspects
-- Present checkpoint with direction options
+- If user names a profile → Use it
+- If user describes a voice → Match to a profile
+- If user just describes content → Suggest appropriate profile, ask for confirmation
+- If user gives feedback → Adjust and rewrite
 
-### Stage 2: Planning
-After direction is chosen, use the planner agent via Task tool to:
-- Define the main thesis or central argument
-- Identify key sections and their purposes
-- Create detailed outline
-- Present checkpoint for structure approval
+## Loading Profiles
 
-### Stage 3: Drafting
-After outline is approved, use the drafter agent via Task tool to:
-- Write content following the approved outline
-- Maintain the user's style throughout
-- Create checkpoints after each major section
-- Allow for mid-draft adjustments
+Use Glob to find all profiles:
+```
+plugins/writing-studio/taste-profiles/*.md
+```
 
-### Stage 4: Editing
-After draft is complete, use the editor agent via Task tool to:
-- Review for style consistency
-- Check against prohibited words and preferences
-- Improve clarity and flow
-- Present final checkpoint with changes summary
+For each profile, read and extract:
+- `## Executive Summary` - The voice in brief
+- `## Distinctive Markers` - What makes it unique
+- `## Writing Instructions` - How to apply it
 
-## Checkpoint Format
+## Presenting Profiles
 
-At each stage, use structured checkpoints:
 ```
 ═══════════════════════════════════════════
-📍 CHECKPOINT: [Stage Name]
+TASTE PROFILES
 ═══════════════════════════════════════════
 
-[Summary of current state]
+[For each profile:]
 
-**Options:**
-1. [Option A] - [Description]
-2. [Option B] - [Description]
-3. [Option C] - [Description]
+**[Profile Name]**
+> [Executive summary]
+Signature: [1-2 distinctive markers]
 
-Which direction? (1/2/3) Or describe your preference.
+═══════════════════════════════════════════
+
+[If $ARGUMENTS provided:]
+You want to write: "$ARGUMENTS"
+Which profile?
+
+[If no $ARGUMENTS:]
+What would you like to write?
+
 ═══════════════════════════════════════════
 ```
 
-## Key Principles
+## Writing
 
-- Be highly interactive - check in frequently
-- Follow the user's style guide strictly
-- Present meaningful options at decision points
-- Allow the user to skip stages if desired
-- Adapt workflow based on user feedback
+Once direction is clear:
+
+1. Apply the selected profile
+2. Write content
+3. Show what profile elements were applied
+4. Wait for user feedback
+5. Iterate until satisfied
+
+## Key Principle
+
+The user plans. You write. Don't brainstorm, don't critique. Just execute in the profile's voice.
