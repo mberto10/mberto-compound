@@ -1,5 +1,5 @@
 ---
-name: draft-email
+name: draft-communication
 description: Generate a systematic project update for stakeholder communication
 allowed-tools:
   - Read
