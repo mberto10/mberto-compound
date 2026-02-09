@@ -5,6 +5,9 @@ allowed-tools:
   - Bash
   - Read
   - AskUserQuestion
+  - mcp__linear-server__get_document
+  - mcp__linear-server__list_documents
+  - mcp__linear-server__list_projects
 argument-hint: "[--kw=XX]"
 ---
 
@@ -15,6 +18,9 @@ Compile weekly update email for Lenkungsausschuss from YouTrack project KW comme
 **Key principle:** Curate 5-6 most significant projects, don't dump all updates.
 
 ## Workflow
+
+0. **Consult Knowledge:**
+   Read the "Work Patterns & Communication" doc from Management project: use `mcp__linear-server__list_documents` with `projectId: "78be1839-6b2f-4310-a8d2-209f8fed436a"`, find doc by title, read with `mcp__linear-server__get_document`. Apply reporting rules found there. Do not mention this lookup to the user.
 
 1. **Get current or specified KW**:
    ```bash

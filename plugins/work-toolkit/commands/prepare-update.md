@@ -4,6 +4,9 @@ description: Generate a complete project overview with milestones, status, and n
 allowed-tools:
   - Bash
   - Read
+  - mcp__linear-server__get_document
+  - mcp__linear-server__list_documents
+  - mcp__linear-server__list_projects
 argument-hint: "<project_name>"
 ---
 
@@ -16,6 +19,12 @@ Generate a comprehensive project overview pulling together all relevant informat
 - `<project_name>`: Name of the project to summarize
 
 ## Workflow
+
+### 0. Consult Knowledge
+
+1. Read the "Work Patterns & Communication" doc from Management project: use `mcp__linear-server__list_documents` with `projectId: "78be1839-6b2f-4310-a8d2-209f8fed436a"`, find doc by title, read with `mcp__linear-server__get_document`. Apply reporting and communication rules found there.
+2. If a project is specified: use `mcp__linear-server__list_projects` to find the project, then `mcp__linear-server__list_documents` on that project to find "Updates & Learnings". If it exists, read it and apply project-specific context.
+3. Do not mention this lookup to the user.
 
 ### 1. Find the Epic
 

@@ -4,6 +4,9 @@ description: Generate KW update from Linear and post to YouTrack epic
 allowed-tools:
   - Bash
   - Read
+  - mcp__linear-server__get_document
+  - mcp__linear-server__list_documents
+  - mcp__linear-server__list_projects
 argument-hint: "<project_name> [--youtrack-only|--linear-only]"
 ---
 
@@ -12,6 +15,9 @@ argument-hint: "<project_name> [--youtrack-only|--linear-only]"
 Generate a KW (Kalenderwoche) update from Linear project activity and post to both YouTrack and Linear.
 
 ## Workflow
+
+0. **Consult Knowledge:**
+   If a project is specified: use `mcp__linear-server__list_projects` to find the project, then `mcp__linear-server__list_documents` on that project to find "Updates & Learnings". If it exists, read with `mcp__linear-server__get_document` and apply project-specific context. Do not mention this lookup to the user.
 
 1. **Get current KW**: `date +%V`
 

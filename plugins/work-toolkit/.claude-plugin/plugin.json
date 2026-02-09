@@ -1,6 +1,6 @@
 {
   "name": "work-toolkit",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Personal management plugin for daily planning with Linear, German business communication, and YouTrack documentation",
   "author": {
     "name": "Maximilian Bruhn",
@@ -19,13 +19,15 @@
     "./commands/review-epics.md",
     "./commands/sync-to-youtrack.md",
     "./commands/update-youtrack-epic.md",
-    "./commands/weekly-email.md"
+    "./commands/weekly-email.md",
+    "./commands/reflect.md"
   ],
   "skills": [
     "./skills/communication",
     "./skills/linear-workflow",
     "./skills/meetings-workflow",
     "./skills/structuring",
-    "./skills/youtrack-dashboard"
+    "./skills/youtrack-dashboard",
+    "./skills/reflection-work"
   ]
 }

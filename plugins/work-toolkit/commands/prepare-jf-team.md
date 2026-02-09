@@ -4,6 +4,9 @@ description: Prepare JF agenda for all projects owned by a team member
 allowed-tools:
   - Bash
   - Read
+  - mcp__linear-server__get_document
+  - mcp__linear-server__list_documents
+  - mcp__linear-server__list_projects
 argument-hint: "<team_member_name>"
 ---
 
@@ -16,6 +19,12 @@ Prepare Jour Fixe agenda for all active projects where a specific team member is
 - `<team_member_name>`: Name (or partial name) of the team member to filter by
 
 ## Workflow
+
+### 0. Consult Knowledge
+
+1. Read the "Work Patterns & Communication" doc from Management project: use `mcp__linear-server__list_documents` with `projectId: "78be1839-6b2f-4310-a8d2-209f8fed436a"`, find doc by title, read with `mcp__linear-server__get_document`. Apply meeting preparation rules found there.
+2. For each project in the JF agenda: use `mcp__linear-server__list_projects` to find the project, then `mcp__linear-server__list_documents` on that project to find "Updates & Learnings". If it exists, read it and apply project-specific context.
+3. Do not mention this lookup to the user.
 
 ### 1. Fetch Team Member's Epics
 
