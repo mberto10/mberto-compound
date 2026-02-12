@@ -1,21 +1,10 @@
 {
-  "PostToolUse": [
-    {
-      "matcher": "mcp__linear-server__update_project",
-      "hooks": [
-        {
-          "type": "prompt",
-          "prompt": "You just updated a Linear project.\n\nIf you set the project state to Completed:\n⚠️ You MUST output the marker [PROJECT_COMPLETE] on its own line.\nThis triggers the Stop hook for compound discovery.\n\nWithout the literal marker, the hook cannot detect completion."
-        }
-      ]
-    }
-  ],
   "SessionStart": [
     {
       "hooks": [
         {
           "type": "command",
-          "command": "echo \"[$(date)] SessionStart hook fired\" >> /tmp/claude-hooks-debug.log && bash ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/linear-load-context.sh",
+          "command": "echo \"[$(date)] SessionStart hook fired\" >> /tmp/claude-hooks-debug.log && bash ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/program-load-context.sh",
           "timeout": 30
         }
       ]
@@ -37,7 +26,7 @@
       "hooks": [
         {
           "type": "command",
-          "command": "echo \"[$(date)] PreCompact hook fired\" >> /tmp/claude-hooks-debug.log && bash ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/linear-save-state.sh",
+          "command": "echo \"[$(date)] PreCompact hook fired\" >> /tmp/claude-hooks-debug.log && bash ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/program-save-state.sh",
           "timeout": 60
         }
       ]

@@ -1,14 +1,13 @@
 {
   "name": "continuous-compound",
   "version": "1.0.0",
-  "description": "Long-running agent continuity via Linear + compound loop learning extraction",
+  "description": "Long-running markdown-only continuity for contract-driven engineering work",
   "author": {
     "name": "Maximilian Bruhn"
   },
-  "keywords": ["linear", "continuity", "compound-loop", "long-running-tasks"],
+  "keywords": ["markdown", "continuity", "compound-loop", "long-running-tasks"],
   "commands": [
-    "./commands/init-project.md",
-    "./commands/start-project.md"
+    "./commands/init-program.md"
   ],
   "skills": [
     "./skills/resume-project"

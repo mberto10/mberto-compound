@@ -3,20 +3,11 @@
  * Transcript Parser for Continuous Context Management
  *
  * Parses JSONL transcript files from Claude Code sessions and extracts
- * high-signal data for handoff generation.
- *
- * Adapted from Continuous-Claude-v2 (https://github.com/parcadei/Continuous-Claude-v2)
- *
- * Usage: node transcript-parser.mjs <transcript-path>
- * Output: JSON with extracted state
+ * high-signal data for markdown handoff generation.
  */
 
 import * as fs from 'fs';
 import * as readline from 'readline';
-
-// ============================================================================
-// Parse transcript file
-// ============================================================================
 
 async function parseTranscript(transcriptPath) {
   const summary = {
@@ -26,8 +17,6 @@ async function parseTranscript(transcriptPath) {
     filesModified: [],
     errorsEncountered: [],
     sessionId: null,
-    // New fields for enhanced handoff context
-    activeLinearIssue: null,  // {id, identifier, lastAccessed}
     sessionStartTime: null,
     sessionEndTime: null,
   };
@@ -54,7 +43,6 @@ async function parseTranscript(transcriptPath) {
     try {
       const entry = JSON.parse(line);
 
-      // Track session timestamps
       if (entry.timestamp) {
         if (!summary.sessionStartTime) {
           summary.sessionStartTime = entry.timestamp;
@@ -62,149 +50,111 @@ async function parseTranscript(transcriptPath) {
         summary.sessionEndTime = entry.timestamp;
       }
 
-      // Extract session ID (Claude Code format has it at root level)
       if (entry.sessionId && !summary.sessionId) {
         summary.sessionId = entry.sessionId;
       }
 
-      // Claude Code wraps messages in a "message" field
       const message = entry.message || entry;
-      const entryType = entry.type; // "user", "assistant"
+      const entryType = entry.type;
 
-      // Extract last assistant message and tool calls
-      // Claude Code format: entry.type="assistant", message.content=[{type:"tool_use",...}, {type:"text",...}]
       if (entryType === 'assistant' && message.content) {
         if (Array.isArray(message.content)) {
-          // Extract text blocks for last assistant message
           const textBlocks = message.content.filter((b) => b.type === 'text');
           if (textBlocks.length > 0) {
             lastAssistant = textBlocks.map((b) => b.text).join('\n');
           }
 
-          // Extract tool_use blocks for tool calls
           const toolUseBlocks = message.content.filter((b) => b.type === 'tool_use');
           for (const block of toolUseBlocks) {
             const toolName = block.name;
             const toolInput = block.input || {};
 
-            if (toolName) {
-              const toolCall = {
-                name: toolName,
-                timestamp: entry.timestamp,
-                input: toolInput,
-                success: true,
-                toolUseId: block.id, // Track ID for matching results
-              };
+            if (!toolName) continue;
 
-              // Capture TodoWrite state
-              if (toolName === 'TodoWrite') {
-                if (toolInput?.todos) {
-                  lastTodoState = toolInput.todos.map((t, idx) => ({
-                    id: t.id || `todo-${idx}`,
-                    content: t.content || '',
-                    status: t.status || 'pending',
-                    activeForm: t.activeForm || '',
-                  }));
-                }
-              }
+            const toolCall = {
+              name: toolName,
+              timestamp: entry.timestamp,
+              input: toolInput,
+              success: true,
+              toolUseId: block.id,
+            };
 
-              // Track file modifications from Edit/Write tools
-              if (['Edit', 'Write', 'MultiEdit'].includes(toolName)) {
-                const filePath = toolInput?.file_path || toolInput?.path;
-                if (filePath && typeof filePath === 'string') {
-                  modifiedFiles.add(filePath);
-                }
-              }
-
-              // Track Bash commands
-              if (toolName === 'Bash') {
-                if (toolInput?.command) {
-                  toolCall.input = { command: toolInput.command.substring(0, 100) };
-                }
-              }
-
-              // Track Linear issue operations for handoff context
-              if (toolName.includes('linear-server')) {
-                if (toolName === 'mcp__linear-server__get_issue' ||
-                    toolName === 'mcp__linear-server__update_issue' ||
-                    toolName === 'mcp__linear-server__create_comment') {
-                  const issueId = toolInput?.id || toolInput?.issueId;
-                  if (issueId) {
-                    summary.activeLinearIssue = {
-                      id: issueId,
-                      lastAccessed: entry.timestamp,
-                    };
-                  }
-                }
-              }
-
-              allToolCalls.push(toolCall);
+            if (toolName === 'TodoWrite' && toolInput?.todos) {
+              lastTodoState = toolInput.todos.map((t, idx) => ({
+                id: t.id || `todo-${idx}`,
+                content: t.content || '',
+                status: t.status || 'pending',
+                activeForm: t.activeForm || '',
+              }));
             }
+
+            if (['Edit', 'Write', 'MultiEdit'].includes(toolName)) {
+              const filePath = toolInput?.file_path || toolInput?.path;
+              if (filePath && typeof filePath === 'string') {
+                modifiedFiles.add(filePath);
+              }
+            }
+
+            if (toolName === 'Bash' && toolInput?.command) {
+              toolCall.input = { command: toolInput.command.substring(0, 100) };
+            }
+
+            allToolCalls.push(toolCall);
           }
         } else if (typeof message.content === 'string') {
           lastAssistant = message.content;
         }
       }
 
-      // Check for tool result failures
-      // Claude Code format: entry.type="user", message.content=[{type:"tool_result", tool_use_id:..., content:...}]
       if (entryType === 'user' && message.content && Array.isArray(message.content)) {
         const toolResultBlocks = message.content.filter((b) => b.type === 'tool_result');
         for (const resultBlock of toolResultBlocks) {
           const toolUseId = resultBlock.tool_use_id;
-
-          // Find the matching tool call by ID
           const matchingToolCall = allToolCalls.find((tc) => tc.toolUseId === toolUseId);
 
-          // Check for errors in result content
           let resultContent = resultBlock.content;
           if (Array.isArray(resultContent)) {
             resultContent = resultContent.map((c) => c.text || '').join('\n');
           }
 
-          if (typeof resultContent === 'string') {
-            // Check for error indicators
-            if (resultContent.includes('error') || resultContent.includes('Error') ||
-                resultContent.includes('failed') || resultContent.includes('Failed')) {
-              if (matchingToolCall) {
-                matchingToolCall.success = false;
-              }
-              // Extract short error message
-              const errorMatch = resultContent.match(/error[:\s]+([^\n]{1,100})/i);
-              if (errorMatch) {
-                errors.push(errorMatch[1].substring(0, 200));
-              }
-            }
+          if (typeof resultContent !== 'string') continue;
 
-            // Check for exit codes in Bash results
-            const exitCodeMatch = resultContent.match(/exit code[:\s]+(\d+)/i);
-            if (exitCodeMatch && parseInt(exitCodeMatch[1]) !== 0) {
-              if (matchingToolCall) {
-                matchingToolCall.success = false;
-              }
+          if (
+            resultContent.includes('error') ||
+            resultContent.includes('Error') ||
+            resultContent.includes('failed') ||
+            resultContent.includes('Failed')
+          ) {
+            if (matchingToolCall) {
+              matchingToolCall.success = false;
+            }
+            const errorMatch = resultContent.match(/error[:\s]+([^\n]{1,100})/i);
+            if (errorMatch) {
+              errors.push(errorMatch[1].substring(0, 200));
+            }
+          }
+
+          const exitCodeMatch = resultContent.match(/exit code[:\s]+(\d+)/i);
+          if (exitCodeMatch && parseInt(exitCodeMatch[1], 10) !== 0) {
+            if (matchingToolCall) {
+              matchingToolCall.success = false;
             }
           }
         }
       }
     } catch {
-      // Skip malformed JSON lines
       continue;
     }
   }
 
-  // Populate summary
   summary.lastTodos = lastTodoState;
-  summary.recentToolCalls = allToolCalls.slice(-10); // Last 10 tool calls
+  summary.recentToolCalls = allToolCalls.slice(-10);
   summary.lastAssistantMessage = lastAssistant.substring(0, 1000);
   summary.filesModified = Array.from(modifiedFiles);
-  summary.errorsEncountered = errors.slice(-5); // Last 5 errors
+  summary.errorsEncountered = errors.slice(-5);
 
   return summary;
 }
-
-// ============================================================================
-// Helper: Calculate session duration
-// ============================================================================
 
 function calculateDuration(startTime, endTime) {
   try {
@@ -221,61 +171,42 @@ function calculateDuration(startTime, endTime) {
   }
 }
 
-// ============================================================================
-// Generate handoff markdown
-// ============================================================================
-
 function generateHandoffMarkdown(summary) {
   const lines = [];
   const timestamp = new Date().toISOString();
+  const programName = process.env.CONTINUOUS_COMPOUND_PROGRAM || '_autonomous';
 
-  lines.push(`# Auto-Handoff`);
+  lines.push('# Auto-Handoff');
   lines.push('');
   lines.push(`Generated: ${timestamp}`);
 
-  // Session duration
   if (summary.sessionStartTime && summary.sessionEndTime) {
     const duration = calculateDuration(summary.sessionStartTime, summary.sessionEndTime);
     lines.push(`Session Duration: ${duration}`);
   }
   lines.push('');
 
-  // Active Linear Issue
-  if (summary.activeLinearIssue) {
-    lines.push('## Active Linear Issue');
-    lines.push(`- **${summary.activeLinearIssue.id}** (last accessed: ${summary.activeLinearIssue.lastAccessed || 'unknown'})`);
-    lines.push('');
-  }
-
-  // Resume From Here section
   lines.push('## Resume From Here');
   lines.push('');
   const inProgress = summary.lastTodos.filter((t) => t.status === 'in_progress');
   if (inProgress.length > 0) {
     lines.push(`1. **Continue**: ${inProgress[0].content}`);
-    if (summary.activeLinearIssue) {
-      lines.push(`2. **Check**: ${summary.activeLinearIssue.id} for acceptance criteria`);
-    }
   } else {
-    lines.push('1. **Check**: Current tasks in Linear (_autonomous project)');
-    if (summary.activeLinearIssue) {
-      lines.push(`2. **Review**: ${summary.activeLinearIssue.id} for context`);
-    }
+    lines.push(`1. **Check**: Current tasks in local program files (${programName})`);
   }
   lines.push('');
 
-  // Todo state
   lines.push('## Task State');
   lines.push('');
 
   if (summary.lastTodos.length > 0) {
-    const inProgress = summary.lastTodos.filter((t) => t.status === 'in_progress');
+    const todoInProgress = summary.lastTodos.filter((t) => t.status === 'in_progress');
     const pending = summary.lastTodos.filter((t) => t.status === 'pending');
     const completed = summary.lastTodos.filter((t) => t.status === 'completed');
 
-    if (inProgress.length > 0) {
+    if (todoInProgress.length > 0) {
       lines.push('**In Progress:**');
-      inProgress.forEach((t) => lines.push(`- [>] ${t.content}`));
+      todoInProgress.forEach((t) => lines.push(`- [>] ${t.content}`));
       lines.push('');
     }
 
@@ -295,7 +226,6 @@ function generateHandoffMarkdown(summary) {
     lines.push('');
   }
 
-  // Recent actions
   lines.push('## Recent Actions');
   lines.push('');
 
@@ -309,7 +239,6 @@ function generateHandoffMarkdown(summary) {
   }
   lines.push('');
 
-  // Files modified
   lines.push('## Files Modified');
   lines.push('');
 
@@ -320,7 +249,6 @@ function generateHandoffMarkdown(summary) {
   }
   lines.push('');
 
-  // Errors
   if (summary.errorsEncountered.length > 0) {
     lines.push('## Errors');
     lines.push('');
@@ -332,7 +260,6 @@ function generateHandoffMarkdown(summary) {
     lines.push('');
   }
 
-  // Last context
   if (summary.lastAssistantMessage) {
     lines.push('## Last Context');
     lines.push('');
@@ -347,10 +274,6 @@ function generateHandoffMarkdown(summary) {
 
   return lines.join('\n');
 }
-
-// ============================================================================
-// Main CLI
-// ============================================================================
 
 async function main() {
   const args = process.argv.slice(2);
