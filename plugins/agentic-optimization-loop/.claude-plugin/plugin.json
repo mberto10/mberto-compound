@@ -1,10 +1,9 @@
 {
   "name": "agentic-optimization-loop",
-  "version": "2.0.0",
-  "description": "Iterative optimization loops for AI agents using a three-layer framework: (1) Evaluation Infrastructure - dataset, graders, baseline; (2) Optimization Target - goal, constraints, main knob; (3) Optimization Loop - cloud-ready execution prompts. Based on Anthropic's agent eval best practices.",
+  "version": "2.1.1",
+  "description": "Contract-driven optimization controller for AI agents: define optimization targets, execute iterative loops, and steer single- or multi-lever experiments against Langfuse-backed evaluation contracts.",
   "commands": [
     "./commands/optimize.md",
-    "./commands/optimize-bootstrap.md",
     "./commands/optimize-status.md",
     "./commands/cloud-optimize.md"
   ],

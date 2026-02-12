@@ -1,12 +1,15 @@
 {
   "name": "langfuse-analyzer",
-  "version": "0.8.0",
+  "version": "0.8.2",
   "description": "Complete Langfuse toolkit for AI agent engineering: instrumentation, trace analysis, prompt management, dataset curation, experiments, evaluations, schema validation, and expert optimization advice",
   "author": {
     "name": "Mberto"
   },
   "keywords": ["langfuse", "tracing", "debugging", "observability", "analysis", "datasets", "prompts", "experiments", "evaluation", "scores", "analytics", "sessions", "annotation", "instrumentation", "setup", "schema", "validation"],
   "commands": [
+    "./commands/agent-eval-init.md",
+    "./commands/optimize-bootstrap.md",
+    "./commands/agent-eval-infra.md",
     "./commands/agent-eval-setup.md",
     "./commands/agent-eval.md",
     "./commands/setup-dataset.md"
@@ -16,6 +19,7 @@
     "./skills/annotation-manager",
     "./skills/data-retrieval",
     "./skills/dataset-management",
+    "./skills/eval-infrastructure",
     "./skills/experiment-runner",
     "./skills/instrumentation-setup",
     "./skills/prompt-management",

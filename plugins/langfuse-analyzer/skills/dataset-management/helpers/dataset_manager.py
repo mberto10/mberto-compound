@@ -11,6 +11,8 @@ COMMANDS:
     add-batch   Add multiple traces from a file
     list        List all datasets
     get         Get items from a dataset
+    set-metadata Update dataset metadata (idempotent merge by default)
+    describe    Get dataset details including metadata contract fields
 
 EXAMPLES:
     python dataset_manager.py create --name "checkout_regressions" --description "Failing traces"
@@ -304,6 +306,132 @@ def get_dataset_items(name: str) -> Dict[str, Any]:
         return {"error": f"Could not get dataset '{name}': {e}"}
 
 
+def deep_merge(base: Dict[str, Any], patch: Dict[str, Any]) -> Dict[str, Any]:
+    """Deep merge dictionaries recursively."""
+    merged = dict(base)
+    for key, value in patch.items():
+        if key in merged and isinstance(merged[key], dict) and isinstance(value, dict):
+            merged[key] = deep_merge(merged[key], value)
+        else:
+            merged[key] = value
+    return merged
+
+
+def set_dataset_metadata(
+    name: str,
+    metadata: Dict[str, Any],
+    merge: bool = True
+) -> Dict[str, Any]:
+    """
+    Update dataset metadata.
+
+    If merge=True (default), merges patch into existing metadata.
+    If merge=False, replaces metadata.
+    """
+    client = get_langfuse_client()
+
+    try:
+        dataset = client.get_dataset(name)
+        if not dataset:
+            return {"error": f"Dataset '{name}' not found", "status": "error"}
+
+        dataset_dict = dataset.dict() if hasattr(dataset, "dict") else dict(dataset)
+        existing = dataset_dict.get("metadata") or {}
+        final_metadata = deep_merge(existing, metadata) if merge else metadata
+        dataset_id = dataset_dict.get("id") or getattr(dataset, "id", None)
+
+        errors: List[str] = []
+
+        if hasattr(client, "api") and hasattr(client.api, "datasets"):
+            datasets_api = client.api.datasets
+            if hasattr(datasets_api, "update"):
+                for call in (
+                    lambda: datasets_api.update(dataset_id, metadata=final_metadata),
+                    lambda: datasets_api.update(id=dataset_id, metadata=final_metadata),
+                    lambda: datasets_api.update(name=name, metadata=final_metadata),
+                ):
+                    try:
+                        call()
+                        return {
+                            "status": "updated",
+                            "name": name,
+                            "metadata": final_metadata,
+                            "merge": merge,
+                        }
+                    except Exception as exc:
+                        errors.append(str(exc))
+            if hasattr(datasets_api, "patch"):
+                for call in (
+                    lambda: datasets_api.patch(dataset_id, metadata=final_metadata),
+                    lambda: datasets_api.patch(id=dataset_id, metadata=final_metadata),
+                ):
+                    try:
+                        call()
+                        return {
+                            "status": "updated",
+                            "name": name,
+                            "metadata": final_metadata,
+                            "merge": merge,
+                        }
+                    except Exception as exc:
+                        errors.append(str(exc))
+
+        if hasattr(dataset, "update"):
+            try:
+                dataset.update(metadata=final_metadata)
+                return {
+                    "status": "updated",
+                    "name": name,
+                    "metadata": final_metadata,
+                    "merge": merge,
+                }
+            except Exception as exc:
+                errors.append(str(exc))
+
+        return {
+            "status": "warning",
+            "name": name,
+            "metadata": final_metadata,
+            "merge": merge,
+            "error": "Could not update metadata with available SDK methods. Update manually in Langfuse UI.",
+            "details": errors[:3],
+        }
+    except Exception as e:
+        return {"error": f"Could not update metadata for '{name}': {e}", "status": "error"}
+
+
+def describe_dataset(name: str) -> Dict[str, Any]:
+    """Get detailed dataset information including metadata and readiness hints."""
+    client = get_langfuse_client()
+
+    try:
+        dataset = client.get_dataset(name)
+        if not dataset:
+            return {"error": f"Dataset '{name}' not found"}
+
+        dataset_dict = dataset.dict() if hasattr(dataset, "dict") else dict(dataset)
+        metadata = dataset_dict.get("metadata") or {}
+        status = metadata.get("status") if isinstance(metadata.get("status"), dict) else {}
+        dimensions = metadata.get("dimensions") if isinstance(metadata.get("dimensions"), list) else []
+        baseline = metadata.get("baseline") if isinstance(metadata.get("baseline"), dict) else {}
+
+        return {
+            "name": name,
+            "id": dataset_dict.get("id"),
+            "description": dataset_dict.get("description"),
+            "item_count": dataset_dict.get("items_count"),
+            "schema_version": metadata.get("schema_version"),
+            "score_scale": metadata.get("score_scale"),
+            "dimensions": dimensions,
+            "judge_prompts": metadata.get("judge_prompts", []),
+            "baseline": baseline,
+            "status": status,
+            "metadata": metadata,
+        }
+    except Exception as e:
+        return {"error": f"Could not describe dataset '{name}': {e}"}
+
+
 # =============================================================================
 # OUTPUT FORMATTING
 # =============================================================================
@@ -460,6 +588,74 @@ def format_get_result(result: Dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def format_set_metadata_result(result: Dict[str, Any]) -> str:
+    """Format set-metadata result as markdown."""
+    lines = ["# Dataset Metadata Update", ""]
+
+    status = result.get("status", "error")
+    lines.append(f"**Dataset:** `{result.get('name', '-')}`")
+    lines.append(f"**Status:** {status}")
+    lines.append(f"**Merge Mode:** {result.get('merge', True)}")
+
+    if result.get("error"):
+        lines.append(f"**Error:** {result['error']}")
+    for detail in result.get("details", []):
+        lines.append(f"- detail: {detail}")
+
+    if result.get("metadata"):
+        lines.append("")
+        lines.append("```json")
+        lines.append(json.dumps(result["metadata"], indent=2))
+        lines.append("```")
+
+    return "\n".join(lines)
+
+
+def format_describe_result(result: Dict[str, Any]) -> str:
+    """Format dataset description as markdown."""
+    lines = ["# Dataset Description", ""]
+
+    if "error" in result:
+        lines.append(f"**Error:** {result['error']}")
+        return "\n".join(lines)
+
+    lines.append(f"**Name:** `{result.get('name')}`")
+    if result.get("id"):
+        lines.append(f"**ID:** `{result['id']}`")
+    if result.get("description"):
+        lines.append(f"**Description:** {result['description']}")
+    lines.append(f"**Items:** {result.get('item_count', 0)}")
+    lines.append(f"**Schema Version:** `{result.get('schema_version', '-')}`")
+    lines.append(f"**Score Scale:** `{result.get('score_scale', '-')}`")
+    lines.append(f"**Dimensions:** {len(result.get('dimensions') or [])}")
+    lines.append(f"**Judge Prompts:** {len(result.get('judge_prompts') or [])}")
+
+    status = result.get("status") or {}
+    if status:
+        lines.append("")
+        lines.append("## Readiness")
+        lines.append(f"- dataset_ready: {status.get('dataset_ready')}")
+        lines.append(f"- judges_ready: {status.get('judges_ready')}")
+        lines.append(f"- baseline_ready: {status.get('baseline_ready')}")
+
+    baseline = result.get("baseline") or {}
+    if baseline:
+        lines.append("")
+        lines.append("## Baseline")
+        lines.append(f"- run_name: `{baseline.get('run_name', '-')}`")
+        lines.append(f"- created_at: `{baseline.get('created_at', '-')}`")
+        metrics = baseline.get("metrics") if isinstance(baseline.get("metrics"), dict) else {}
+        lines.append(f"- metrics: {len(metrics)}")
+
+    lines.append("")
+    lines.append("## Metadata")
+    lines.append("```json")
+    lines.append(json.dumps(result.get("metadata", {}), indent=2))
+    lines.append("```")
+
+    return "\n".join(lines)
+
+
 # =============================================================================
 # MAIN
 # =============================================================================
@@ -475,6 +671,8 @@ Commands:
   add-batch   Add multiple traces from a file
   list        List all datasets
   get         Get items from a dataset
+  set-metadata Update dataset metadata
+  describe    Get dataset details + metadata
 
 Examples:
   %(prog)s create --name "checkout_regressions" --description "Failing traces"
@@ -482,6 +680,8 @@ Examples:
   %(prog)s add-batch --dataset "checkout_regressions" --trace-file ids.txt
   %(prog)s list
   %(prog)s get --name "checkout_regressions"
+  %(prog)s set-metadata --name "checkout_regressions" --metadata '{"schema_version":"eval_infra_v1"}'
+  %(prog)s describe --name "checkout_regressions"
         """
     )
 
@@ -538,6 +738,25 @@ Examples:
     get_parser = subparsers.add_parser("get", help="Get dataset items")
     get_parser.add_argument("--name", required=True, help="Dataset name")
 
+    # set-metadata subcommand
+    set_meta_parser = subparsers.add_parser("set-metadata", help="Set dataset metadata")
+    set_meta_parser.add_argument("--name", required=True, help="Dataset name")
+    set_meta_parser.add_argument(
+        "--metadata",
+        required=True,
+        type=json.loads,
+        help="Metadata JSON patch"
+    )
+    set_meta_parser.add_argument(
+        "--replace",
+        action="store_true",
+        help="Replace metadata instead of merging"
+    )
+
+    # describe subcommand
+    describe_parser = subparsers.add_parser("describe", help="Describe dataset + metadata")
+    describe_parser.add_argument("--name", required=True, help="Dataset name")
+
     args = parser.parse_args()
 
     # Execute command
@@ -575,6 +794,18 @@ Examples:
     elif args.command == "get":
         result = get_dataset_items(name=args.name)
         print(format_get_result(result))
+
+    elif args.command == "set-metadata":
+        result = set_dataset_metadata(
+            name=args.name,
+            metadata=args.metadata,
+            merge=not args.replace
+        )
+        print(format_set_metadata_result(result))
+
+    elif args.command == "describe":
+        result = describe_dataset(name=args.name)
+        print(format_describe_result(result))
 
 
 if __name__ == "__main__":

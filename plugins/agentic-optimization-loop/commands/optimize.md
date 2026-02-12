@@ -1,167 +1,183 @@
 ---
 name: optimize
-description: Start or continue an optimization loop for an AI agent. Guides through hypothesis -> experiment -> analyze -> compound cycles with persistent state.
+description: Start or continue the optimization loop for an AI agent with contract preflight and configurable lever tuning cardinality.
 arguments:
   - name: agent
-    description: Name of the agent to optimize (used for journal path)
+    description: Agent name (used for journal and eval contract file lookup)
     required: false
   - name: phase
-    description: Force entry at a specific phase (init, hypothesize, experiment, analyze, compound)
+    description: Optional forced phase (init, hypothesize, experiment, analyze, compound)
+    required: false
+  - name: lever-mode
+    description: Lever strategy for hypothesis scope: single or multi
+    required: false
+  - name: max-levers
+    description: Maximum levers allowed when lever-mode=multi (1..5)
     required: false
 ---
 
-# Optimization Loop Command
+# Optimize Command
 
-You are orchestrating an iterative optimization loop for an AI agent. This command manages state across sessions and guides the user through systematic improvement.
+Run one optimization loop with persistent journal state and strict contract preflight.
 
-## Step 1: Determine Agent
+## Step 1: Resolve Inputs
 
-If `agent` argument provided, use it. Otherwise:
+Determine:
+- `agent` (ask if missing)
+- `lever_mode` (default `single`)
+- `max_levers`
 
+Rules:
+- `single` => force `max_levers=1`
+- `multi` => default `max_levers=3`
+- hard validation: `1 <= max_levers <= 5`
+
+If validation fails, stop with a deterministic remediation message.
+
+## Step 2: Contract Preflight (Required)
+
+Before phase routing, resolve and validate external eval contract:
+
+1. Local snapshot first:
+- `.claude/eval-infra/<agent>.yaml`
+- `.claude/eval-infra/<agent>.json`
+
+2. Live validation (Langfuse identifiers):
+
+```bash
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/optimization-loop/helpers/contract_resolver.py \
+  resolve \
+  --agent "<agent>" \
+  --validate-live
 ```
-Which agent would you like to optimize?
 
-If this is a new optimization, I'll need:
-- Agent name (for the journal)
-- Path to agent code
-- How to run it
-- Target metric and goal
+If preflight fails:
+- do not run optimization phases
+- output fail-fast summary + exact handoff commands:
+
+```bash
+# Example handoff
+/agent-eval-infra status --agent <agent> --dataset <dataset>
+/agent-eval-setup --agent <agent>
 ```
 
-Use AskUserQuestion if needed.
+## Step 3: Load Journal State
 
-## Step 2: Load State
-
-Check for existing optimization journal:
+Journal path:
 
 ```
 .claude/optimization-loops/<agent>/journal.yaml
 ```
 
-Read the journal if it exists. Parse the YAML to understand current state.
+Behavior:
+- if journal exists, load and infer defaults for missing new fields
+- if journal missing, initialize journal with `loop.lever_mode` and `loop.max_levers`
+- target and lever scope must live in this same journal file (no separate target config file)
 
-## Step 3: Determine Phase
+Backward-compatible defaults for old journals:
+- `loop.lever_mode: single`
+- `loop.max_levers: 1`
 
-Based on journal (or absence), determine current phase:
+### Target + Lever Scope Persistence
 
-| Journal State | Current Phase |
-|---------------|---------------|
-| No journal exists | INITIALIZE |
-| `current_phase: init` | INITIALIZE (continue) |
-| `current_phase: hypothesize` | HYPOTHESIZE |
-| `current_phase: experiment` | EXPERIMENT |
-| `current_phase: analyze` | ANALYZE |
-| `current_phase: compound` | COMPOUND |
-| `current_phase: graduated` | COMPLETE (celebrate!) |
+Maintain optimization definition directly in journal metadata:
 
-If `phase` argument provided, override (but warn if skipping steps).
-
-## Step 4: Load Skill and Reference
-
-Load the optimization-craft skill:
+```yaml
+meta:
+  target:
+    metric: "<primary metric>"
+    current: <0-1>
+    goal: <0-1>
+    dimensions:
+      - name: "<dimension>"
+        signal: "<signal>"
+        threshold: <0-1>
+        weight: <number>
+        critical: <true|false>
+  levers:
+    main_knob:
+      type: config|prompt|grader|code
+      location: "<path/ref>"
+    allowed:
+      - "<surgical lever path/ref>"
+    frozen:
+      - "<immutable path/ref>"
 ```
-Read: ${CLAUDE_PLUGIN_ROOT}/skills/optimization-craft/SKILL.md
+
+Rules:
+- never create or require a separate `target.yaml`
+- if `meta.target` or `meta.levers` is missing, collect once and persist to journal
+- all hypothesis lever choices must be subsets of `meta.levers.allowed` and outside `meta.levers.frozen`
+
+## Step 4: Determine Phase
+
+Same phase flow as before:
+- init
+- hypothesize
+- experiment
+- analyze
+- compound
+
+If `phase` argument is provided, allow override with warning.
+
+## Step 5: Execute Phase (Unchanged Loop Semantics)
+
+Use:
+
+```text
+${CLAUDE_PLUGIN_ROOT}/skills/optimization-craft/SKILL.md
 ```
 
-Then load the phase-specific reference:
-- INITIALIZE: `references/journal-schema.md`
-- HYPOTHESIZE: `references/hypothesis-patterns.md`
-- EXPERIMENT: `references/experiment-design.md`
-- ANALYZE: `references/analysis-framework.md`
-- COMPOUND: `references/compounding-strategies.md`
+### Lever-specific hypothesis rule
 
-## Step 5: Execute Phase
+During HYPOTHESIZE only:
+- `single`: propose exactly one lever change
+- `multi`: propose a lever set with size `2..max_levers`
 
-Follow the skill instructions for the current phase. Key behaviors:
+Always record:
+- `iterations[].lever_set`
+- `iterations[].lever_set_size`
+- `iterations[].attribution_confidence`
 
-### INITIALIZE Phase
-1. Gather agent information (path, entry point, prompts, tools)
-2. Confirm target metric and goal with user
-3. Establish baseline by running initial evaluation
-4. Create journal with baseline metrics
-5. Transition to HYPOTHESIZE
+Decision policy stays identical in both modes:
+- same strict guards
+- same rollback rules
+- same thresholds
 
-### HYPOTHESIZE Phase
-1. Review current state vs target
-2. Analyze failures from previous iteration (if any)
-3. Identify highest-impact improvement opportunity
-4. Formulate specific, testable hypothesis
-5. Design the change (what, where, how)
-6. Update journal with hypothesis
-7. Confirm with user before transitioning to EXPERIMENT
+For deeper diagnosis inside analyze/compound, use local read-only retrieval helpers:
 
-### EXPERIMENT Phase
-1. Guide user through implementing the change
-2. Verify change is active (smoke test)
-3. Run evaluation experiment
-4. Collect results
-5. Update journal with results
-6. Transition to ANALYZE
-
-### ANALYZE Phase
-1. Compare results to baseline and previous iteration
-2. Determine if hypothesis was validated
-3. Investigate failures (use optimization-analyst agent for deep dives)
-4. Extract patterns and findings
-5. Update journal with analysis
-6. Transition to COMPOUND
-
-### COMPOUND Phase
-1. Add failure cases to dataset
-2. Check judge calibration
-3. Capture learnings in journal
-4. Decide: continue, pivot, or graduate
-5. If continuing, formulate next hypothesis direction
-6. Transition to HYPOTHESIZE or GRADUATED
-
-## Step 6: Update Journal
-
-After each phase completion:
-1. Update `current_phase` in journal
-2. Update iteration record with phase data
-3. Write journal back to file
-
-## Step 7: Report and Prompt
-
-After executing phase:
-1. Summarize what was accomplished
-2. Show current metrics vs target
-3. Explain what's needed for next phase
-4. Ask if user wants to continue or pause
-
-## Interruption Handling
-
-The user can pause at any time. State is preserved in journal. When they return:
-- Journal tells us exactly where we left off
-- Continue from that point seamlessly
-
-## Output Format
-
-Always provide clear status:
-
+```bash
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/optimization-loop/helpers/trace_retriever.py --trace-id <trace_id> --mode io
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/optimization-loop/helpers/trace_retriever.py --last 10 --filter-field candidate_id --filter-value <candidate> --mode flow
 ```
-## Optimization Loop: <agent>
 
-**Phase:** <current> → <next>
-**Iteration:** <N>
+## Step 6: Persist State
 
-### Progress
-| Metric   | Baseline | Current | Target | Gap |
-|----------|----------|---------|--------|-----|
-| accuracy | 72%      | 81%     | 90%    | 9%  |
+After each phase:
+1. update `current_phase`
+2. update current iteration block
+3. write journal back
 
-### This Phase
-<Summary of what was done>
+Ensure new loop fields are preserved:
 
-### Next Steps
-<What's needed to proceed>
-
-Ready to continue? [Yes / Pause for now]
+```yaml
+loop:
+  lever_mode: single|multi
+  max_levers: 1..5
 ```
+
+## Step 7: Report
+
+Output:
+- current phase and next phase
+- lever mode and max levers
+- lever scope summary (main knob, allowed, frozen)
+- guard status summary
+- next action
 
 ## Error Handling
 
-- If Langfuse unavailable: Inform user, suggest checking credentials
-- If experiment fails: Record failure, allow retry or skip
-- If journal corrupted: Offer to backup and restart
-- If agent not found: Help user set up tracing first
+- Contract missing/incomplete => fail fast + handoff
+- Lever-mode/max-levers invalid => fail fast + correction hint
+- Langfuse unavailable => report and stop
+- Journal parse failure => advise backup/rebuild path

@@ -1,238 +1,123 @@
 # Agentic Optimization Loop
 
-A Claude Code plugin for systematic, iterative improvement of AI agents through hypothesis-driven experimentation. Based on Anthropic's agent evaluation best practices.
+Contract-driven optimization controller for iterative AI-agent improvement.
 
-## Overview
+This plugin no longer owns evaluation setup. It consumes canonical evaluation state prepared by `langfuse-analyzer` and runs a strict optimization loop.
 
-This plugin implements a **three-layer framework** for AI agent optimization:
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│ Layer 1: EVALUATION INFRASTRUCTURE                          │
-│ Dataset + Graders + Baseline                                │
-├─────────────────────────────────────────────────────────────┤
-│ Layer 2: OPTIMIZATION TARGET                                │
-│ Goal + Constraints + Main Knob                              │
-├─────────────────────────────────────────────────────────────┤
-│ Layer 3: OPTIMIZATION LOOP                                  │
-│ Diagnose → Hypothesize → Experiment → Compound → Decide     │
-└─────────────────────────────────────────────────────────────┘
-```
-
-## Two Modes of Operation
-
-### Local Interactive Mode (`/optimize`)
-
-Run optimization loops interactively with persistent state:
-- Journal-driven progress tracking
-- Resume from where you left off
-- Human-in-the-loop at each phase
-
-### Cloud Execution Mode (`/cloud-optimize`)
-
-Generate self-contained prompts for cloud-based coding agents:
-- Run in parallel across multiple environments
-- Compare results across different models
-- Consistent output format for easy comparison
-
-## The Three-Layer Framework
-
-### Layer 1: Evaluation Infrastructure
-
-Before optimizing, establish what you need to measure:
-
-| Component | Purpose |
-|-----------|---------|
-| **Dataset** | Tasks with inputs + success criteria (20+ items) |
-| **Graders** | How to score outputs (code, model, or human) |
-| **Baseline** | Current measurements to improve from |
-
-**Skill:** `evaluation-infrastructure`
-
-### Layer 2: Optimization Target
-
-Define what you're optimizing toward:
-
-| Component | Purpose |
-|-----------|---------|
-| **Goal** | Metric to improve + target value |
-| **Constraints** | Hard boundaries + regression guards |
-| **Main Knob** | What you're adjusting (config, prompt, grader, code) |
-
-**Skill:** `optimization-target`
-
-### Layer 3: Optimization Loop
-
-Execute iterations:
+## Architecture
 
 ```
-DIAGNOSE   → Analyze failures, find patterns
-HYPOTHESIZE → Propose ONE change to main knob
-EXPERIMENT  → Implement, run evaluation
-COMPOUND    → Keep/rollback, capture learnings
-DECIDE      → Continue, graduate, or stop
+Langfuse Analyzer (eval setup owner)
+  -> exports .claude/eval-infra/<agent>.yaml|json
+  -> stores canonical state in Langfuse metadata/prompts/runs
+
+Agentic Optimization Loop (this plugin)
+  -> validates contract snapshot + live identifiers
+  -> defines optimization target (dimensions/signals/levers)
+  -> runs init -> hypothesize -> experiment -> analyze -> compound
+  -> performs diagnosis during analyze and decision in compound
 ```
 
-**Skill:** `optimization-loop`
+## Core Concepts
+
+| Concept | Meaning |
+|---|---|
+| Goal | What metric/outcome to improve |
+| Dimensions | Quality facets to optimize (e.g. correctness, safety) |
+| Signals | Measurable scores/metrics for each dimension (canonical 0-1) |
+| Levers | What can change (config/prompt/grader/code) |
+| Guards | Hard regression boundaries; violations trigger rollback |
+| Slices | Segment-level checks to avoid hidden regressions |
+
+## Lever Strategy
+
+Single loop, configurable lever cardinality:
+
+- `single` mode: exactly 1 lever per iteration
+- `multi` mode: 2..N levers per iteration
+- default for `multi`: `N=3`
+- hard cap: `N=5`
+
+Decision policy is unchanged across both modes (same strict guards and rollback criteria).
 
 ## Commands
 
 ### `/optimize [agent]`
 
-Interactive local optimization with persistent state.
+Primary interactive loop command.
 
-```bash
-/optimize my-agent
-```
+New arguments:
+- `--lever-mode single|multi` (default `single`)
+- `--max-levers N` (`1..5`; default `1` for single, `3` for multi)
 
 ### `/optimize-status [agent]`
 
-Check current optimization state.
-
-```bash
-/optimize-status my-agent
-```
+Read-only status including lever strategy fields (`lever_mode`, `max_levers`, `current_lever_set_size`).
 
 ### `/cloud-optimize [iterations]`
 
-Generate cloud-ready optimization prompt.
+Generate cloud execution prompts with explicit lever cardinality policy and strict guard instructions.
 
-```bash
-/cloud-optimize 5
-```
+### Eval Bootstrap
 
-Guides you through:
-1. Assessing existing evaluation infrastructure
-2. Defining optimization target and constraints
-3. Generating self-contained prompt for cloud execution
+Optimization bootstrap/setup now lives in `langfuse-analyzer` via `/optimize-bootstrap`.
 
-## Quick Start Paths
+## Contract Dependency
 
-### Path A: Full Infrastructure Exists
+Expected local contract snapshot path:
 
-You have dataset, graders, and baseline.
+- `.claude/eval-infra/<agent>.yaml`
+- `.claude/eval-infra/<agent>.json`
 
-```
-→ /cloud-optimize
-→ Define target (goal, constraints, main knob)
-→ Generate prompt
-→ Run in cloud
-```
+`/optimize` fails fast if contract is missing/incomplete or live identifiers do not validate.
 
-### Path B: Have Traces, Need Graders
+See:
+- `references/eval-contract.md`
+- `references/lever-strategy.md`
 
-You have production data but no formal evaluation.
+## Minimal State Model
 
-```
-→ /cloud-optimize
-→ Build graders (Layer 1 guidance)
-→ Establish baseline
-→ Define target
-→ Generate prompt
-```
+This plugin should operate with only two files:
 
-### Path C: Starting Fresh
+1. **Eval handoff snapshot (read-only):**
+   - `.claude/eval-infra/<agent>.yaml|json`
+2. **Optimization state (read/write):**
+   - `.claude/optimization-loops/<agent>/journal.yaml`
 
-Need to set up everything.
+Target definition and lever scope are stored directly in `journal.yaml` under `meta.target` and `meta.levers`.
+No separate `target.yaml` is required.
+
+## Journal State
+
+State remains in:
 
 ```
-→ /cloud-optimize
-→ Create dataset from production traces
-→ Design graders
-→ Establish baseline
-→ Define target
-→ Generate prompt
+.claude/optimization-loops/<agent>/journal.yaml
 ```
 
-## Key Concepts
+Additional fields:
+- `loop.lever_mode`
+- `loop.max_levers`
+- `iterations[].lever_set`
+- `iterations[].lever_set_size`
+- `iterations[].attribution_confidence`
+- `meta.target` (goal/dimensions/constraints)
+- `meta.levers` (main knob, allowed scope, frozen scope)
 
-### Main Knob Types
+## Notes
 
-| Type | What Changes | Example |
-|------|--------------|---------|
-| CONFIG | Parameter values | `style: "formal" → "analytical"` |
-| PROMPT | Prompt content | Add examples, restructure |
-| GRADER | Evaluation criteria | Refine rubric |
-| CODE | Implementation | Modify logic (within boundaries) |
+- Canonical score semantics are `0-1` for gating and decisions.
+- Any `0-10` representation is display-only and non-authoritative.
+- This plugin is read-only with respect to evaluation infrastructure objects.
 
-### Constraint Types
+## Local Langfuse Helper Surface
 
-| Type | Purpose | Violation = |
-|------|---------|-------------|
-| Hard boundaries | Paths that cannot change | Immediate stop |
-| Regression guards | Metrics that cannot get worse | Rollback |
-| Soft preferences | Nice to have | Noted but continues |
+Helpers live in:
 
-### Metrics from Anthropic's Framework
+`/Users/max/mberto-compound/plugins/agentic-optimization-loop/skills/optimization-loop/helpers/`
 
-| Metric | Measures | Use for |
-|--------|----------|---------|
-| pass@k | Works eventually? | Capability ceiling |
-| pass^k | Reliably consistent? | Production readiness |
-
-## State Persistence: The Journal
-
-All optimization progress is tracked in:
-
-```
-.claude/optimization-loops/<agent-name>/
-├── journal.yaml           # Full state (Layer 1 + 2 + 3 history)
-├── iterations/            # Detailed per-iteration records
-│   ├── 001-tool-guidance.md
-│   └── 002-prompt-restructure.md
-└── artifacts/             # Modified files
-```
-
-The journal captures:
-- **Evaluation infrastructure** (dataset, graders, baseline)
-- **Optimization target** (goal, constraints, main knob)
-- **Iteration history** (every hypothesis, experiment, result)
-- **Accumulated learnings** (what works, what fails, patterns)
-
-**Resume anywhere:** The journal allows picking up exactly where you left off, whether running locally or in cloud.
-
-## Parallel Cloud Execution
-
-Generate one prompt, run in multiple environments:
-
-1. Generate prompt with `/cloud-optimize`
-2. Copy to 5 different cloud agents
-3. Each runs independently
-4. Compare FINAL REPORT sections
-5. Merge best changes and learnings
-
-Output format is consistent across all runs.
-
-## References
-
-### Best Practices Guide
-
-`references/agent-eval-best-practices.md`
-
-Comprehensive guide covering:
-- Grader design (code, model, human)
-- Dataset construction
-- Calibration protocols
-- Failure debugging
-- The relationship between evals and optimization
-
-### Skills
-
-| Skill | Purpose |
-|-------|---------|
-| `evaluation-infrastructure` | Layer 1 - Build/assess eval infra |
-| `optimization-target` | Layer 2 - Define goal + constraints |
-| `optimization-loop` | Layer 3 - Execute iterations |
-| `optimization-craft` | Local interactive methodology |
-
-## Philosophy
-
-Based on Anthropic's agent evaluation principles:
-
-1. **Evaluation-first**: Define metrics BEFORE making changes
-2. **Hypothesis-driven**: Every change has a testable prediction
-3. **Controlled experiments**: One change at a time, compare to baseline
-4. **Compounding returns**: Failures become test cases, learnings accumulate
-5. **Statistical rigor**: Multiple samples, track trends
-
-The goal is not just to improve your agent, but to build a **self-improving evaluation system**.
+- `contract_resolver.py`: contract load + live Langfuse object validation
+- `run_metrics_reader.py`: baseline/candidate comparison (normalized)
+- `failure_pack_reader.py`: low-scoring item extraction for diagnosis
+- `trace_retriever.py`: trace-by-id, last-N, metadata/tag/time filters, score filters, and modes (`minimal|io|prompts|flow|full`)
+- `langfuse_client.py`: local auth client + connection test
