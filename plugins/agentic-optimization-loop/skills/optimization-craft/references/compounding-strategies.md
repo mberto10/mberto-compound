@@ -205,18 +205,18 @@ false_negatives = [
 ```python
 # If judge is too lenient on citations:
 old_criteria = """
-Rate accuracy from 0-10:
+Rate accuracy from 0-1:
 - Check if claims are factually correct
 """
 
 new_criteria = """
-Rate accuracy from 0-10:
+Rate accuracy from 0-1:
 - Check if claims are factually correct
 - Verify each claim has a supporting citation
-- Claims without citations should reduce score by 2 points
-- Incorrect claims should reduce score by 3 points
+- Claims without citations should reduce score by 0.2
+- Incorrect claims should reduce score by 0.3
 
-IMPORTANT: Uncited claims are NOT acceptable for scores above 7.
+IMPORTANT: Uncited claims are NOT acceptable for scores above 0.7.
 """
 
 lf.create_prompt(

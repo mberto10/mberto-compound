@@ -1,0 +1,157 @@
+#!/usr/bin/env python3
+"""
+Read and compare baseline/candidate run metrics using normalized 0-1 semantics.
+Read-only helper.
+"""
+
+import argparse
+import json
+from typing import Any, Dict, List, Optional
+
+from contract_resolver import _as_dict, normalize_score, normalize_contract, load_snapshot, _resolve_snapshot_path
+from contract_resolver import validate_contract_shape
+
+
+def _find_run(dataset: Any, run_name: str) -> Optional[Any]:
+    runs = getattr(dataset, "runs", []) or []
+    for run in runs:
+        if getattr(run, "name", None) == run_name:
+            return run
+    return None
+
+
+def _collect_scores(run: Any) -> Dict[str, List[float]]:
+    by_name: Dict[str, List[float]] = {}
+    items = getattr(run, "items", []) or []
+    for item in items:
+        scores = getattr(item, "scores", []) or []
+        for score in scores:
+            name = getattr(score, "name", None) or _as_dict(score).get("name")
+            value = getattr(score, "value", None)
+            if value is None:
+                value = _as_dict(score).get("value")
+            if not name:
+                continue
+            if isinstance(value, (int, float)):
+                by_name.setdefault(name, []).append(normalize_score(value))
+    return by_name
+
+
+def _mean(values: List[float]) -> Optional[float]:
+    if not values:
+        return None
+    return sum(values) / len(values)
+
+
+def _get_client():
+    from contract_resolver import _resolve_langfuse_client
+
+    return _resolve_langfuse_client()
+
+
+def cmd_compare(args: argparse.Namespace) -> int:
+    path = _resolve_snapshot_path(args.agent, args.path)
+    raw = load_snapshot(path)
+    contract = normalize_contract(raw, args.agent, str(path))
+
+    shape_errors = validate_contract_shape(contract)
+    if shape_errors:
+        print(json.dumps({"status": "error", "errors": shape_errors}, indent=2))
+        return 2
+
+    dataset_name = _as_dict(contract.get("dataset")).get("name")
+    client = _get_client()
+    dataset = client.get_dataset(dataset_name)
+    if not dataset:
+        print(json.dumps({"status": "error", "error": f"dataset not found: {dataset_name}"}, indent=2))
+        return 3
+
+    baseline = _find_run(dataset, args.baseline_run)
+    candidate = _find_run(dataset, args.candidate_run)
+    if not baseline or not candidate:
+        print(
+            json.dumps(
+                {
+                    "status": "error",
+                    "error": "baseline or candidate run not found",
+                    "baseline_run": args.baseline_run,
+                    "candidate_run": args.candidate_run,
+                },
+                indent=2,
+            )
+        )
+        return 4
+
+    baseline_scores = _collect_scores(baseline)
+    candidate_scores = _collect_scores(candidate)
+
+    dimensions = contract.get("dimensions") or []
+    rows = []
+
+    for dim in dimensions:
+        if not isinstance(dim, dict):
+            continue
+        name = dim.get("name")
+        if not name:
+            continue
+        b_mean = _mean(baseline_scores.get(name, []))
+        c_mean = _mean(candidate_scores.get(name, []))
+        if b_mean is None and c_mean is None:
+            continue
+        delta = None
+        if b_mean is not None and c_mean is not None:
+            delta = c_mean - b_mean
+
+        threshold = normalize_score(dim.get("threshold", 0.0))
+        guard_pass = c_mean is None or c_mean >= threshold
+
+        rows.append(
+            {
+                "dimension": name,
+                "baseline_mean": b_mean,
+                "candidate_mean": c_mean,
+                "delta": delta,
+                "threshold": threshold,
+                "critical": bool(dim.get("critical", False)),
+                "guard_pass": guard_pass,
+            }
+        )
+
+    payload = {
+        "status": "ok",
+        "dataset": dataset_name,
+        "baseline_run": args.baseline_run,
+        "candidate_run": args.candidate_run,
+        "score_scale": "0-1",
+        "rows": rows,
+    }
+
+    print(json.dumps(payload, indent=2))
+    return 0
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="Read normalized run metrics")
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    compare = sub.add_parser("compare", help="Compare baseline and candidate runs")
+    compare.add_argument("--agent", required=True, help="Agent name")
+    compare.add_argument("--baseline-run", required=True, help="Baseline run name")
+    compare.add_argument("--candidate-run", required=True, help="Candidate run name")
+    compare.add_argument("--path", help="Explicit contract snapshot path")
+
+    return parser
+
+
+def main() -> None:
+    parser = build_parser()
+    args = parser.parse_args()
+
+    if args.command == "compare":
+        raise SystemExit(cmd_compare(args))
+
+    raise SystemExit(1)
+
+
+if __name__ == "__main__":
+    main()

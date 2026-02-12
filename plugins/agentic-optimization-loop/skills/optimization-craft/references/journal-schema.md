@@ -2,6 +2,10 @@
 
 The optimization journal is the persistent state machine for the optimization loop. It lives at `.claude/optimization-loops/<agent>/journal.yaml`.
 
+This is the only optimization state file.
+- Do not create a separate `target.yaml`.
+- Keep target definition and lever scope under `meta`.
+
 ---
 
 ## Full Schema
@@ -24,6 +28,22 @@ meta:
     metric: string                # Primary metric name (e.g., "accuracy")
     current: number               # Value at start (baseline)
     goal: number                  # Target value to achieve
+    dimensions:
+      - name: string
+        signal: string
+        threshold: number         # Canonical 0-1
+        weight: number
+        critical: boolean
+
+  # Lever scope (single source of truth for allowed tuning surface)
+  levers:
+    main_knob:
+      type: string                # config | prompt | grader | code
+      location: string
+    allowed:
+      - string                    # Explicit tunable paths/refs
+    frozen:
+      - string                    # Explicit blocked paths/refs
 
   # Constraints that must not regress
   constraints:
@@ -84,6 +104,9 @@ meta:
 # ══════════════════════════════════════════════════════════════════
 current_phase: enum               # init | hypothesize | experiment | analyze | compound | graduated
 current_iteration: number         # 0 = pre-first-iteration, 1+ = iteration number
+loop:
+  lever_mode: enum                # single | multi
+  max_levers: number              # 1..5
 
 # ══════════════════════════════════════════════════════════════════
 # ITERATIONS - One entry per optimization cycle
@@ -114,6 +137,9 @@ iterations:
       type: enum                  # prompt | tool | architecture | retrieval | code
       location: string            # File path OR langfuse://prompts/<name>
       description: string         # What specifically changes
+      lever_set:                  # Explicit lever list for this iteration
+        - string
+      lever_set_size: number      # Number of levers in this iteration
 
       # Optional: detailed change info
       before: string | null       # Previous state (for rollback)
@@ -164,6 +190,7 @@ iterations:
     analysis:
       hypothesis_validated: boolean
       verdict: string             # One-line summary of outcome
+      attribution_confidence: enum # high | medium | low
 
       metrics_summary:
         accuracy: string          # e.g., "+3% (expected +10%)"

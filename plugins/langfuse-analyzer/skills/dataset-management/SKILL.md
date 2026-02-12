@@ -85,6 +85,35 @@ python3 ${CLAUDE_PLUGIN_ROOT}/skills/dataset-management/helpers/dataset_manager.
   --name "checkout_regressions"
 ```
 
+### Set Dataset Metadata (Contract Updates)
+
+Merge metadata patch (idempotent):
+
+```bash
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/dataset-management/helpers/dataset_manager.py \
+  set-metadata \
+  --name "checkout_regressions" \
+  --metadata '{"schema_version":"eval_infra_v1","score_scale":"0-1"}'
+```
+
+Replace metadata entirely:
+
+```bash
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/dataset-management/helpers/dataset_manager.py \
+  set-metadata \
+  --name "checkout_regressions" \
+  --metadata '{"schema_version":"eval_infra_v1"}' \
+  --replace
+```
+
+### Describe Dataset + Contract Status
+
+```bash
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/dataset-management/helpers/dataset_manager.py \
+  describe \
+  --name "checkout_regressions"
+```
+
 ## Python SDK Note
 
 When using the Langfuse Python SDK directly (not via CLI), use the correct method for adding items:
@@ -138,6 +167,18 @@ Or custom expectations:
   "original_score": 6.2
 }
 ```
+
+## Eval Infrastructure Contract
+
+When a dataset is used for optimization loops, prefer Langfuse metadata schema `eval_infra_v1`:
+
+- `schema_version: "eval_infra_v1"`
+- `score_scale: "0-1"` (canonical)
+- `dimensions[]` with `threshold`, `weight`, `critical`
+- `judge_prompts[]`
+- `baseline` and readiness `status`
+
+Use the `langfuse-eval-infrastructure` skill and helper CLI for full contract lifecycle.
 
 ## Common Workflows
 

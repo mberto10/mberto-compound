@@ -15,13 +15,16 @@ How to analyze experiment results, validate hypotheses, and extract learnings.
 
 ## Step 1: Quantitative Comparison
 
+Canonical decision semantics are `0-1`.
+If you display percentages for readability, treat them as derived-only and non-authoritative.
+
 ### Metrics Table
 
 Create a comparison table:
 
 | Metric | Baseline | Previous | Current | Delta | Target | Status |
 |--------|----------|----------|---------|-------|--------|--------|
-| accuracy | 72% | 78% | 81% | +3% | 90% | Gap: 9% |
+| accuracy | 0.72 | 0.78 | 0.81 | +0.03 | 0.90 | Gap: 0.09 |
 | latency_p95 | 2.1s | 2.4s | 2.3s | -0.1s | <3s | ✓ |
 | cost_avg | $0.015 | $0.018 | $0.017 | -$0.001 | <$0.02 | ✓ |
 
@@ -30,12 +33,12 @@ Create a comparison table:
 Plot progress over iterations:
 
 ```
-Accuracy Trajectory
-100% ┤
- 90% ┤                                    ─── target
- 80% ┤              ●─────●
- 70% ┤    ●─────●
- 60% ┤
+Accuracy Trajectory (0-1)
+1.00 ┤
+0.90 ┤                                    ─── target
+0.80 ┤              ●─────●
+0.70 ┤    ●─────●
+0.60 ┤
      └────┬─────┬─────┬─────┬───
         base   v1    v2    v3
 ```
@@ -56,8 +59,8 @@ Count
   10 ┤    ████████████████████████
    5 ┤████████████████████████████████
    0 ┼────┬────┬────┬────┬────┬────
-     0-20 20-40 40-60 60-80 80-100
-                Score %
+    0.0-0.2 0.2-0.4 0.4-0.6 0.6-0.8 0.8-1.0
+                        Score
 ```
 
 Questions:

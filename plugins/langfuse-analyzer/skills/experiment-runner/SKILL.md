@@ -9,6 +9,12 @@ Run experiments on datasets with evaluators stored in Langfuse or custom scripts
 
 **Key Feature:** Judge prompts can be stored in Langfuse for versioning and reuse across experiments.
 
+## Score Scale Policy
+
+- Canonical score scale is `0-1`.
+- If judge outputs `0-10`, runner normalizes to `0-1` before aggregation and threshold checks.
+- Reports may display both representations (e.g., `0.82 (8.2/10)`), but gating logic uses canonical `0-1`.
+
 ## When to Use
 
 - Running experiments on Langfuse datasets

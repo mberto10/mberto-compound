@@ -33,6 +33,35 @@ from datetime import datetime
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "data-retrieval" / "helpers"))
 from langfuse_client import get_langfuse_client
 
+CANONICAL_SCORE_SCALE = "0-1"
+
+
+def normalize_score(value: Any) -> float:
+    """
+    Normalize raw score values to canonical 0-1 scale.
+
+    Accepted inputs:
+    - 0-1 (already normalized)
+    - 0-10 (converted to 0-1)
+    """
+    try:
+        v = float(value)
+    except (TypeError, ValueError):
+        return 0.0
+
+    if v < 0:
+        return 0.0
+    if v <= 1.0:
+        return v
+    if v <= 10.0:
+        return v / 10.0
+    return 1.0
+
+
+def format_score_dual(value: float) -> str:
+    """Format score with canonical and human-readable equivalents."""
+    return f"{value:.3f} ({value * 10:.1f}/10)"
+
 
 def create_langfuse_judge_evaluator(prompt_name: str, client) -> Callable:
     """
@@ -93,19 +122,24 @@ def create_langfuse_judge_evaluator(prompt_name: str, client) -> Callable:
                 json_match = re.search(r'\{[^}]+\}', result_text)
                 if json_match:
                     result = json.loads(json_match.group())
-                    score = float(result.get("score", 0)) / 10.0  # Normalize to 0-1
-                    score = max(0.0, min(1.0, score))
+                    raw_score = result.get("score", 0)
+                    score = normalize_score(raw_score)
                     reasoning = result.get("reasoning", "")
-                    return Evaluation(name=score_name, value=score, comment=reasoning)
+                    comment = f"raw_score={raw_score}; normalized={score:.3f}; {reasoning}".strip("; ")
+                    return Evaluation(name=score_name, value=score, comment=comment)
             except (json.JSONDecodeError, ValueError):
                 pass
 
             # Fallback: try to extract just a number
             numbers = re.findall(r'\b(\d+(?:\.\d+)?)\b', result_text)
             if numbers:
-                score = float(numbers[0]) / 10.0
-                score = max(0.0, min(1.0, score))
-                return Evaluation(name=score_name, value=score, comment=result_text[:100])
+                raw_score = float(numbers[0])
+                score = normalize_score(raw_score)
+                return Evaluation(
+                    name=score_name,
+                    value=score,
+                    comment=f"raw_score={raw_score}; normalized={score:.3f}; {result_text[:100]}"
+                )
 
             # If all parsing fails, return 0
             return Evaluation(name=score_name, value=0.0, comment=f"Failed to parse: {result_text[:100]}")
@@ -336,7 +370,7 @@ def run_experiment(
                     if name not in scores:
                         scores[name] = []
                     if isinstance(value, (int, float)):
-                        scores[name].append(value)
+                        scores[name].append(normalize_score(value))
 
         # Calculate averages
         score_averages = {}
@@ -352,7 +386,9 @@ def run_experiment(
             "successful": successful,
             "failed": failed,
             "score_averages": score_averages,
-            "evaluators_used": [e.__name__ for e in evaluators] if evaluators else []
+            "evaluators_used": [e.__name__ for e in evaluators] if evaluators else [],
+            "score_scale": CANONICAL_SCORE_SCALE,
+            "score_scale_note": "Canonical 0-1 scale. 0-10 values are normalized before aggregation.",
         }
 
     except FileNotFoundError as e:
@@ -430,7 +466,8 @@ def get_run(dataset_name: str, run_name: str) -> Optional[Dict[str, Any]]:
                     item_dict["scores"] = {}
                     for score in item.scores:
                         name = score.name if hasattr(score, 'name') else "score"
-                        value = score.value if hasattr(score, 'value') else score
+                        raw_value = score.value if hasattr(score, 'value') else score
+                        value = normalize_score(raw_value) if isinstance(raw_value, (int, float)) else raw_value
                         item_dict["scores"][name] = value
 
                         if name not in scores_summary:
@@ -552,6 +589,7 @@ def analyze_run(
     lines.append(f"**Dataset:** {dataset_name}")
     lines.append(f"**Created:** {run.get('created_at', 'Unknown')}")
     lines.append(f"**Total Items:** {run.get('item_count', 0)}")
+    lines.append(f"**Score Scale:** `{CANONICAL_SCORE_SCALE}` (with 0-10 equivalents in display)")
 
     if run.get('description'):
         lines.append(f"**Description:** {run['description']}")
@@ -568,21 +606,26 @@ def analyze_run(
             min_v = f"{stats.get('min', 0):.3f}"
             max_v = f"{stats.get('max', 0):.3f}"
             count = stats.get('count', 0)
-            lines.append(f"| {name} | {mean} | {min_v} | {max_v} | {count} |")
+            lines.append(
+                f"| {name} | {mean} ({float(mean)*10:.1f}/10) | {min_v} ({float(min_v)*10:.1f}/10) | {max_v} ({float(max_v)*10:.1f}/10) | {count} |"
+            )
         lines.append("")
 
     # Filter items by score threshold
     items = run.get('items', [])
     if score_threshold is not None and score_name:
+        threshold_normalized = normalize_score(score_threshold)
         filtered_items = []
         for item in items:
             scores = item.get('scores', {})
             if score_name in scores:
-                if scores[score_name] < score_threshold:
+                if normalize_score(scores[score_name]) < threshold_normalized:
                     filtered_items.append(item)
         items = filtered_items
         lines.append(f"## Items Below Threshold\n")
-        lines.append(f"Showing items where `{score_name}` < {score_threshold}")
+        lines.append(
+            f"Showing items where `{score_name}` < {threshold_normalized:.3f} ({threshold_normalized * 10:.1f}/10)"
+        )
         lines.append(f"**Count:** {len(items)}\n")
     elif show_failures:
         # Show items with any low scores (< 0.5 for normalized scores)
@@ -590,7 +633,7 @@ def analyze_run(
         for item in items:
             scores = item.get('scores', {})
             for name, value in scores.items():
-                if isinstance(value, (int, float)) and value < 0.5:
+                if isinstance(value, (int, float)) and normalize_score(value) < 0.5:
                     failure_items.append(item)
                     break
         items = failure_items
@@ -620,8 +663,10 @@ def analyze_run(
                 lines.append(f"**Actual:** `{output}`")
 
             if item.get('scores'):
-                scores_str = ", ".join(f"{k}: {v:.3f}" if isinstance(v, float) else f"{k}: {v}"
-                                      for k, v in item['scores'].items())
+                scores_str = ", ".join(
+                    f"{k}: {format_score_dual(normalize_score(v))}" if isinstance(v, (int, float)) else f"{k}: {v}"
+                    for k, v in item['scores'].items()
+                )
                 lines.append(f"**Scores:** {scores_str}")
             lines.append("")
 
@@ -705,7 +750,13 @@ def format_result(result: Dict[str, Any]) -> str:
     if result.get('score_averages'):
         lines.append("\n## Average Scores\n")
         for name, avg in result['score_averages'].items():
-            lines.append(f"- **{name}:** {avg:.3f}")
+            lines.append(f"- **{name}:** {format_score_dual(avg)}")
+
+    if result.get('score_scale'):
+        lines.append("")
+        lines.append(f"**Score Scale:** `{result['score_scale']}`")
+        if result.get("score_scale_note"):
+            lines.append(f"**Note:** {result['score_scale_note']}")
 
     return "\n".join(lines)
 
