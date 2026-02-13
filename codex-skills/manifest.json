@@ -161,6 +161,12 @@
       "path": "codex-skills/compound-consolidation-craft",
       "version": "0.1.0",
       "description": "Review and implement compound learnings into skills and plugins"
+    },
+    {
+      "name": "markdown-program-autopilot",
+      "path": "codex-skills/markdown-program-autopilot",
+      "version": "0.1.0",
+      "description": "Self-sustaining markdown-based long-running program execution loop"
     }
   ]
 }
