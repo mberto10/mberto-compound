@@ -4,13 +4,18 @@
 // symbol = EODHD symbol (required, e.g. AAPL.US)
 // help = true|false (optional, default false). If true, returns a decision guide and exits.
 // analysisType = Optional beginner shortcut: momentum|trend_short|trend_medium|trend_strength|volatility|mean_reversion
+// analysis_type = snake_case alias for analysisType
 // function = Indicator function (required unless analysisType is used). Common: rsi,sma,ema,wma,macd,atr,adx,stochastic,cci,williams,mfi,bbands
 // period = Optional indicator period (default: 14, or analysisType default if provided)
 // from = Optional YYYY-MM-DD date lower bound
 // to = Optional YYYY-MM-DD date upper bound
 // order = Optional order a|d (default: d)
 // maxPoints = Maximum points to return (default: 120, min: 1, max: 2000)
+// max_points = snake_case alias for maxPoints
+// maxPeriods = camelCase alias for maxPoints
+// max_periods = snake_case alias for maxPoints
 // outputMode = compact|full (default: compact)
+// output_mode = snake_case alias for outputMode
 
 function asBool(value, defaultValue) {
   if (value === undefined || value === null || value === '') return defaultValue;
@@ -25,6 +30,14 @@ function clampNumber(value, fallback, minValue, maxValue) {
   const n = Number(value);
   if (!Number.isFinite(n)) return fallback;
   return Math.min(Math.max(Math.floor(n), minValue), maxValue);
+}
+
+function firstDefined() {
+  for (let i = 0; i < arguments.length; i++) {
+    const value = arguments[i];
+    if (value !== undefined && value !== null) return value;
+  }
+  return undefined;
 }
 
 function isValidDateString(dateStr) {
@@ -59,7 +72,7 @@ const ANALYSIS_TYPE_MAP = {
 };
 
 const help = asBool(data.input.help, false);
-const analysisType = (data.input.analysisType || '').toString().trim().toLowerCase();
+const analysisType = (data.input.analysisType || data.input.analysis_type || '').toString().trim().toLowerCase();
 
 if (help) {
   return {
@@ -108,8 +121,9 @@ const indicatorFunctionInput = (data.input.function || '').toString().trim().toL
 const from = (data.input.from || '').toString().trim();
 const to = (data.input.to || '').toString().trim();
 const order = (data.input.order || 'd').toString().trim().toLowerCase();
-const outputMode = (data.input.outputMode || 'compact').toString().trim().toLowerCase();
-const maxPoints = clampNumber(data.input.maxPoints, 120, 1, 2000);
+const outputMode = (data.input.outputMode || data.input.output_mode || 'compact').toString().trim().toLowerCase();
+const maxPointsInput = firstDefined(data.input.maxPoints, data.input.max_points, data.input.maxPeriods, data.input.max_periods);
+const maxPoints = clampNumber(maxPointsInput, 120, 1, 2000);
 
 if (!symbol) return { error: true, message: 'symbol is required.' };
 if (analysisType && !Object.prototype.hasOwnProperty.call(ANALYSIS_TYPE_MAP, analysisType)) {
