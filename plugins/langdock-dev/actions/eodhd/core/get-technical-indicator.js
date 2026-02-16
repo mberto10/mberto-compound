@@ -2,7 +2,7 @@
 // description = Fetches one technical indicator series for a symbol from EODHD technical endpoint.
 //
 // symbol = EODHD symbol (required, e.g. AAPL.US)
-// function = Indicator function (required, e.g. rsi, sma, ema, macd)
+// function = Indicator function (required). Common options: rsi,sma,ema,wma,macd,atr,adx,stochastic,cci,williams,mfi,bbands
 // period = Optional indicator period (default: 14)
 // from = Optional YYYY-MM-DD date lower bound
 // to = Optional YYYY-MM-DD date upper bound
@@ -28,6 +28,21 @@ const period = clampNumber(data.input.period, 14, 1, 500);
 if (!symbol) return { error: true, message: 'symbol is required.' };
 if (!indicatorFunction) return { error: true, message: 'function is required (e.g. rsi, sma, ema, macd).' };
 if (order !== 'a' && order !== 'd') return { error: true, message: 'order must be a or d.' };
+
+const COMMON_FUNCTIONS = [
+  'rsi',
+  'sma',
+  'ema',
+  'wma',
+  'macd',
+  'atr',
+  'adx',
+  'stochastic',
+  'cci',
+  'williams',
+  'mfi',
+  'bbands',
+];
 
 function isValidDateString(dateStr) {
   if (!dateStr) return true;
@@ -122,6 +137,7 @@ try {
     endpointDiagnostics: {
       endpoint: '/api/technical/{symbol}',
       parameters: { symbol, function: indicatorFunction, period, order, from: from || null, to: to || null },
+      commonFunctions: COMMON_FUNCTIONS,
       rowCount: rows.length,
     },
     metadata: {
@@ -137,4 +153,3 @@ try {
     status: error.status || null,
   };
 }
-
