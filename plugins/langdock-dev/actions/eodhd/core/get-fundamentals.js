@@ -49,7 +49,7 @@ const FIELDS_PRESET_MAP = {
 };
 
 const help = asBool(data.input.help, false);
-const fieldsPresetInput = (data.input.fieldsPreset || '').toString().trim().toLowerCase();
+const fieldsPresetInput = (data.input.fieldsPreset || data.input.fields_preset || '').toString().trim().toLowerCase();
 
 if (help) {
   return {
@@ -93,8 +93,9 @@ if (!apiKey) return { error: true, message: 'Missing auth credential. Set one of
 const symbol = (data.input.symbol || '').toString().trim().toUpperCase();
 const fieldsInput = (data.input.fields || '').toString().trim();
 const formatInput = (data.input.format || 'summary').toString().trim().toLowerCase();
-const hasMaxPeriodsInput = data.input.maxPeriods !== undefined && data.input.maxPeriods !== null && String(data.input.maxPeriods).trim() !== '';
-const maxPeriods = hasMaxPeriodsInput ? clampNumber(data.input.maxPeriods, 8, 1, 120) : null;
+const maxPeriodsRaw = data.input.maxPeriods !== undefined ? data.input.maxPeriods : data.input.max_periods;
+const hasMaxPeriodsInput = maxPeriodsRaw !== undefined && maxPeriodsRaw !== null && String(maxPeriodsRaw).trim() !== '';
+const maxPeriods = hasMaxPeriodsInput ? clampNumber(maxPeriodsRaw, 8, 1, 120) : null;
 
 if (!symbol) return { error: true, message: 'symbol is required.' };
 if (formatInput !== 'raw' && formatInput !== 'summary') {
@@ -197,16 +198,6 @@ async function fetchJson(url, label) {
 }
 
 try {
-  const params = [];
-  addParam(params, 'api_token', apiKey);
-  addParam(params, 'fmt', 'json');
-  const url = `https://eodhd.com/api/fundamentals/${encodeURIComponent(symbol)}?${params.join('&')}`;
-
-  const raw = await fetchJson(url, 'fundamentals');
-  const availableTopLevelKeys = raw && typeof raw === 'object' && !Array.isArray(raw)
-    ? Object.keys(raw).sort()
-    : [];
-
   let fields = [];
   if (fieldsInput) {
     const parsed = fieldsInput.split(',').map((s) => s.trim()).filter(Boolean);
@@ -234,7 +225,6 @@ try {
           details: {
             unknownFields,
             allowedFields: ALLOWED_TOP_LEVEL_FIELDS,
-            availableTopLevelKeys,
           },
         };
       }
@@ -243,6 +233,35 @@ try {
   } else if (fieldsPresetInput && fieldsPresetInput !== 'full') {
     fields = FIELDS_PRESET_MAP[fieldsPresetInput].slice();
   }
+
+  let apiFilterKeys = [];
+  if (formatInput === 'summary') {
+    apiFilterKeys = ['General', 'Highlights', 'Valuation', 'SharesStats', 'Technicals'];
+  } else if (formatInput === 'raw' && fields.length > 0) {
+    apiFilterKeys = fields.slice();
+  }
+
+  const params = [];
+  addParam(params, 'api_token', apiKey);
+  addParam(params, 'fmt', 'json');
+  if (apiFilterKeys.length > 0) addParam(params, 'filter', apiFilterKeys.join(','));
+  const url = `https://eodhd.com/api/fundamentals/${encodeURIComponent(symbol)}?${params.join('&')}`;
+
+  let raw = await fetchJson(url, 'fundamentals');
+  if (
+    apiFilterKeys.length === 1 &&
+    raw &&
+    typeof raw === 'object' &&
+    !Array.isArray(raw) &&
+    !Object.prototype.hasOwnProperty.call(raw, apiFilterKeys[0])
+  ) {
+    const wrapped = {};
+    wrapped[apiFilterKeys[0]] = raw;
+    raw = wrapped;
+  }
+  const availableTopLevelKeys = raw && typeof raw === 'object' && !Array.isArray(raw)
+    ? Object.keys(raw).sort()
+    : [];
 
   let selected = raw;
   if (fields.length > 0) {
@@ -291,6 +310,7 @@ try {
       symbol,
       requestedFields: fields,
       fieldsPreset: fieldsPresetInput || null,
+      apiFilterKeys,
       allowedFields: ALLOWED_TOP_LEVEL_FIELDS,
       availableTopLevelKeys,
       responseType: Array.isArray(raw) ? 'array' : typeof raw,

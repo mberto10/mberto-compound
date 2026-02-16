@@ -140,11 +140,12 @@ if (!apiKey) return { error: true, message: 'Missing auth credential. Set one of
 
 const symbolsInput = (data.input.symbols || '').toString().trim();
 const sOverride = (data.input.s || '').toString().trim();
-const windowPreset = (data.input.windowPreset || '').toString().trim().toLowerCase();
+const windowPreset = (data.input.windowPreset || data.input.window_preset || '').toString().trim().toLowerCase();
 const outputMode = (data.input.outputMode || 'compact').toString().trim().toLowerCase();
 let from = (data.input.from || '').toString().trim();
 let to = (data.input.to || '').toString().trim();
-const contentMaxChars = clampNumber(data.input.contentMaxChars, 280, 80, 5000);
+const contentMaxCharsRaw = data.input.contentMaxChars !== undefined ? data.input.contentMaxChars : data.input.content_max_chars;
+const contentMaxChars = clampNumber(contentMaxCharsRaw, 280, 80, 5000);
 
 if (outputMode !== 'compact' && outputMode !== 'full') {
   return { error: true, message: 'outputMode must be compact or full.' };
@@ -180,7 +181,8 @@ if (from && to && from > to) return { error: true, message: 'from must be <= to.
 
 const limit = clampNumber(data.input.limit, 20, 1, 200);
 const offset = clampNumber(data.input.offset, 0, 0, 1000000);
-const resultLimit = clampNumber(data.input.resultLimit, limit, 1, 200);
+const resultLimitRaw = data.input.resultLimit !== undefined ? data.input.resultLimit : data.input.result_limit;
+const resultLimit = clampNumber(resultLimitRaw, limit, 1, 200);
 
 try {
   const sParam = sOverride || toSymbolsQuery(symbolsInput);

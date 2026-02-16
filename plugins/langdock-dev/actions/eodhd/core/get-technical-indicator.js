@@ -60,7 +60,7 @@ const ANALYSIS_TYPE_MAP = {
 };
 
 const help = asBool(data.input.help, false);
-const analysisType = (data.input.analysisType || '').toString().trim().toLowerCase();
+const analysisType = (data.input.analysisType || data.input.analysis_type || '').toString().trim().toLowerCase();
 
 if (help) {
   return {
@@ -111,7 +111,8 @@ const to = (data.input.to || '').toString().trim();
 const order = (data.input.order || 'd').toString().trim().toLowerCase();
 const outputMode = (data.input.outputMode || 'compact').toString().trim().toLowerCase();
 const maxPoints = clampNumber(data.input.maxPoints, 120, 1, 2000);
-const maxPeriods = clampNumber(data.input.maxPeriods, maxPoints, 1, 2000);
+const maxPeriodsRaw = data.input.maxPeriods !== undefined ? data.input.maxPeriods : data.input.max_periods;
+const maxPeriods = clampNumber(maxPeriodsRaw, maxPoints, 1, 2000);
 
 if (!symbol) return { error: true, message: 'symbol is required.' };
 if (analysisType && !Object.prototype.hasOwnProperty.call(ANALYSIS_TYPE_MAP, analysisType)) {

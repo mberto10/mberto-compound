@@ -149,7 +149,8 @@ if (!hasUserLimit && preset && Number.isFinite(preset.limit)) {
   limit = clampNumber(preset.limit, 50, 1, 500);
 }
 const offset = clampNumber(data.input.offset, 0, 0, 1000000);
-const resultLimit = clampNumber(data.input.resultLimit, limit, 1, 500);
+const resultLimitRaw = data.input.resultLimit !== undefined ? data.input.resultLimit : data.input.result_limit;
+const resultLimit = clampNumber(resultLimitRaw, limit, 1, 500);
 
 const sortInput = sortInputRaw || (preset ? preset.sort : 'market_capitalization.desc');
 const signalsInput = signalsInputRaw || (preset ? preset.signals : '');
