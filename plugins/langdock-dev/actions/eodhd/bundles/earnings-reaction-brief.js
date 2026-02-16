@@ -4,14 +4,15 @@
 // from = Start date YYYY-MM-DD (default: 3 days ago)
 // to = End date YYYY-MM-DD (default: today)
 // symbols = Optional comma-separated symbols to constrain analysis
-// maxSymbols = Maximum symbols to analyze (default: 20, max: 50)
-// topN = Number of top winners/losers to return (default: 5, max: 20)
-// includeIntraday = Include intraday reaction signal (default: true)
-// intradayInterval = 1m|5m|1h (default: 5m)
-// includeNews = Include catalyst headlines from news endpoint (default: true)
-// newsLimit = Maximum total news items to fetch (default: 40, max: 100)
-// minAbsMovePct = Minimum absolute daily move to classify as strong reaction (default: 2.0)
-// outputMode = compact|full (default: compact)
+// max_symbols = Maximum symbols to analyze (default: 20, max: 50)
+// top_n = Number of top winners/losers to return (default: 5, max: 20)
+// include_intraday = Include intraday reaction signal (default: true)
+// intraday_interval = 1m|5m|1h (default: 5m)
+// include_news = Include catalyst headlines from news endpoint (default: true)
+// news_limit = Maximum total news items to fetch (default: 40, max: 100)
+// min_abs_move_pct = Minimum absolute daily move to classify as strong reaction (default: 2.0)
+// output_mode = compact|full (default: compact)
+// canonical input naming uses snake_case. Legacy camelCase aliases are supported for compatibility.
 
 const auth = (data && data.auth) ? data.auth : {};
 const apiKey = (
@@ -24,6 +25,39 @@ const apiKey = (
   ''
 ).toString().trim();
 if (!apiKey) return { error: true, message: 'Missing auth credential. Set one of: auth.apiKey, auth.apiToken, auth.api_key, auth.api_token, auth.eodhdApiKey' };
+
+function trimInput(value) {
+  if (value === undefined || value === null) return '';
+  return String(value).trim();
+}
+
+function recordLegacyAliasUsage(usageList, key) {
+  if (usageList.indexOf(key) === -1) usageList.push(key);
+}
+
+function getCanonicalInput(input, canonicalKey, aliases, fallback, legacyUsage) {
+  const canonicalRaw = trimInput(input[canonicalKey]);
+  const aliasValues = {};
+  for (let i = 0; i < aliases.length; i++) {
+    const alias = aliases[i];
+    const aliasRaw = trimInput(input[alias]);
+    if (aliasRaw !== '') {
+      aliasValues[alias] = aliasRaw;
+      if (legacyUsage) recordLegacyAliasUsage(legacyUsage, alias);
+    }
+  }
+  if (canonicalRaw !== '') return canonicalRaw;
+  for (let i = 0; i < aliases.length; i++) {
+    const alias = aliases[i];
+    if (aliasValues[alias] !== undefined) return aliasValues[alias];
+  }
+  return fallback;
+}
+
+function deprecationWarnings(inputCompatibility) {
+  if (!inputCompatibility || inputCompatibility.length === 0) return [];
+  return ['Deprecated legacy input key(s) used: ' + inputCompatibility.join(', ') + '. Use snake_case canonical names when possible.'];
+}
 
 function asBool(value, defaultValue) {
   if (value === undefined || value === null || value === '') return defaultValue;
@@ -67,6 +101,7 @@ function dateDaysBefore(dateStr, days) {
   base.setUTCDate(base.getUTCDate() - days);
   return formatDate(base);
 }
+
 function addParam(params, key, value) {
   if (value === undefined || value === null) return;
   const str = String(value).trim();
@@ -163,24 +198,37 @@ async function fetchJson(url, label) {
   return response.json;
 }
 
-const from = (data.input.from || dateDaysAgo(3)).toString().trim();
-const to = (data.input.to || formatDate(new Date())).toString().trim();
-const symbolsInput = (data.input.symbols || '').toString().trim();
-const maxSymbols = clampNumber(data.input.maxSymbols, 20, 1, 50);
-const topN = clampNumber(data.input.topN, 5, 1, 20);
-const includeIntraday = asBool(data.input.includeIntraday, true);
-const intradayInterval = (data.input.intradayInterval || '5m').toString().trim().toLowerCase();
-const includeNews = asBool(data.input.includeNews, true);
-const newsLimit = clampNumber(data.input.newsLimit, 40, 1, 100);
-const minAbsMovePct = clampNumber(data.input.minAbsMovePct, 2.0, 0.1, 20);
-const outputMode = (data.input.outputMode || 'compact').toString().trim().toLowerCase();
+const input = (data && data.input) ? data.input : {};
+const inputCompatibility = [];
+const INPUT_ALIASES = {
+  max_symbols: ['maxSymbols'],
+  top_n: ['topN'],
+  include_intraday: ['includeIntraday'],
+  intraday_interval: ['intradayInterval'],
+  include_news: ['includeNews'],
+  news_limit: ['newsLimit'],
+  min_abs_move_pct: ['minAbsMovePct'],
+  output_mode: ['outputMode'],
+};
+
+const from = getCanonicalInput(input, 'from', [], dateDaysAgo(3), inputCompatibility);
+const to = getCanonicalInput(input, 'to', [], formatDate(new Date()), inputCompatibility);
+const symbolsInput = getCanonicalInput(input, 'symbols', [], '', inputCompatibility);
+const maxSymbols = clampNumber(getCanonicalInput(input, 'max_symbols', INPUT_ALIASES.max_symbols, 20, inputCompatibility), 20, 1, 50);
+const topN = clampNumber(getCanonicalInput(input, 'top_n', INPUT_ALIASES.top_n, 5, inputCompatibility), 5, 1, 20);
+const includeIntraday = asBool(getCanonicalInput(input, 'include_intraday', INPUT_ALIASES.include_intraday, true, inputCompatibility), true);
+const intradayInterval = getCanonicalInput(input, 'intraday_interval', INPUT_ALIASES.intraday_interval, '5m', inputCompatibility).toLowerCase();
+const includeNews = asBool(getCanonicalInput(input, 'include_news', INPUT_ALIASES.include_news, true, inputCompatibility), true);
+const newsLimit = clampNumber(getCanonicalInput(input, 'news_limit', INPUT_ALIASES.news_limit, 40, inputCompatibility), 40, 1, 100);
+const minAbsMovePct = clampNumber(getCanonicalInput(input, 'min_abs_move_pct', INPUT_ALIASES.min_abs_move_pct, 2.0, inputCompatibility), 2.0, 0.1, 20);
+const outputMode = getCanonicalInput(input, 'output_mode', INPUT_ALIASES.output_mode, 'compact', inputCompatibility).toLowerCase();
 const eodFrom = dateDaysBefore(from, 40);
 
 if (intradayInterval !== '1m' && intradayInterval !== '5m' && intradayInterval !== '1h') {
-  return { error: true, message: 'intradayInterval must be 1m, 5m, or 1h' };
+  return { error: true, message: 'intraday_interval must be 1m, 5m, or 1h' };
 }
 if (outputMode !== 'compact' && outputMode !== 'full') {
-  return { error: true, message: 'outputMode must be compact or full.' };
+  return { error: true, message: 'output_mode must be compact or full.' };
 }
 
 const diagnostics = {
@@ -464,6 +512,8 @@ try {
     outputMode,
     truncated: truncationNotes.length > 0,
     truncationNotes,
+    aliasWarnings: deprecationWarnings(inputCompatibility),
+    inputCompatibility,
   });
 
   return {
@@ -507,6 +557,7 @@ try {
         minAbsMovePct,
         outputMode,
       },
+      inputCompatibility,
     },
   };
 } catch (error) {

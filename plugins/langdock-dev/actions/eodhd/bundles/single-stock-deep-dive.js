@@ -2,17 +2,18 @@
 // description = Produces a comprehensive single-stock dossier combining fundamentals, price action, technical state, catalysts, and sentiment context.
 //
 // symbol = EODHD symbol (e.g. AAPL.US) (required)
-// benchmarkSymbol = Optional benchmark symbol for relative performance (no default)
-// lookbackDays = EOD lookback window in days (default: 365, min: 90, max: 1500)
-// includeNews = Include news enrichment (default: true)
-// newsDays = News lookback days (default: 30, min: 1, max: 365)
-// includeCalendar = Include earnings/dividends/splits timeline (default: true)
-// calendarBackDays = Calendar lookback days (default: 60, min: 7, max: 365)
-// calendarForwardDays = Calendar forward window days (default: 180, min: 7, max: 365)
-// includeTechnicals = Include RSI and trend assessment (default: true)
-// rsiPeriod = RSI period (default: 14, min: 2, max: 50)
-// newsLimit = News items limit (default: 30, min: 1, max: 100)
-// outputMode = compact|full (default: compact)
+// benchmark_symbol = Optional benchmark symbol for relative performance (no default)
+// lookback_days = EOD lookback window in days (default: 365, min: 90, max: 1500)
+// include_news = Include news enrichment (default: true)
+// news_days = News lookback days (default: 30, min: 1, max: 365)
+// include_calendar = Include earnings/dividends/splits timeline (default: true)
+// calendar_back_days = Calendar lookback days (default: 60, min: 7, max: 365)
+// calendar_forward_days = Calendar forward window days (default: 180, min: 7, max: 365)
+// include_technicals = Include RSI and trend assessment (default: true)
+// rsi_period = RSI period (default: 14, min: 2, max: 50)
+// news_limit = News items limit (default: 30, min: 1, max: 100)
+// output_mode = compact|full (default: compact)
+// canonical input naming uses snake_case. Legacy camelCase aliases are supported for compatibility.
 
 const auth = (data && data.auth) ? data.auth : {};
 const apiKey = (
@@ -25,6 +26,39 @@ const apiKey = (
   ''
 ).toString().trim();
 if (!apiKey) return { error: true, message: 'Missing auth credential. Set one of: auth.apiKey, auth.apiToken, auth.api_key, auth.api_token, auth.eodhdApiKey' };
+
+function trimInput(value) {
+  if (value === undefined || value === null) return '';
+  return String(value).trim();
+}
+
+function recordLegacyAliasUsage(usageList, key) {
+  if (usageList.indexOf(key) === -1) usageList.push(key);
+}
+
+function getCanonicalInput(input, canonicalKey, aliases, fallback, legacyUsage) {
+  const canonicalRaw = trimInput(input[canonicalKey]);
+  const aliasValues = {};
+  for (let i = 0; i < aliases.length; i++) {
+    const alias = aliases[i];
+    const aliasRaw = trimInput(input[alias]);
+    if (aliasRaw !== '') {
+      aliasValues[alias] = aliasRaw;
+      if (legacyUsage) recordLegacyAliasUsage(legacyUsage, alias);
+    }
+  }
+  if (canonicalRaw !== '') return canonicalRaw;
+  for (let i = 0; i < aliases.length; i++) {
+    const alias = aliases[i];
+    if (aliasValues[alias] !== undefined) return aliasValues[alias];
+  }
+  return fallback;
+}
+
+function deprecationWarnings(inputCompatibility) {
+  if (!inputCompatibility || inputCompatibility.length === 0) return [];
+  return ['Deprecated legacy input key(s) used: ' + inputCompatibility.join(', ') + '. Use snake_case canonical names when possible.'];
+}
 
 function asBool(value, defaultValue) {
   if (value === undefined || value === null || value === '') return defaultValue;
@@ -352,21 +386,37 @@ async function fetchJson(url, label) {
   return response.json;
 }
 
-const symbol = (data.input.symbol || '').toString().trim().toUpperCase();
-const benchmarkSymbol = (data.input.benchmarkSymbol || '').toString().trim().toUpperCase();
-const lookbackDays = clampNumber(data.input.lookbackDays, 365, 90, 1500);
-const includeNews = asBool(data.input.includeNews, true);
-const newsDays = clampNumber(data.input.newsDays, 30, 1, 365);
-const includeCalendar = asBool(data.input.includeCalendar, true);
-const calendarBackDays = clampNumber(data.input.calendarBackDays, 60, 7, 365);
-const calendarForwardDays = clampNumber(data.input.calendarForwardDays, 180, 7, 365);
-const includeTechnicals = asBool(data.input.includeTechnicals, true);
-const rsiPeriod = clampNumber(data.input.rsiPeriod, 14, 2, 50);
-const newsLimit = clampNumber(data.input.newsLimit, 30, 1, 100);
-const outputMode = (data.input.outputMode || 'compact').toString().trim().toLowerCase();
+const input = (data && data.input) ? data.input : {};
+const inputCompatibility = [];
+const INPUT_ALIASES = {
+  benchmark_symbol: ['benchmarkSymbol'],
+  lookback_days: ['lookbackDays'],
+  include_news: ['includeNews'],
+  news_days: ['newsDays'],
+  include_calendar: ['includeCalendar'],
+  calendar_back_days: ['calendarBackDays'],
+  calendar_forward_days: ['calendarForwardDays'],
+  include_technicals: ['includeTechnicals'],
+  rsi_period: ['rsiPeriod'],
+  news_limit: ['newsLimit'],
+  output_mode: ['outputMode'],
+};
+
+const symbol = getCanonicalInput(input, 'symbol', [], '', inputCompatibility).toUpperCase();
+const benchmarkSymbol = getCanonicalInput(input, 'benchmark_symbol', INPUT_ALIASES.benchmark_symbol, '', inputCompatibility).toUpperCase();
+const lookbackDays = clampNumber(getCanonicalInput(input, 'lookback_days', INPUT_ALIASES.lookback_days, 365, inputCompatibility), 365, 90, 1500);
+const includeNews = asBool(getCanonicalInput(input, 'include_news', INPUT_ALIASES.include_news, true, inputCompatibility), true);
+const newsDays = clampNumber(getCanonicalInput(input, 'news_days', INPUT_ALIASES.news_days, 30, inputCompatibility), 30, 1, 365);
+const includeCalendar = asBool(getCanonicalInput(input, 'include_calendar', INPUT_ALIASES.include_calendar, true, inputCompatibility), true);
+const calendarBackDays = clampNumber(getCanonicalInput(input, 'calendar_back_days', INPUT_ALIASES.calendar_back_days, 60, inputCompatibility), 60, 7, 365);
+const calendarForwardDays = clampNumber(getCanonicalInput(input, 'calendar_forward_days', INPUT_ALIASES.calendar_forward_days, 180, inputCompatibility), 180, 7, 365);
+const includeTechnicals = asBool(getCanonicalInput(input, 'include_technicals', INPUT_ALIASES.include_technicals, true, inputCompatibility), true);
+const rsiPeriod = clampNumber(getCanonicalInput(input, 'rsi_period', INPUT_ALIASES.rsi_period, 14, inputCompatibility), 14, 2, 50);
+const newsLimit = clampNumber(getCanonicalInput(input, 'news_limit', INPUT_ALIASES.news_limit, 30, inputCompatibility), 30, 1, 100);
+const outputMode = getCanonicalInput(input, 'output_mode', INPUT_ALIASES.output_mode, 'compact', inputCompatibility).toLowerCase();
 
 if (!symbol) return { error: true, message: 'symbol is required' };
-if (outputMode !== 'compact' && outputMode !== 'full') return { error: true, message: 'outputMode must be compact or full.' };
+if (outputMode !== 'compact' && outputMode !== 'full') return { error: true, message: 'output_mode must be compact or full.' };
 
 const diagnostics = {
   calls: {
@@ -691,6 +741,8 @@ try {
     outputMode,
     truncated: truncationNotes.length > 0,
     truncationNotes,
+    aliasWarnings: deprecationWarnings(inputCompatibility),
+    inputCompatibility,
   });
 
   return {
@@ -837,6 +889,7 @@ try {
         rsiPeriod,
         outputMode,
       },
+      inputCompatibility,
     },
   };
 } catch (error) {

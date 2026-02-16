@@ -1,19 +1,20 @@
 // name = Screen To Story Details
 // description = Returns full ranked candidate tables and score decomposition for screen-to-story runs.
 //
-// screenerFilters = Screener filters JSON string (optional if screenerSignals provided)
-// screenerSignals = Screener signals (comma-separated, optional if screenerFilters provided)
-// screenerSort = Screener sort expression (default: market_capitalization.desc)
-// candidateLimit = Maximum symbols from screener to analyze (default: 25, min: 5, max: 100)
-// shortlistSize = Number of ranked ideas to return (default: 8, min: 3, max: 20)
-// lookbackDays = EOD lookback days for momentum/volatility (default: 120, min: 40, max: 1500)
-// includeTechnicals = Include RSI enrichment (default: true)
-// rsiPeriod = RSI period (default: 14, min: 2, max: 50)
-// includeNews = Include news intensity/rationale (default: true)
-// newsDays = News lookback days (default: 7, min: 1, max: 60)
-// newsLimit = Max news items to fetch (default: 100, min: 1, max: 250)
-// outputMode = compact|full (default: full)
-// tableLimit = Max rows for full ranked candidate tables (default: compact=50, full=200, min: 1, max: 500)
+// screener_filters = Screener filters JSON string (optional if screener_signals provided)
+// screener_signals = Screener signals (comma-separated, optional if screener_filters provided)
+// screener_sort = Screener sort expression (default: market_capitalization.desc)
+// candidate_limit = Maximum symbols from screener to analyze (default: 25, min: 5, max: 100)
+// shortlist_size = Number of ranked ideas to return (default: 8, min: 3, max: 20)
+// lookback_days = EOD lookback days for momentum/volatility (default: 120, min: 40, max: 1500)
+// include_technicals = Include RSI enrichment (default: true)
+// rsi_period = RSI period (default: 14, min: 2, max: 50)
+// include_news = Include news intensity/rationale (default: true)
+// news_days = News lookback days (default: 7, min: 1, max: 60)
+// news_limit = Max news items to fetch (default: 100, min: 1, max: 250)
+// output_mode = compact|full (default: full)
+// table_limit = Max rows for full ranked candidate tables (default: compact=50, full=200, min: 1, max: 500)
+// canonical input naming uses snake_case. Legacy camelCase aliases are supported for compatibility.
 
 const auth = (data && data.auth) ? data.auth : {};
 const apiKey = (
@@ -26,6 +27,39 @@ const apiKey = (
   ''
 ).toString().trim();
 if (!apiKey) return { error: true, message: 'Missing auth credential. Set one of: auth.apiKey, auth.apiToken, auth.api_key, auth.api_token, auth.eodhdApiKey' };
+
+function trimInput(value) {
+  if (value === undefined || value === null) return '';
+  return String(value).trim();
+}
+
+function recordLegacyAliasUsage(usageList, key) {
+  if (usageList.indexOf(key) === -1) usageList.push(key);
+}
+
+function getCanonicalInput(input, canonicalKey, aliases, fallback, legacyUsage) {
+  const canonicalRaw = trimInput(input[canonicalKey]);
+  const aliasValues = {};
+  for (let i = 0; i < aliases.length; i++) {
+    const alias = aliases[i];
+    const aliasRaw = trimInput(input[alias]);
+    if (aliasRaw !== '') {
+      aliasValues[alias] = aliasRaw;
+      if (legacyUsage) recordLegacyAliasUsage(legacyUsage, alias);
+    }
+  }
+  if (canonicalRaw !== '') return canonicalRaw;
+  for (let i = 0; i < aliases.length; i++) {
+    const alias = aliases[i];
+    if (aliasValues[alias] !== undefined) return aliasValues[alias];
+  }
+  return fallback;
+}
+
+function deprecationWarnings(inputCompatibility) {
+  if (!inputCompatibility || inputCompatibility.length === 0) return [];
+  return ['Deprecated legacy input key(s) used: ' + inputCompatibility.join(', ') + '. Use snake_case canonical names when possible.'];
+}
 
 function asBool(value, defaultValue) {
   if (value === undefined || value === null || value === '') return defaultValue;
@@ -185,20 +219,38 @@ async function fetchJson(url, label) {
   return response.json;
 }
 
-const screenerFilters = (data.input.screenerFilters || '').toString().trim();
-const screenerSignals = (data.input.screenerSignals || '').toString().trim();
-const screenerSort = (data.input.screenerSort || 'market_capitalization.desc').toString().trim();
-const candidateLimit = clampNumber(data.input.candidateLimit, 25, 5, 100);
-const shortlistSize = clampNumber(data.input.shortlistSize, 8, 3, 20);
-const lookbackDays = clampNumber(data.input.lookbackDays, 120, 40, 1500);
-const includeTechnicals = asBool(data.input.includeTechnicals, true);
-const rsiPeriod = clampNumber(data.input.rsiPeriod, 14, 2, 50);
-const includeNews = asBool(data.input.includeNews, true);
-const newsDays = clampNumber(data.input.newsDays, 7, 1, 60);
-const newsLimit = clampNumber(data.input.newsLimit, 100, 1, 250);
-const outputMode = (data.input.outputMode || 'full').toString().trim().toLowerCase();
-if (outputMode !== 'compact' && outputMode !== 'full') return { error: true, message: 'outputMode must be compact or full.' };
-const tableLimit = clampNumber(data.input.tableLimit, outputMode === 'compact' ? 50 : 200, 1, 500);
+const input = (data && data.input) ? data.input : {};
+const inputCompatibility = [];
+const INPUT_ALIASES = {
+  screener_filters: ['screenerFilters'],
+  screener_signals: ['screenerSignals'],
+  screener_sort: ['screenerSort'],
+  candidate_limit: ['candidateLimit'],
+  shortlist_size: ['shortlistSize'],
+  lookback_days: ['lookbackDays'],
+  include_technicals: ['includeTechnicals'],
+  rsi_period: ['rsiPeriod'],
+  include_news: ['includeNews'],
+  news_days: ['newsDays'],
+  news_limit: ['newsLimit'],
+  output_mode: ['outputMode'],
+  table_limit: ['tableLimit'],
+};
+
+const screenerFilters = getCanonicalInput(input, 'screener_filters', INPUT_ALIASES.screener_filters, '', inputCompatibility);
+const screenerSignals = getCanonicalInput(input, 'screener_signals', INPUT_ALIASES.screener_signals, '', inputCompatibility);
+const screenerSort = getCanonicalInput(input, 'screener_sort', INPUT_ALIASES.screener_sort, 'market_capitalization.desc', inputCompatibility);
+const candidateLimit = clampNumber(getCanonicalInput(input, 'candidate_limit', INPUT_ALIASES.candidate_limit, 25, inputCompatibility), 25, 5, 100);
+const shortlistSize = clampNumber(getCanonicalInput(input, 'shortlist_size', INPUT_ALIASES.shortlist_size, 8, inputCompatibility), 8, 3, 20);
+const lookbackDays = clampNumber(getCanonicalInput(input, 'lookback_days', INPUT_ALIASES.lookback_days, 120, inputCompatibility), 120, 40, 1500);
+const includeTechnicals = asBool(getCanonicalInput(input, 'include_technicals', INPUT_ALIASES.include_technicals, true, inputCompatibility), true);
+const rsiPeriod = clampNumber(getCanonicalInput(input, 'rsi_period', INPUT_ALIASES.rsi_period, 14, inputCompatibility), 14, 2, 50);
+const includeNews = asBool(getCanonicalInput(input, 'include_news', INPUT_ALIASES.include_news, true, inputCompatibility), true);
+const newsDays = clampNumber(getCanonicalInput(input, 'news_days', INPUT_ALIASES.news_days, 7, inputCompatibility), 7, 1, 60);
+const newsLimit = clampNumber(getCanonicalInput(input, 'news_limit', INPUT_ALIASES.news_limit, 100, inputCompatibility), 100, 1, 250);
+const outputMode = getCanonicalInput(input, 'output_mode', INPUT_ALIASES.output_mode, 'full', inputCompatibility).toLowerCase();
+if (outputMode !== 'compact' && outputMode !== 'full') return { error: true, message: 'output_mode must be compact or full.' };
+const tableLimit = clampNumber(getCanonicalInput(input, 'table_limit', INPUT_ALIASES.table_limit, outputMode === 'compact' ? 50 : 200, inputCompatibility), outputMode === 'compact' ? 50 : 200, 1, 500);
 
 if (!screenerFilters && !screenerSignals) {
   return { error: true, message: 'Provide screenerFilters or screenerSignals for screen_to_story.' };
@@ -480,6 +532,8 @@ try {
     outputMode,
     truncated: truncationNotes.length > 0,
     truncationNotes,
+    aliasWarnings: deprecationWarnings(inputCompatibility),
+    inputCompatibility,
   });
 
   return {
@@ -533,6 +587,7 @@ try {
         outputMode,
         tableLimit,
       },
+      inputCompatibility,
     },
   };
 } catch (error) {
