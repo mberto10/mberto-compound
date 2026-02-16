@@ -38,6 +38,7 @@ from typing import Any, Dict, List, Optional
 
 sys.path.insert(0, str(Path(__file__).parent))
 from langfuse_client import get_langfuse_client
+import langfuse_rest_client
 
 
 # =============================================================================
@@ -208,6 +209,14 @@ def get_trace_score(trace_id: str, score_name: str) -> Optional[float]:
     Returns:
         The score value if found, None otherwise
     """
+    # 1. Try REST API via get_trace (reliable)
+    trace = langfuse_rest_client.get_trace(trace_id)
+    if trace and "scores" in trace:
+        for score in trace["scores"]:
+            if score.get("name") == score_name:
+                return score.get("value")
+
+    # 2. Fallback to SDK
     client = get_langfuse_client()
     try:
         response = client.api.scores.get_many(trace_id=trace_id)
