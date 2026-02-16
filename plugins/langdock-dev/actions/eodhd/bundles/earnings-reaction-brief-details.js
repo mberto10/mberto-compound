@@ -68,7 +68,6 @@ function dateDaysBefore(dateStr, days) {
   base.setUTCDate(base.getUTCDate() - days);
   return formatDate(base);
 }
-
 function addParam(params, key, value) {
   if (value === undefined || value === null) return;
   const str = String(value).trim();
