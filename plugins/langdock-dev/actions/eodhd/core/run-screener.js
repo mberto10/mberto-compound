@@ -2,8 +2,8 @@
 // description = Runs EODHD screener with optional filters/signals and returns rows plus extracted symbols.
 //
 // filters = Optional JSON string for EODHD screener filters
-// signals = Optional comma-separated screener signals
-// sort = Optional sort field (default: market_capitalization.desc)
+// signals = Optional comma-separated screener signals (common: top_gainers,top_losers,oversold,overbought)
+// sort = Optional sort field (default: market_capitalization.desc). Common: market_capitalization.desc,market_capitalization.asc,name.asc,name.desc,volume.desc,change_p.desc
 // limit = Max rows (default: 50, min: 1, max: 500)
 // offset = Pagination offset (default: 0, min: 0)
 
@@ -13,6 +13,21 @@ if (!apiKey) return { error: true, message: 'Missing auth.apiKey' };
 const filtersInput = (data.input.filters || '').toString().trim();
 const signalsInput = (data.input.signals || '').toString().trim();
 const sortInput = (data.input.sort || 'market_capitalization.desc').toString().trim();
+const COMMON_SORT_OPTIONS = [
+  'market_capitalization.desc',
+  'market_capitalization.asc',
+  'name.asc',
+  'name.desc',
+  'volume.desc',
+  'change_p.desc',
+  'change_p.asc',
+];
+const COMMON_SIGNALS = [
+  'top_gainers',
+  'top_losers',
+  'oversold',
+  'overbought',
+];
 
 function clampNumber(value, fallback, minValue, maxValue) {
   const n = Number(value);
@@ -111,6 +126,8 @@ try {
         hasFilters: !!parsedFilters,
         signals: signalsInput || null,
       },
+      commonSortOptions: COMMON_SORT_OPTIONS,
+      commonSignals: COMMON_SIGNALS,
     },
     metadata: {
       source: 'EODHD atomic action: run_screener',
@@ -125,4 +142,3 @@ try {
     status: error.status || null,
   };
 }
-

@@ -6,7 +6,7 @@
 // to = Optional YYYY-MM-DD end date
 // limit = Optional max items (default: 50, min: 1, max: 200)
 // offset = Optional pagination offset (default: 0, min: 0)
-// s = Optional direct EODHD news "s" query override (if set, it is used as-is)
+// s = Optional direct EODHD news "s" query override (if set, it is used as-is; example: AAPL.US,MSFT.US)
 
 const apiKey = (data.auth.apiKey || '').toString().trim();
 if (!apiKey) return { error: true, message: 'Missing auth.apiKey' };
@@ -131,4 +131,3 @@ try {
     status: error.status || null,
   };
 }
-
