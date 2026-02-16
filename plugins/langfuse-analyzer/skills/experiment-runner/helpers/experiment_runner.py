@@ -32,6 +32,7 @@ from datetime import datetime
 # Add parent directories to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "data-retrieval" / "helpers"))
 from langfuse_client import get_langfuse_client
+import langfuse_rest_client
 
 CANONICAL_SCORE_SCALE = "0-1"
 
@@ -57,6 +58,552 @@ def normalize_score(value: Any) -> float:
         return v / 10.0
     return 1.0
 
+
+def format_score_dual(normalized_value: float) -> str:
+    """Format score as '0.85 (8.5/10)'."""
+    return f"{normalized_value:.3f} ({normalized_value * 10:.1f}/10)"
+
+
+class Evaluation:
+    """Value object for an evaluation result."""
+    def __init__(self, name: str, value: float, comment: Optional[str] = None):
+        self.name = name
+        self.value = value
+        self.comment = comment
+
+
+def create_langfuse_judge_evaluator(prompt_name: str, client) -> Callable:
+    """
+    Create an evaluator function from a Langfuse prompt.
+    The prompt is expected to have {{input}}, {{output}}, and optional {{expected_output}} variables.
+    It should return JSON with "score" and "reasoning".
+    """
+    def evaluator(*, output, expected_output=None, **kwargs) -> Evaluation:
+        # Get the compiled prompt
+        # We need the 'production' version or latest
+        try:
+            prompt = client.get_prompt(prompt_name)
+        except Exception:
+            # Fallback for old SDK or missing prompt
+            try:
+                prompt = client.get_prompt(prompt_name, label="production")
+            except Exception as e:
+                return Evaluation(name=prompt_name, value=0.0, comment=f"Prompt not found: {e}")
+
+        # Extract config
+        config = prompt.config if hasattr(prompt, 'config') else {}
+        model = config.get("model", "gpt-4o")
+        temperature = config.get("temperature", 0)
+        max_tokens = config.get("max_tokens", 256) # Increased for reasoning
+
+        # Compile prompt
+        # Map kwargs to variables expected by prompt
+        # Standard variables: input, output, expected_output
+        compile_kwargs = {
+            "output": output,
+            "expected_output": expected_output or ""
+        }
+        # Add input from kwargs if present (usually passed as 'input' or inside 'item')
+        if "input" in kwargs:
+            compile_kwargs["input"] = kwargs["input"]
+        elif "item" in kwargs and hasattr(kwargs["item"], "input"):
+             compile_kwargs["input"] = kwargs["item"].input
+        elif "item" in kwargs and isinstance(kwargs["item"], dict):
+             compile_kwargs["input"] = kwargs["item"].get("input", "")
+
+        try:
+            filled_prompt = prompt.compile(**compile_kwargs)
+        except Exception as e:
+            return Evaluation(name=prompt_name, value=0.0, comment=f"Prompt compilation failed: {e}")
+
+        # Execute LLM call
+        # We use the client's openai adapter or just direct openai call if available?
+        # Langfuse client doesn't expose generic chat completion easily, but we can usage the one from the prompt if using new SDK,
+        # or we might need a separate OpenAI client.
+        # For simplicity/robustness in this plugin, we assume OPENAI_API_KEY is set and use standard client.
+        
+        # Checking if we can use the langfuse prompt's chat methods (newer SDK)
+        # If not, fall back to OpenAI
+        
+        # We'll use a standard OpenAI client approach for now, assuming env var is present.
+        import os
+        from openai import OpenAI
+        
+        if not os.getenv("OPENAI_API_KEY"):
+             return Evaluation(name=prompt_name, value=0.0, comment="OPENAI_API_KEY not set")
+
+        openai_client = OpenAI()
+        
+        # Score name derived from prompt name (dataset.judge-accuracy -> accuracy)
+        score_name = prompt_name.split("-")[-1] if "-" in prompt_name else "score"
+
+        # Handle potential {{expected_output}} logic in prompt text if compiler didn't handle it (some older SDKs)
+        # But compile() should handle it.
+        
+        # Ensure we don't have None values in prompt
+        # (Already handled by compile_kwargs defaults)
+        
+        try:
+            messages = [
+                {"role": "system", "content": "You are an evaluation judge. Follow the instructions exactly."},
+                {"role": "user", "content": filled_prompt}
+            ]
+            
+            # If the prompt itself is a list of messages (chat prompt), use that
+            # The SDK compile returns a string for text prompts, but for chat prompts?
+            # Assuming text prompt for now as per `ensure_judge_prompts`.
+            
+            response = openai_client.chat.completions.create(
+                model=model,
+                messages=messages,
+                temperature=temperature,
+                max_tokens=max_tokens
+            )
+
+            result_text = response.choices[0].message.content.strip()
+
+            # Try to parse JSON response
+            try:
+                # Find JSON in response
+                json_match = re.search(r'\{[^}]+\}', result_text)
+                if json_match:
+                    result = json.loads(json_match.group())
+                    raw_score = result.get("score", 0)
+                    score = normalize_score(raw_score)
+                    reasoning = result.get("reasoning", "")
+                    comment = f"raw_score={raw_score}; normalized={score:.3f}; {reasoning}".strip("; ")
+                    return Evaluation(name=score_name, value=score, comment=comment)
+            except (json.JSONDecodeError, ValueError):
+                pass
+
+            # Fallback: try to extract just a number
+            numbers = re.findall(r'\b(\d+(?:\.\d+)?)\b', result_text)
+            if numbers:
+                raw_score = float(numbers[0])
+                score = normalize_score(raw_score)
+                return Evaluation(
+                    name=score_name,
+                    value=score,
+                    comment=f"raw_score={raw_score}; normalized={score:.3f}; {result_text[:100]}"
+                )
+
+            # If all parsing fails, return 0
+            return Evaluation(name=score_name, value=0.0, comment=f"Failed to parse: {result_text[:100]}")
+
+        except Exception as e:
+            return Evaluation(name=score_name, value=0.0, comment=f"Error: {str(e)[:100]}")
+
+    # Set a meaningful name for the function
+    evaluator.__name__ = f"judge_{prompt_name.split('-')[-1]}"
+    evaluator.__doc__ = f"Evaluator generated from Langfuse prompt: {prompt_name}"
+
+    return evaluator
+
+
+def load_langfuse_judges(
+    client,
+    judge_names: Optional[List[str]] = None,
+    dataset_name: Optional[str] = None
+) -> List[Callable]:
+    """
+    Load judge evaluators from Langfuse prompts.
+
+    If judge_names is provided, load those specific judges.
+    If dataset_name is provided, try to get judge names from dataset metadata.
+    Otherwise, auto-discover prompts starting with "judge-".
+    """
+    evaluators = []
+
+    # Option 1: Explicit judge names provided
+    if judge_names:
+        for name in judge_names:
+            try:
+                evaluator = create_langfuse_judge_evaluator(name, client)
+                evaluators.append(evaluator)
+                print(f"Loaded judge: {name}", file=sys.stderr)
+            except Exception as e:
+                print(f"Warning: Failed to load judge '{name}': {e}", file=sys.stderr)
+        return evaluators
+
+    # Option 2: Get from dataset metadata
+    if dataset_name:
+        try:
+            dataset = client.get_dataset(dataset_name)
+            if dataset and hasattr(dataset, 'metadata') and dataset.metadata:
+                metadata = dataset.metadata
+                if 'judge_prompts' in metadata:
+                    for name in metadata['judge_prompts']:
+                        try:
+                            evaluator = create_langfuse_judge_evaluator(name, client)
+                            evaluators.append(evaluator)
+                            print(f"Loaded judge from dataset metadata: {name}", file=sys.stderr)
+                        except Exception as e:
+                            print(f"Warning: Failed to load judge '{name}': {e}", file=sys.stderr)
+                    if evaluators:
+                        return evaluators
+        except Exception as e:
+            print(f"Warning: Could not read dataset metadata: {e}", file=sys.stderr)
+
+    # Option 3: Auto-discover judge prompts
+    # List all prompts and find ones starting with "judge-"
+    try:
+        prompts = client.get_prompts()
+        if prompts:
+            for prompt in prompts:
+                name = prompt.name if hasattr(prompt, 'name') else str(prompt)
+                if name.startswith("judge-"):
+                    try:
+                        evaluator = create_langfuse_judge_evaluator(name, client)
+                        evaluators.append(evaluator)
+                        print(f"Auto-discovered judge: {name}", file=sys.stderr)
+                    except Exception as e:
+                        print(f"Warning: Failed to load judge '{name}': {e}", file=sys.stderr)
+    except Exception as e:
+        print(f"Warning: Could not auto-discover judges: {e}", file=sys.stderr)
+
+    if not evaluators:
+        print("Warning: No Langfuse judges found. Create prompts starting with 'judge-'.", file=sys.stderr)
+
+    return evaluators
+
+
+def load_module_from_path(script_path: str, module_name: str):
+    """Load a Python module from a file path."""
+    path = Path(script_path).resolve()
+    if not path.exists():
+        raise FileNotFoundError(f"Script not found: {script_path}")
+
+    spec = importlib.util.spec_from_file_location(module_name, path)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"Cannot load module from: {script_path}")
+
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[module_name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def load_task(task_script_path: str) -> Callable:
+    """Load task function from a script file.
+
+    The script must define a `task` function with signature:
+        def task(*, item, **kwargs) -> Any
+    """
+    module = load_module_from_path(task_script_path, "task_module")
+
+    if not hasattr(module, "task"):
+        raise AttributeError(f"Script must define a 'task' function: {task_script_path}")
+
+    return module.task
+
+
+def load_evaluators(evaluator_script_path: str) -> List[Callable]:
+    """Load evaluator functions from a script file.
+
+    The script must define EVALUATORS list or individual evaluator functions.
+    Each evaluator function should have signature:
+        def evaluator(*, output, expected_output, **kwargs) -> Evaluation
+    """
+    module = load_module_from_path(evaluator_script_path, "evaluator_module")
+
+    # Check for EVALUATORS list first
+    if hasattr(module, "EVALUATORS"):
+        evaluators = module.EVALUATORS
+        if isinstance(evaluators, list):
+            return evaluators
+
+    # Fall back to finding all functions that look like evaluators
+    evaluators = []
+    for name in dir(module):
+        if name.startswith("_"):
+            continue
+        obj = getattr(module, name)
+        if callable(obj) and name not in ("task", "load_module_from_path"):
+            evaluators.append(obj)
+
+    if not evaluators:
+        raise AttributeError(
+            f"Script must define EVALUATORS list or evaluator functions: {evaluator_script_path}"
+        )
+
+    return evaluators
+
+
+def prepare_live_dataset(client, run_name: str, limit: int, agent_name: Optional[str] = None) -> str:
+    """Fetch recent traces and create an ephemeral dataset for the experiment."""
+    # 1. Fetch recent traces
+    # We use a loose filter (just last N) or filter by agent if possible (via tags/metadata?)
+    # For now, simplest approach: last N traces globally or simplistic filter
+    
+    # Try to fetch traces
+    try:
+        # We can try to use tags if agent_name provided, but for now we just get global last N
+        # assuming the workspace is relevant.
+        traces = client.api.trace.list(limit=limit)
+        if not traces.data:
+            raise ValueError("No live traces found to bootstrap experiment")
+    except Exception as e:
+        raise ValueError(f"Failed to fetch live traces: {e}")
+
+    # 2. Create Dataset
+    dataset_name = f"live-{run_name}"
+    try:
+        client.create_dataset(name=dataset_name, description=f"Ephemeral dataset from live traces for run {run_name}")
+    except Exception:
+        # Ignore if exists (might retry run)
+        pass
+
+    # 3. Populate Dataset
+    mapped_count = 0
+    for trace in traces.data:
+        t_dict = trace.dict() if hasattr(trace, 'dict') else dict(trace)
+        
+        # Heuristic: use trace input/output
+        # input might be string or dict.
+        existing_input = t_dict.get("input")
+        existing_output = t_dict.get("output")
+        
+        if existing_input is None:
+            continue
+
+        try:
+            client.create_dataset_item(
+                dataset_name=dataset_name,
+                input=existing_input,
+                expected_output=existing_output, # Optional: treat past output as expected? Or just reference?
+                metadata={
+                    "source_trace_id": t_dict.get("id"),
+                    "source": "live-capture"
+                }
+            )
+            mapped_count += 1
+        except Exception:
+            pass
+            
+    if mapped_count == 0:
+        raise ValueError("Could not map any traces to dataset items (missing inputs?)")
+        
+    return dataset_name
+
+
+def run_experiment(
+    dataset_name: str,
+    run_name: str,
+    task_script: str,
+    evaluator_script: Optional[str] = None,
+    use_langfuse_judges: bool = False,
+    judge_names: Optional[List[str]] = None,
+    max_concurrency: int = 5,
+    run_description: Optional[str] = None,
+    metadata: Optional[Dict[str, Any]] = None,
+    # New args for live mode
+    source_type: str = "dataset",
+    sample_size: int = 10,
+    agent_name: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Run an experiment on a dataset with custom task and evaluators.
+
+    Evaluators can come from:
+    1. Local script file (--evaluator-script)
+    2. Langfuse prompts (--use-langfuse-judges or --judges)
+
+    Langfuse judges are prompts named 'judge-*' that define LLM-as-judge evaluation.
+    """
+    client = get_langfuse_client()
+
+    try:
+        # Handle Live Mode
+        if source_type == "live":
+            print(f"Fetching last {sample_size} traces for live dataset...", file=sys.stderr)
+            dataset_name = prepare_live_dataset(client, run_name, sample_size, agent_name)
+            print(f"Created ephemeral dataset: {dataset_name}", file=sys.stderr)
+        # Load task function
+        task_fn = load_task(task_script)
+
+        # Load evaluators
+        evaluators = []
+
+        # Option 1: Load from local script
+        if evaluator_script:
+            evaluators = load_evaluators(evaluator_script)
+            print(f"Loaded {len(evaluators)} evaluators from script", file=sys.stderr)
+
+        # Option 2: Load from Langfuse judge prompts
+        if use_langfuse_judges or judge_names:
+            langfuse_evaluators = load_langfuse_judges(
+                client,
+                judge_names=judge_names,
+                dataset_name=dataset_name
+            )
+            evaluators.extend(langfuse_evaluators)
+            print(f"Loaded {len(langfuse_evaluators)} Langfuse judges", file=sys.stderr)
+
+        # Get dataset
+        dataset = client.get_dataset(dataset_name)
+        if not dataset:
+            print(f"Dataset '{dataset_name}' not found", file=sys.stderr)
+            return {"status": "error", "message": f"Dataset not found: {dataset_name}"}
+
+        # Prepare run metadata
+        run_metadata = metadata or {}
+        run_metadata["task_script"] = task_script
+        if evaluator_script:
+            run_metadata["evaluator_script"] = evaluator_script
+        run_metadata["max_concurrency"] = max_concurrency
+
+        # Run experiment using Langfuse SDK
+        results = dataset.run_experiment(
+            name=run_name,
+            run_description=run_description,
+            run_metadata=run_metadata,
+            experiment_task=task_fn,
+            evaluators=evaluators if evaluators else None,
+            max_concurrency=max_concurrency
+        )
+
+        # Collect summary statistics
+        total_items = 0
+        successful = 0
+        failed = 0
+        scores = {}
+
+        for item_result in results:
+            total_items += 1
+            if hasattr(item_result, 'error') and item_result.error:
+                failed += 1
+            else:
+                successful += 1
+
+            # Aggregate scores
+            if hasattr(item_result, 'scores') and item_result.scores:
+                for score in item_result.scores:
+                    name = score.name if hasattr(score, 'name') else str(score)
+                    value = score.value if hasattr(score, 'value') else score
+                    if name not in scores:
+                        scores[name] = []
+                    if isinstance(value, (int, float)):
+                        scores[name].append(normalize_score(value))
+
+        # Calculate averages
+        score_averages = {}
+        for name, values in scores.items():
+            if values:
+                score_averages[name] = sum(values) / len(values)
+
+        return {
+            "status": "completed",
+            "dataset": dataset_name,
+            "run_name": run_name,
+            "total_items": total_items,
+            "successful": successful,
+            "failed": failed,
+            "score_averages": score_averages,
+            "evaluators_used": [e.__name__ for e in evaluators] if evaluators else [],
+            "score_scale": CANONICAL_SCORE_SCALE,
+            "score_scale_note": "Canonical 0-1 scale. 0-10 values are normalized before aggregation.",
+        }
+
+    except FileNotFoundError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return {"status": "error", "message": str(e)}
+    except Exception as e:
+        print(f"Error running experiment: {e}", file=sys.stderr)
+        return {"status": "error", "message": str(e)}
+
+
+def list_runs(dataset_name: str) -> List[Dict[str, Any]]:
+    """List all experiment runs for a dataset using REST API."""
+    try:
+        raw_runs = langfuse_rest_client.get_dataset_runs(dataset_name)
+        runs = []
+        for r in raw_runs:
+             runs.append({
+                 "name": r.get("name"),
+                 "created_at": r.get("createdAt"), # API uses camelCase
+                 "description": r.get("description"),
+                 "metadata": r.get("metadata", {})
+             })
+        return runs
+    except Exception as e:
+        print(f"Error listing runs: {e}", file=sys.stderr)
+        return []
+
+
+def get_run(dataset_name: str, run_name: str) -> Optional[Dict[str, Any]]:
+    """Get details of a specific experiment run using REST API."""
+    try:
+        # 1. Get run metadata from list
+        runs = langfuse_rest_client.get_dataset_runs(dataset_name)
+        run_info = next((r for r in runs if r.get("name") == run_name), None)
+        
+        if not run_info:
+            print(f"Run '{run_name}' not found in dataset '{dataset_name}'", file=sys.stderr)
+            return None
+
+        # 2. Get dataset ID for item fetch
+        dataset = langfuse_rest_client.get_dataset_by_name(dataset_name)
+        if not dataset:
+            print(f"Dataset '{dataset_name}' not found", file=sys.stderr)
+            return None
+        dataset_id = dataset.get("id")
+
+        # 3. Get items
+        raw_items = langfuse_rest_client.get_dataset_run_items(dataset_id, run_name)
+        
+        items = []
+        scores_summary = {}
+
+        for item in raw_items:
+            # Map camelCase from API to snake_case for internal use
+            item_dict = {
+                "id": item.get("id"),
+                "input": item.get("input"),
+                "output": item.get("output"),
+                "expected_output": item.get("expectedOutput"),
+            }
+
+            # Process scores
+            if item.get("scores"):
+                item_dict["scores"] = {}
+                for score in item.get("scores", []):
+                    # Score keys in API: name, value, ...
+                    name = score.get("name", "score")
+                    raw_value = score.get("value")
+                    value = normalize_score(raw_value) if isinstance(raw_value, (int, float)) else raw_value
+                    item_dict["scores"][name] = value
+
+                    if name not in scores_summary:
+                        scores_summary[name] = []
+                    if isinstance(value, (int, float)):
+                        scores_summary[name].append(value)
+
+            items.append(item_dict)
+
+        # Calculate score statistics
+        score_stats = {}
+        for name, values in scores_summary.items():
+            if values:
+                score_stats[name] = {
+                    "mean": sum(values) / len(values),
+                    "min": min(values),
+                    "max": max(values),
+                    "count": len(values)
+                }
+
+        return {
+            "name": run_name,
+            "dataset": dataset_name,
+            "created_at": run_info.get("createdAt"),
+            "description": run_info.get("description"),
+            "metadata": run_info.get("metadata", {}),
+            "item_count": len(items),
+            "score_stats": score_stats,
+            "items": items
+        }
+
+    except Exception as e:
+        print(f"Error getting run: {e}", file=sys.stderr)
+        return None
 
 def format_score_dual(value: float) -> str:
     """Format score with canonical and human-readable equivalents."""
@@ -283,6 +830,63 @@ def load_evaluators(evaluator_script_path: str) -> List[Callable]:
     return evaluators
 
 
+def prepare_live_dataset(client, run_name: str, limit: int, agent_name: Optional[str] = None) -> str:
+    """Fetch recent traces and create an ephemeral dataset for the experiment."""
+    # 1. Fetch recent traces
+    # We use a loose filter (just last N) or filter by agent if possible (via tags/metadata?)
+    # For now, simplest approach: last N traces globally or simplistic filter
+    
+    # Try to fetch traces
+    try:
+        # We can try to use tags if agent_name provided, but for now we just get global last N
+        # assuming the workspace is relevant.
+        traces = client.api.trace.list(limit=limit)
+        if not traces.data:
+            raise ValueError("No live traces found to bootstrap experiment")
+    except Exception as e:
+        raise ValueError(f"Failed to fetch live traces: {e}")
+
+    # 2. Create Dataset
+    dataset_name = f"live-{run_name}"
+    try:
+        client.create_dataset(name=dataset_name, description=f"Ephemeral dataset from live traces for run {run_name}")
+    except Exception:
+        # Ignore if exists (might retry run)
+        pass
+
+    # 3. Populate Dataset
+    mapped_count = 0
+    for trace in traces.data:
+        t_dict = trace.dict() if hasattr(trace, 'dict') else dict(trace)
+        
+        # Heuristic: use trace input/output
+        # input might be string or dict.
+        existing_input = t_dict.get("input")
+        existing_output = t_dict.get("output")
+        
+        if existing_input is None:
+            continue
+
+        try:
+            client.create_dataset_item(
+                dataset_name=dataset_name,
+                input=existing_input,
+                expected_output=existing_output, # Optional: treat past output as expected? Or just reference?
+                metadata={
+                    "source_trace_id": t_dict.get("id"),
+                    "source": "live-capture"
+                }
+            )
+            mapped_count += 1
+        except Exception:
+            pass
+            
+    if mapped_count == 0:
+        raise ValueError("Could not map any traces to dataset items (missing inputs?)")
+        
+    return dataset_name
+
+
 def run_experiment(
     dataset_name: str,
     run_name: str,
@@ -292,7 +896,11 @@ def run_experiment(
     judge_names: Optional[List[str]] = None,
     max_concurrency: int = 5,
     run_description: Optional[str] = None,
-    metadata: Optional[Dict[str, Any]] = None
+    metadata: Optional[Dict[str, Any]] = None,
+    # New args for live mode
+    source_type: str = "dataset",
+    sample_size: int = 10,
+    agent_name: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Run an experiment on a dataset with custom task and evaluators.
 
@@ -305,6 +913,11 @@ def run_experiment(
     client = get_langfuse_client()
 
     try:
+        # Handle Live Mode
+        if source_type == "live":
+            print(f"Fetching last {sample_size} traces for live dataset...", file=sys.stderr)
+            dataset_name = prepare_live_dataset(client, run_name, sample_size, agent_name)
+            print(f"Created ephemeral dataset: {dataset_name}", file=sys.stderr)
         # Load task function
         task_fn = load_task(task_script)
 
@@ -771,7 +1384,7 @@ def main():
 
     # Run command
     run_parser = subparsers.add_parser("run", help="Run an experiment on a dataset")
-    run_parser.add_argument("--dataset", required=True, help="Dataset name")
+    run_parser.add_argument("--dataset", required=False, help="Dataset name (required if source-type is dataset)")
     run_parser.add_argument("--run-name", required=True, help="Name for this experiment run")
     run_parser.add_argument("--task-script", required=True,
                            help="Path to Python script with task() function")
@@ -784,6 +1397,13 @@ def main():
     run_parser.add_argument("--max-concurrency", type=int, default=5,
                            help="Maximum concurrent executions (default: 5)")
     run_parser.add_argument("--description", help="Run description")
+    
+    # Live mode args
+    run_parser.add_argument("--source-type", choices=["dataset", "live"], default="dataset",
+                           help="Source of inputs: 'dataset' (default) or 'live' (last N traces)")
+    run_parser.add_argument("--sample-size", type=int, default=10,
+                           help="Number of traces to fetch in live mode")
+    run_parser.add_argument("--agent-name", help="Agent name (for filtering live traces - currently unused but reserved)")
 
     # List runs command
     list_parser = subparsers.add_parser("list-runs", help="List experiment runs for a dataset")
@@ -812,15 +1432,23 @@ def main():
     args = parser.parse_args()
 
     if args.command == "run":
+        # Check requirements based on source type
+        if args.source_type == "dataset" and not args.dataset:
+             print("Error: -dataset is required when source-type is 'dataset'", file=sys.stderr)
+             sys.exit(1)
+
         result = run_experiment(
-            args.dataset,
-            args.run_name,
-            args.task_script,
+            dataset_name=args.dataset if args.source_type == "dataset" else "",
+            run_name=args.run_name,
+            task_script=args.task_script,
             evaluator_script=args.evaluator_script,
             use_langfuse_judges=args.use_langfuse_judges,
             judge_names=args.judges,
             max_concurrency=args.max_concurrency,
-            run_description=args.description
+            run_description=args.description,
+            source_type=args.source_type,
+            sample_size=args.sample_size,
+            agent_name=args.agent_name,
         )
         print(format_result(result))
 
