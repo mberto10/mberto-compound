@@ -9,6 +9,9 @@ actions/
 ├── parallel/     # Parallel Web Systems API (parallel.ai)
 ├── perplexity/   # Perplexity AI API
 ├── exa/          # Exa AI API
+├── eodhd/        # Unified EODHD actions (core + bundles)
+│   ├── core/
+│   └── bundles/
 └── README.md
 ```
 
@@ -51,6 +54,19 @@ Neural search engine for finding articles and documents.
 | `batch-search.js` | Multiple searches with article excerpts |
 
 **Auth:** API key header (`apikey`)
+
+---
+
+### [EODHD](./eodhd/)
+
+Unified EODHD folder containing both atomic and bundle actions.
+
+| Scope | Path | Description |
+|--------|------|-------------|
+| Core atomic actions | `./eodhd/core/` | Single-endpoint wrappers (`fundamentals`, `screener`, `technical`, `calendar`, `news`, `real-time`) |
+| Bundle composite actions | `./eodhd/bundles/` | Multi-endpoint newsroom analyses (daily pulse, deep dive, earnings reaction, etc.) |
+
+**Auth:** API key (`apiKey`, mapped to `api_token`) for all EODHD actions.
 
 ---
 

@@ -1,0 +1,268 @@
+// name = Daily Market Pulse Universe
+// description = Produces a daily market pulse for a fixed input universe of symbols.
+//
+// symbols = Comma-separated symbols (required, e.g. AAPL.US,MSFT.US,NVDA.US)
+// asOfDate = Analysis date in YYYY-MM-DD (required)
+// topN = Number of top gainers/losers/movers to return (default: 5, min: 1, max: 30)
+// lookbackDays = EOD lookback window for volatility and context (default: 90, min: 20, max: 365)
+
+const apiKey = (data.auth.apiKey || '').toString().trim();
+if (!apiKey) return { error: true, message: 'Missing auth.apiKey' };
+
+function clampNumber(value, fallback, minValue, maxValue) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(Math.max(n, minValue), maxValue);
+}
+
+function round(value, decimals) {
+  if (!Number.isFinite(value)) return null;
+  const factor = Math.pow(10, decimals);
+  return Math.round(value * factor) / factor;
+}
+
+function pctChange(fromValue, toValue) {
+  if (!Number.isFinite(fromValue) || !Number.isFinite(toValue) || fromValue === 0) return null;
+  return ((toValue - fromValue) / fromValue) * 100;
+}
+
+function mean(values) {
+  if (!Array.isArray(values) || values.length === 0) return null;
+  const sum = values.reduce((acc, v) => acc + v, 0);
+  return sum / values.length;
+}
+
+function median(values) {
+  if (!Array.isArray(values) || values.length === 0) return null;
+  const sorted = values.slice().sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
+}
+
+function stddev(values) {
+  if (!Array.isArray(values) || values.length < 2) return null;
+  const m = mean(values);
+  const variance = values.reduce((acc, v) => acc + Math.pow(v - m, 2), 0) / (values.length - 1);
+  return Math.sqrt(variance);
+}
+
+function addParam(params, key, value) {
+  if (value === undefined || value === null) return;
+  const str = String(value).trim();
+  if (!str) return;
+  params.push(key + '=' + encodeURIComponent(str));
+}
+
+function isValidDateString(dateStr) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return false;
+  const d = new Date(dateStr + 'T00:00:00Z');
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === dateStr;
+}
+
+function dateDaysAgo(fromDate, days) {
+  const d = new Date(fromDate + 'T00:00:00Z');
+  d.setUTCDate(d.getUTCDate() - days);
+  return d.toISOString().slice(0, 10);
+}
+
+function dedupeSymbols(symbols) {
+  const seen = {};
+  const out = [];
+  for (let i = 0; i < symbols.length; i++) {
+    const s = (symbols[i] || '').toString().trim().toUpperCase();
+    if (!s || seen[s]) continue;
+    seen[s] = true;
+    out.push(s);
+  }
+  return out;
+}
+
+function safeNumber(v) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+function normalizeEod(raw) {
+  if (!Array.isArray(raw)) return [];
+  const rows = raw.map((r) => ({
+    date: (r.date || '').toString(),
+    close: safeNumber(r.close),
+    volume: safeNumber(r.volume),
+  })).filter((r) => r.date && Number.isFinite(r.close));
+  rows.sort((a, b) => (a.date < b.date ? -1 : (a.date > b.date ? 1 : 0)));
+  return rows;
+}
+
+function annualizedVol20FromRows(rows, idx) {
+  if (!Array.isArray(rows) || idx < 21) return null;
+  const closes = rows.slice(idx - 20, idx + 1).map((r) => r.close);
+  const logReturns = [];
+  for (let i = 1; i < closes.length; i++) {
+    const prev = closes[i - 1];
+    const curr = closes[i];
+    if (!Number.isFinite(prev) || !Number.isFinite(curr) || prev <= 0 || curr <= 0) continue;
+    logReturns.push(Math.log(curr / prev));
+  }
+  const s = stddev(logReturns);
+  if (!Number.isFinite(s)) return null;
+  return s * Math.sqrt(252) * 100;
+}
+
+function findAsOfIndex(rows, asOfDate) {
+  let idx = -1;
+  for (let i = 0; i < rows.length; i++) {
+    if (rows[i].date <= asOfDate) idx = i;
+    else break;
+  }
+  return idx;
+}
+
+async function fetchJson(url, label) {
+  const response = await ld.request({
+    url,
+    method: 'GET',
+    headers: { 'Accept': 'application/json' },
+    body: null,
+  });
+  if (response.status < 200 || response.status >= 300) {
+    const err = new Error(label + ' request failed');
+    err.status = response.status;
+    err.details = response.json || null;
+    throw err;
+  }
+  return response.json;
+}
+
+const symbolsInput = (data.input.symbols || '').toString().trim();
+const asOfDate = (data.input.asOfDate || '').toString().trim();
+const topN = clampNumber(data.input.topN, 5, 1, 30);
+const lookbackDays = clampNumber(data.input.lookbackDays, 90, 20, 365);
+
+if (!symbolsInput) return { error: true, message: 'symbols is required. Provide comma-separated symbols.' };
+if (!asOfDate) return { error: true, message: 'asOfDate is required (YYYY-MM-DD).' };
+if (!isValidDateString(asOfDate)) return { error: true, message: 'Invalid asOfDate format. Use YYYY-MM-DD.' };
+
+const symbols = dedupeSymbols(symbolsInput.split(',').map((s) => s.trim()).filter(Boolean));
+if (symbols.length === 0) return { error: true, message: 'No valid symbols after parsing input.' };
+
+const diagnostics = {
+  calls: { eod: 0 },
+  errors: [],
+};
+const riskFlags = [];
+
+try {
+  const fromDate = dateDaysAgo(asOfDate, lookbackDays + 20);
+  const snapshots = [];
+
+  for (let i = 0; i < symbols.length; i++) {
+    const symbol = symbols[i];
+    try {
+      const eParams = [];
+      addParam(eParams, 'api_token', apiKey);
+      addParam(eParams, 'fmt', 'json');
+      addParam(eParams, 'period', 'd');
+      addParam(eParams, 'order', 'a');
+      addParam(eParams, 'from', fromDate);
+      addParam(eParams, 'to', asOfDate);
+      const eUrl = `https://eodhd.com/api/eod/${encodeURIComponent(symbol)}?${eParams.join('&')}`;
+      diagnostics.calls.eod += 1;
+      const eRaw = await fetchJson(eUrl, `eod:${symbol}`);
+      const rows = normalizeEod(eRaw);
+      const asOfIdx = findAsOfIndex(rows, asOfDate);
+      if (asOfIdx < 1) continue;
+
+      const latest = rows[asOfIdx];
+      const prev = rows[asOfIdx - 1];
+      const return1d = pctChange(prev.close, latest.close);
+      const return5d = asOfIdx >= 5 ? pctChange(rows[asOfIdx - 5].close, latest.close) : null;
+      const return20d = asOfIdx >= 20 ? pctChange(rows[asOfIdx - 20].close, latest.close) : null;
+      const vol20 = annualizedVol20FromRows(rows, asOfIdx);
+
+      snapshots.push({
+        symbol,
+        asOfDate: latest.date,
+        close: round(latest.close, 4),
+        previousClose: round(prev.close, 4),
+        return1dPct: round(return1d, 3),
+        return5dPct: round(return5d, 3),
+        return20dPct: round(return20d, 3),
+        vol20Pct: round(vol20, 3),
+        volume: safeNumber(latest.volume),
+      });
+    } catch (e) {
+      diagnostics.errors.push({ stage: 'eod', symbol, status: e.status || null, message: e.message || 'eod failed' });
+    }
+  }
+
+  if (snapshots.length === 0) {
+    return { error: true, message: 'No symbols had sufficient EOD data for the requested date.', details: diagnostics };
+  }
+
+  const validReturns = snapshots.filter((r) => Number.isFinite(r.return1dPct));
+  const sortedByReturn = validReturns.slice().sort((a, b) => b.return1dPct - a.return1dPct);
+  const topGainers = sortedByReturn.slice(0, topN);
+  const topLosers = sortedByReturn.slice(-topN).reverse();
+  const topMoversAbs = validReturns.slice().sort((a, b) => Math.abs(b.return1dPct) - Math.abs(a.return1dPct)).slice(0, topN);
+
+  const advancers = validReturns.filter((r) => r.return1dPct > 0.05).length;
+  const decliners = validReturns.filter((r) => r.return1dPct < -0.05).length;
+  const unchanged = validReturns.length - advancers - decliners;
+  const breadthPct = validReturns.length ? (advancers / validReturns.length) * 100 : null;
+  const medianReturn = median(validReturns.map((r) => r.return1dPct));
+
+  const keyTakeaways = [];
+  keyTakeaways.push(`Universe size: ${snapshots.length} symbols from explicit input.`);
+  keyTakeaways.push(`Breadth on ${asOfDate}: ${advancers} advancers / ${decliners} decliners / ${unchanged} flat.`);
+  if (topGainers.length > 0) keyTakeaways.push(`Top gainer: ${topGainers[0].symbol} (${round(topGainers[0].return1dPct, 2)}%).`);
+  if (topLosers.length > 0) keyTakeaways.push(`Top loser: ${topLosers[0].symbol} (${round(topLosers[0].return1dPct, 2)}%).`);
+
+  if (diagnostics.errors.length > 0) {
+    riskFlags.push(`${diagnostics.errors.length} endpoint call(s) failed; rankings are based on available symbols.`);
+  }
+
+  return {
+    headline_summary: {
+      asOfDate,
+      analyzedSymbols: snapshots.length,
+      breadthPct: round(breadthPct, 2),
+      medianReturn1dPct: round(medianReturn, 3),
+      topGainer: topGainers[0] ? { symbol: topGainers[0].symbol, return1dPct: topGainers[0].return1dPct } : null,
+      topLoser: topLosers[0] ? { symbol: topLosers[0].symbol, return1dPct: topLosers[0].return1dPct } : null,
+    },
+    market_breadth: {
+      advancers,
+      decliners,
+      unchanged,
+      breadthPct: round(breadthPct, 2),
+      medianReturn1dPct: round(medianReturn, 3),
+    },
+    tables: {
+      topGainers,
+      topLosers,
+      topMoversAbs,
+      symbolSnapshots: snapshots,
+    },
+    key_takeaways: keyTakeaways,
+    risk_flags: riskFlags,
+    endpointDiagnostics: diagnostics,
+    calculation_notes: {
+      return1dPct: '(asOf_close - previous_close) / previous_close * 100',
+      return5dPct: '(asOf_close - close_5_sessions_ago) / close_5_sessions_ago * 100',
+      return20dPct: '(asOf_close - close_20_sessions_ago) / close_20_sessions_ago * 100',
+      breadthPct: 'advancers / analyzed_symbols * 100',
+      annualizedVol20dPct: 'stdev(log daily returns over 20 sessions) * sqrt(252) * 100',
+    },
+    metadata: {
+      source: 'EODHD bundle action: daily_market_pulse_universe',
+      generatedAt: new Date().toISOString(),
+      parameters: { asOfDate, topN, lookbackDays, symbols },
+    },
+  };
+} catch (error) {
+  return {
+    error: true,
+    message: 'daily_market_pulse_universe failed',
+    details: error.message || String(error),
+  };
+}
