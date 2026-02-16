@@ -1,6 +1,6 @@
 {
   "name": "compound-engineering",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Portable compound engineering workflow: Plan, Work, Review, Compound. Powered by subsystem knowledge files for dependency-aware planning and contract verification. Each unit of work makes subsequent work easier.",
   "author": {
     "name": "Maximilian Bruhn",
@@ -12,12 +12,17 @@
     "./commands/work.md",
     "./commands/review.md",
     "./commands/discover.md",
-    "./commands/consolidate.md"
+    "./commands/consolidate.md",
+    "./commands/strategic-plan.md",
+    "./commands/harness.md"
   ],
   "skills": [
     "./skills/improvement-cycle",
     "./skills/discovery-craft",
     "./skills/consolidation-craft",
-    "./skills/reflection-craft"
-  ]
+    "./skills/reflection-craft",
+    "./skills/strategic-planner",
+    "./skills/harness-protocol"
+  ],
+  "hooks": "./hooks/hooks.json"
 }
