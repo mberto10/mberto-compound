@@ -4,14 +4,18 @@
 // symbol = EODHD symbol (required, e.g. AAPL.US)
 // help = true|false (optional, default false). If true, returns a decision guide and exits.
 // analysisType = Optional beginner shortcut: momentum|trend_short|trend_medium|trend_strength|volatility|mean_reversion
+// analysis_type = snake_case alias for analysisType
 // function = Indicator function (required unless analysisType is used). Common: rsi,sma,ema,wma,macd,atr,adx,stochastic,cci,williams,mfi,bbands
 // period = Optional indicator period (default: 14, or analysisType default if provided)
 // from = Optional YYYY-MM-DD date lower bound
 // to = Optional YYYY-MM-DD date upper bound
 // order = Optional order a|d (default: d)
 // maxPoints = Maximum points to return (default: 120, min: 1, max: 2000)
-// maxPeriods = Optional alias for maxPoints (same bounds). If set, it overrides maxPoints.
+// max_points = snake_case alias for maxPoints
+// maxPeriods = camelCase alias for maxPoints
+// max_periods = snake_case alias for maxPoints
 // outputMode = compact|full (default: compact)
+// output_mode = snake_case alias for outputMode
 
 function asBool(value, defaultValue) {
   if (value === undefined || value === null || value === '') return defaultValue;
@@ -109,10 +113,9 @@ const indicatorFunctionInput = (data.input.function || '').toString().trim().toL
 const from = (data.input.from || '').toString().trim();
 const to = (data.input.to || '').toString().trim();
 const order = (data.input.order || 'd').toString().trim().toLowerCase();
-const outputMode = (data.input.outputMode || 'compact').toString().trim().toLowerCase();
-const maxPoints = clampNumber(data.input.maxPoints, 120, 1, 2000);
-const maxPeriodsRaw = data.input.maxPeriods !== undefined ? data.input.maxPeriods : data.input.max_periods;
-const maxPeriods = clampNumber(maxPeriodsRaw, maxPoints, 1, 2000);
+const outputMode = (data.input.outputMode || data.input.output_mode || 'compact').toString().trim().toLowerCase();
+const maxPointsInput = data.input.maxPoints || data.input.max_points || data.input.maxPeriods || data.input.max_periods;
+const maxPoints = clampNumber(maxPointsInput, 120, 1, 2000);
 
 if (!symbol) return { error: true, message: 'symbol is required.' };
 if (analysisType && !Object.prototype.hasOwnProperty.call(ANALYSIS_TYPE_MAP, analysisType)) {
@@ -220,7 +223,7 @@ try {
   const url = `https://eodhd.com/api/technical/${encodeURIComponent(symbol)}?${params.join('&')}`;
   const payload = await fetchJson(url, 'technical');
   const rowsFull = normalizeRows(payload, outputMode === 'full');
-  const rows = rowsFull.slice(0, maxPeriods);
+  const rows = rowsFull.slice(0, maxPoints);
 
   return {
     data: {
@@ -242,7 +245,6 @@ try {
         to: to || null,
         analysisType: analysisType || null,
         maxPoints,
-        maxPeriods,
         outputMode,
       },
       commonFunctions: COMMON_FUNCTIONS,

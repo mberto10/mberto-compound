@@ -4,14 +4,18 @@
 // help = true|false (optional, default false). If true, returns a decision guide and exits.
 // symbols = Optional comma-separated symbols (e.g. AAPL.US,MSFT.US)
 // windowPreset = Optional date shortcut: today|last_7d|last_30d
+// window_preset = snake_case alias for windowPreset
 // from = Optional YYYY-MM-DD start date (or use windowPreset)
 // to = Optional YYYY-MM-DD end date (or use windowPreset)
 // limit = Optional max items (default: 20, min: 1, max: 200)
 // offset = Optional pagination offset (default: 0, min: 0)
 // s = Optional direct EODHD news s-query override (if set, it is used as-is; example: AAPL.US,MSFT.US)
 // outputMode = compact|full (default: compact)
+// output_mode = snake_case alias for outputMode
 // contentMaxChars = Maximum content chars per item in compact mode (default: 280, min: 80, max: 5000)
-// resultLimit = Optional max rows returned in action output (default: same as limit, min: 1, max: 200)
+// content_max_chars = snake_case alias for contentMaxChars
+// resultLimit = Optional max returned rows after fetch (default: limit, min: 1, max: 200)
+// result_limit = snake_case alias for resultLimit
 
 function asBool(value, defaultValue) {
   if (value === undefined || value === null || value === '') return defaultValue;
@@ -141,11 +145,10 @@ if (!apiKey) return { error: true, message: 'Missing auth credential. Set one of
 const symbolsInput = (data.input.symbols || '').toString().trim();
 const sOverride = (data.input.s || '').toString().trim();
 const windowPreset = (data.input.windowPreset || data.input.window_preset || '').toString().trim().toLowerCase();
-const outputMode = (data.input.outputMode || 'compact').toString().trim().toLowerCase();
+const outputMode = (data.input.outputMode || data.input.output_mode || 'compact').toString().trim().toLowerCase();
 let from = (data.input.from || '').toString().trim();
 let to = (data.input.to || '').toString().trim();
-const contentMaxCharsRaw = data.input.contentMaxChars !== undefined ? data.input.contentMaxChars : data.input.content_max_chars;
-const contentMaxChars = clampNumber(contentMaxCharsRaw, 280, 80, 5000);
+const contentMaxChars = clampNumber(data.input.contentMaxChars || data.input.content_max_chars, 280, 80, 5000);
 
 if (outputMode !== 'compact' && outputMode !== 'full') {
   return { error: true, message: 'outputMode must be compact or full.' };
@@ -181,8 +184,7 @@ if (from && to && from > to) return { error: true, message: 'from must be <= to.
 
 const limit = clampNumber(data.input.limit, 20, 1, 200);
 const offset = clampNumber(data.input.offset, 0, 0, 1000000);
-const resultLimitRaw = data.input.resultLimit !== undefined ? data.input.resultLimit : data.input.result_limit;
-const resultLimit = clampNumber(resultLimitRaw, limit, 1, 200);
+const resultLimit = clampNumber(data.input.resultLimit || data.input.result_limit, limit, 1, 200);
 
 try {
   const sParam = sOverride || toSymbolsQuery(symbolsInput);
@@ -202,15 +204,17 @@ try {
   const rows = Array.isArray(payload)
     ? payload
     : (Array.isArray(payload.data) ? payload.data : (Array.isArray(payload.results) ? payload.results : []));
-  const rowsOut = rows.slice(0, resultLimit);
-  const normalized = rowsOut.map((item) => normalizeItem(item, outputMode, contentMaxChars));
+  const normalized = rows.map((item) => normalizeItem(item, outputMode, contentMaxChars));
+  const truncated = normalized.length > resultLimit;
+  const rowsLimited = normalized.slice(0, resultLimit);
+  const rawRowsLimited = rows.slice(0, resultLimit);
 
   const dataBlock = {
-    count: rows.length,
-    returnedRows: normalized.length,
-    rows: normalized,
+    fetchedCount: normalized.length,
+    count: rowsLimited.length,
+    rows: rowsLimited,
   };
-  if (outputMode === 'full') dataBlock.rawRows = rowsOut;
+  if (outputMode === 'full') dataBlock.rawRows = rawRowsLimited;
 
   return {
     data: dataBlock,
@@ -229,6 +233,8 @@ try {
       },
       queryMode,
       windowPresetOptions: WINDOW_PRESETS,
+      truncated,
+      truncationNotes: truncated ? [`Returned ${rowsLimited.length} of ${rows.length} rows (resultLimit=${resultLimit}).`] : [],
     },
     metadata: {
       source: 'EODHD atomic action: get_news_sentiment',

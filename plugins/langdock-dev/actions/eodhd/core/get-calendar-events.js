@@ -3,13 +3,18 @@
 //
 // help = true|false (optional, default false). If true, returns a decision guide and exits.
 // calendarType = earnings|dividends|splits|ipos|economic_events (required)
+// calendar_type = snake_case alias for calendarType
 // windowPreset = Optional beginner window: today|next_7d|next_30d|last_7d|last_30d
+// window_preset = snake_case alias for windowPreset
 // from = Start date YYYY-MM-DD (required unless windowPreset is used)
 // to = End date YYYY-MM-DD (required unless windowPreset is used)
 // symbols = Optional comma-separated symbols filter
 // limit = Optional max items (default: 50, min: 1, max: 1000)
 // offset = Optional pagination offset (default: 0, min: 0)
 // outputMode = compact|full (default: compact)
+// output_mode = snake_case alias for outputMode
+// resultLimit = Optional max returned rows after fetch (default: limit, min: 1, max: 1000)
+// result_limit = snake_case alias for resultLimit
 
 function asBool(value, defaultValue) {
   if (value === undefined || value === null || value === '') return defaultValue;
@@ -43,10 +48,10 @@ function isValidDateString(dateStr) {
 }
 
 const help = asBool(data.input.help, false);
-const calendarTypeRaw = (data.input.calendarType || '').toString().trim().toLowerCase();
-const windowPreset = (data.input.windowPreset || '').toString().trim().toLowerCase();
+const calendarTypeRaw = (data.input.calendarType || data.input.calendar_type || '').toString().trim().toLowerCase();
+const windowPreset = (data.input.windowPreset || data.input.window_preset || '').toString().trim().toLowerCase();
 const symbols = (data.input.symbols || '').toString().trim();
-const outputMode = (data.input.outputMode || 'compact').toString().trim().toLowerCase();
+const outputMode = (data.input.outputMode || data.input.output_mode || 'compact').toString().trim().toLowerCase();
 
 const CALENDAR_TYPE_OPTIONS = ['earnings', 'dividends', 'splits', 'ipos', 'economic_events'];
 const WINDOW_PRESETS = ['today', 'next_7d', 'next_30d', 'last_7d', 'last_30d'];
@@ -136,6 +141,7 @@ if (from > to) return { error: true, message: 'from must be <= to.' };
 
 const limit = clampNumber(data.input.limit, 50, 1, 1000);
 const offset = clampNumber(data.input.offset, 0, 0, 1000000);
+const resultLimit = clampNumber(data.input.resultLimit || data.input.result_limit, limit, 1, 1000);
 
 const endpointByType = {
   earnings: 'earnings',
@@ -195,20 +201,26 @@ try {
     epsEstimate: Number.isFinite(Number(row.epsEstimate ?? row.eps_estimate)) ? Number(row.epsEstimate ?? row.eps_estimate) : null,
     epsActual: Number.isFinite(Number(row.epsActual ?? row.eps_actual ?? row.eps)) ? Number(row.epsActual ?? row.eps_actual ?? row.eps) : null,
   }));
+  const truncated = compactRows.length > resultLimit;
+  const compactRowsLimited = compactRows.slice(0, resultLimit);
+  const rawRowsLimited = rows.slice(0, resultLimit);
 
   const dataBlock = {
     calendarType: calendarTypeRaw,
-    count: rows.length,
-    rows: outputMode === 'full' ? rows : compactRows,
+    fetchedCount: rows.length,
+    count: compactRowsLimited.length,
+    rows: compactRowsLimited,
   };
-  if (outputMode === 'full') dataBlock.rawRows = rows;
+  if (outputMode === 'full') dataBlock.rawRows = rawRowsLimited;
 
   return {
     data: dataBlock,
     endpointDiagnostics: {
       endpoint: '/api/calendar/{type}',
       endpointType,
-      parameters: { from, to, symbols: symbols || null, limit, offset, windowPreset: windowPreset || null, outputMode },
+      parameters: { from, to, symbols: symbols || null, limit, offset, resultLimit, windowPreset: windowPreset || null, outputMode },
+      truncated,
+      truncationNotes: truncated ? [`Returned ${compactRowsLimited.length} of ${rows.length} rows (resultLimit=${resultLimit}).`] : [],
       calendarTypeOptions: CALENDAR_TYPE_OPTIONS,
       windowPresetOptions: WINDOW_PRESETS,
     },
