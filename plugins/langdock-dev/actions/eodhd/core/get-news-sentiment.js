@@ -11,6 +11,7 @@
 // s = Optional direct EODHD news s-query override (if set, it is used as-is; example: AAPL.US,MSFT.US)
 // outputMode = compact|full (default: compact)
 // contentMaxChars = Maximum content chars per item in compact mode (default: 280, min: 80, max: 5000)
+// resultLimit = Optional max rows returned in action output (default: same as limit, min: 1, max: 200)
 
 function asBool(value, defaultValue) {
   if (value === undefined || value === null || value === '') return defaultValue;
@@ -179,6 +180,7 @@ if (from && to && from > to) return { error: true, message: 'from must be <= to.
 
 const limit = clampNumber(data.input.limit, 20, 1, 200);
 const offset = clampNumber(data.input.offset, 0, 0, 1000000);
+const resultLimit = clampNumber(data.input.resultLimit, limit, 1, 200);
 
 try {
   const sParam = sOverride || toSymbolsQuery(symbolsInput);
@@ -198,13 +200,15 @@ try {
   const rows = Array.isArray(payload)
     ? payload
     : (Array.isArray(payload.data) ? payload.data : (Array.isArray(payload.results) ? payload.results : []));
-  const normalized = rows.map((item) => normalizeItem(item, outputMode, contentMaxChars));
+  const rowsOut = rows.slice(0, resultLimit);
+  const normalized = rowsOut.map((item) => normalizeItem(item, outputMode, contentMaxChars));
 
   const dataBlock = {
-    count: normalized.length,
+    count: rows.length,
+    returnedRows: normalized.length,
     rows: normalized,
   };
-  if (outputMode === 'full') dataBlock.rawRows = rows;
+  if (outputMode === 'full') dataBlock.rawRows = rowsOut;
 
   return {
     data: dataBlock,
@@ -216,6 +220,7 @@ try {
         to: to || null,
         limit,
         offset,
+        resultLimit,
         windowPreset: windowPreset || null,
         outputMode,
         contentMaxChars: outputMode === 'compact' ? contentMaxChars : null,

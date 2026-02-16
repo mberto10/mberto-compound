@@ -9,6 +9,7 @@
 // outputMode = compact|full (default: compact)
 // limit = Max rows (default: 25, min: 1, max: 500)
 // offset = Pagination offset (default: 0, min: 0)
+// resultLimit = Optional max rows returned in action output (default: same as limit, min: 1, max: 500)
 
 function asBool(value, defaultValue) {
   if (value === undefined || value === null || value === '') return defaultValue;
@@ -148,6 +149,7 @@ if (!hasUserLimit && preset && Number.isFinite(preset.limit)) {
   limit = clampNumber(preset.limit, 50, 1, 500);
 }
 const offset = clampNumber(data.input.offset, 0, 0, 1000000);
+const resultLimit = clampNumber(data.input.resultLimit, limit, 1, 500);
 
 const sortInput = sortInputRaw || (preset ? preset.sort : 'market_capitalization.desc');
 const signalsInput = signalsInputRaw || (preset ? preset.signals : '');
@@ -236,7 +238,8 @@ try {
     ? payload
     : (Array.isArray(payload.data) ? payload.data : (Array.isArray(payload.results) ? payload.results : []));
 
-  const symbols = dedupe(rows.map(extractSymbol).filter(Boolean));
+  const rowsOut = rows.slice(0, resultLimit);
+  const symbols = dedupe(rowsOut.map(extractSymbol).filter(Boolean));
   const compactRows = rows.map((row) => ({
     symbol: extractSymbol(row),
     code: firstText(row, ['code', 'Code', 'ticker']),
@@ -249,13 +252,15 @@ try {
     volume: safeNumber(row.volume),
     marketCap: safeNumber(row.market_capitalization || row.marketCap),
   }));
+  const compactRowsOut = compactRows.slice(0, resultLimit);
 
   const dataBlock = {
-    rows: outputMode === 'full' ? rows : compactRows,
+    rows: outputMode === 'full' ? rowsOut : compactRowsOut,
     symbols,
     count: rows.length,
+    returnedRows: outputMode === 'full' ? rowsOut.length : compactRowsOut.length,
   };
-  if (outputMode === 'full') dataBlock.rawRows = rows;
+  if (outputMode === 'full') dataBlock.rawRows = rowsOut;
 
   return {
     data: dataBlock,
@@ -269,6 +274,7 @@ try {
         signals: signalsInput || null,
         preset: presetInput || null,
         outputMode,
+        resultLimit,
       },
       commonSortOptions: COMMON_SORT_OPTIONS,
       commonSignals: COMMON_SIGNALS,

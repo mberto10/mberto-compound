@@ -6,6 +6,7 @@
 // fieldsPreset = Optional beginner preset: profile|valuation|financials|ownership|technical_snapshot|corporate_actions|full
 // fields = Optional comma-separated top-level keys to return. Allowed: General,Highlights,Valuation,SharesStats,SplitsDividends,Technicals,Holders,InsiderTransactions,ESGScores,outstandingShares,Earnings,Financials.
 // format = raw|summary (default: summary)
+// maxPeriods = Optional cap for yearly/quarterly history blocks in raw output (default: no cap, min: 1, max: 120)
 
 function asBool(value, defaultValue) {
   if (value === undefined || value === null || value === '') return defaultValue;
@@ -14,6 +15,12 @@ function asBool(value, defaultValue) {
   if (normalized === 'true' || normalized === '1' || normalized === 'yes') return true;
   if (normalized === 'false' || normalized === '0' || normalized === 'no') return false;
   return defaultValue;
+}
+
+function clampNumber(value, fallback, minValue, maxValue) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(Math.max(Math.floor(n), minValue), maxValue);
 }
 
 const ALLOWED_TOP_LEVEL_FIELDS = [
@@ -86,6 +93,8 @@ if (!apiKey) return { error: true, message: 'Missing auth credential. Set one of
 const symbol = (data.input.symbol || '').toString().trim().toUpperCase();
 const fieldsInput = (data.input.fields || '').toString().trim();
 const formatInput = (data.input.format || 'summary').toString().trim().toLowerCase();
+const hasMaxPeriodsInput = data.input.maxPeriods !== undefined && data.input.maxPeriods !== null && String(data.input.maxPeriods).trim() !== '';
+const maxPeriods = hasMaxPeriodsInput ? clampNumber(data.input.maxPeriods, 8, 1, 120) : null;
 
 if (!symbol) return { error: true, message: 'symbol is required.' };
 if (formatInput !== 'raw' && formatInput !== 'summary') {
@@ -118,6 +127,55 @@ function addParam(params, key, value) {
 function safeNumber(v) {
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
+}
+
+function limitPeriodMap(periodMap, maxPeriods) {
+  if (!periodMap || typeof periodMap !== 'object' || Array.isArray(periodMap)) return periodMap;
+  const keys = Object.keys(periodMap).sort().reverse();
+  const out = {};
+  for (let i = 0; i < keys.length && i < maxPeriods; i++) {
+    out[keys[i]] = periodMap[keys[i]];
+  }
+  return out;
+}
+
+function applyMaxPeriodsToRaw(rawBlock, maxPeriods) {
+  if (!maxPeriods || !rawBlock || typeof rawBlock !== 'object' || Array.isArray(rawBlock)) return rawBlock;
+  let out = rawBlock;
+  try {
+    out = JSON.parse(JSON.stringify(rawBlock));
+  } catch (e) {
+    return rawBlock;
+  }
+
+  if (out.Financials && typeof out.Financials === 'object') {
+    const blocks = Object.keys(out.Financials);
+    for (let i = 0; i < blocks.length; i++) {
+      const section = out.Financials[blocks[i]];
+      if (!section || typeof section !== 'object') continue;
+      if (section.yearly && typeof section.yearly === 'object' && !Array.isArray(section.yearly)) {
+        section.yearly = limitPeriodMap(section.yearly, maxPeriods);
+      }
+      if (section.quarterly && typeof section.quarterly === 'object' && !Array.isArray(section.quarterly)) {
+        section.quarterly = limitPeriodMap(section.quarterly, maxPeriods);
+      }
+    }
+  }
+
+  if (out.Earnings && typeof out.Earnings === 'object') {
+    if (out.Earnings.History && typeof out.Earnings.History === 'object' && !Array.isArray(out.Earnings.History)) {
+      out.Earnings.History = limitPeriodMap(out.Earnings.History, maxPeriods);
+    }
+    if (Array.isArray(out.Earnings.History)) out.Earnings.History = out.Earnings.History.slice(0, maxPeriods);
+    if (Array.isArray(out.Earnings.Trend)) out.Earnings.Trend = out.Earnings.Trend.slice(0, maxPeriods);
+  }
+
+  if (out.outstandingShares && typeof out.outstandingShares === 'object') {
+    if (Array.isArray(out.outstandingShares.annual)) out.outstandingShares.annual = out.outstandingShares.annual.slice(0, maxPeriods);
+    if (Array.isArray(out.outstandingShares.quarterly)) out.outstandingShares.quarterly = out.outstandingShares.quarterly.slice(0, maxPeriods);
+  }
+
+  return out;
 }
 
 async function fetchJson(url, label) {
@@ -196,6 +254,9 @@ try {
       }
     }
   }
+  if (formatInput === 'raw' && Number.isFinite(maxPeriods)) {
+    selected = applyMaxPeriodsToRaw(selected, maxPeriods);
+  }
 
   const general = raw && raw.General ? raw.General : {};
   const highlights = raw && raw.Highlights ? raw.Highlights : {};
@@ -233,11 +294,13 @@ try {
       allowedFields: ALLOWED_TOP_LEVEL_FIELDS,
       availableTopLevelKeys,
       responseType: Array.isArray(raw) ? 'array' : typeof raw,
+      maxPeriods,
+      periodsCapped: formatInput === 'raw' && Number.isFinite(maxPeriods),
     },
     metadata: {
       source: 'EODHD atomic action: get_fundamentals',
       generatedAt: new Date().toISOString(),
-      parameters: { symbol, format: formatInput, fields, fieldsPreset: fieldsPresetInput || null },
+      parameters: { symbol, format: formatInput, fields, fieldsPreset: fieldsPresetInput || null, maxPeriods },
     },
   };
 } catch (error) {

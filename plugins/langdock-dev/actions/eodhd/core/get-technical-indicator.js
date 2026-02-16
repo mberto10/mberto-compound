@@ -10,6 +10,7 @@
 // to = Optional YYYY-MM-DD date upper bound
 // order = Optional order a|d (default: d)
 // maxPoints = Maximum points to return (default: 120, min: 1, max: 2000)
+// maxPeriods = Optional alias for maxPoints (same bounds). If set, it overrides maxPoints.
 // outputMode = compact|full (default: compact)
 
 function asBool(value, defaultValue) {
@@ -110,6 +111,7 @@ const to = (data.input.to || '').toString().trim();
 const order = (data.input.order || 'd').toString().trim().toLowerCase();
 const outputMode = (data.input.outputMode || 'compact').toString().trim().toLowerCase();
 const maxPoints = clampNumber(data.input.maxPoints, 120, 1, 2000);
+const maxPeriods = clampNumber(data.input.maxPeriods, maxPoints, 1, 2000);
 
 if (!symbol) return { error: true, message: 'symbol is required.' };
 if (analysisType && !Object.prototype.hasOwnProperty.call(ANALYSIS_TYPE_MAP, analysisType)) {
@@ -217,7 +219,7 @@ try {
   const url = `https://eodhd.com/api/technical/${encodeURIComponent(symbol)}?${params.join('&')}`;
   const payload = await fetchJson(url, 'technical');
   const rowsFull = normalizeRows(payload, outputMode === 'full');
-  const rows = rowsFull.slice(0, maxPoints);
+  const rows = rowsFull.slice(0, maxPeriods);
 
   return {
     data: {
@@ -239,6 +241,7 @@ try {
         to: to || null,
         analysisType: analysisType || null,
         maxPoints,
+        maxPeriods,
         outputMode,
       },
       commonFunctions: COMMON_FUNCTIONS,
