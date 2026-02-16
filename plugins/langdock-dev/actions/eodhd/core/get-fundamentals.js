@@ -6,9 +6,6 @@
 // fieldsPreset = Optional beginner preset: profile|valuation|financials|ownership|technical_snapshot|corporate_actions|full
 // fields = Optional comma-separated top-level keys to return. Allowed: General,Highlights,Valuation,SharesStats,SplitsDividends,Technicals,Holders,InsiderTransactions,ESGScores,outstandingShares,Earnings,Financials.
 // format = raw|summary (default: summary)
-// periodsLimit = Max yearly/quarterly periods kept in raw mode for heavy statement blocks (default: 8, min: 1, max: 40)
-// listLimit = Max list items kept in raw mode for heavy arrays (default: 30, min: 5, max: 200)
-// maxOutputChars = Approximate maximum serialized response size in raw mode before summary fallback (default: 90000, min: 20000, max: 180000)
 
 function asBool(value, defaultValue) {
   if (value === undefined || value === null || value === '') return defaultValue;
@@ -17,12 +14,6 @@ function asBool(value, defaultValue) {
   if (normalized === 'true' || normalized === '1' || normalized === 'yes') return true;
   if (normalized === 'false' || normalized === '0' || normalized === 'no') return false;
   return defaultValue;
-}
-
-function clampNumber(value, fallback, minValue, maxValue) {
-  const n = Number(value);
-  if (!Number.isFinite(n)) return fallback;
-  return Math.min(Math.max(Math.floor(n), minValue), maxValue);
 }
 
 const ALLOWED_TOP_LEVEL_FIELDS = [
@@ -95,9 +86,6 @@ if (!apiKey) return { error: true, message: 'Missing auth credential. Set one of
 const symbol = (data.input.symbol || '').toString().trim().toUpperCase();
 const fieldsInput = (data.input.fields || '').toString().trim();
 const formatInput = (data.input.format || 'summary').toString().trim().toLowerCase();
-const periodsLimit = clampNumber(data.input.periodsLimit, 8, 1, 40);
-const listLimit = clampNumber(data.input.listLimit, 30, 5, 200);
-const maxOutputChars = clampNumber(data.input.maxOutputChars, 90000, 20000, 180000);
 
 if (!symbol) return { error: true, message: 'symbol is required.' };
 if (formatInput !== 'raw' && formatInput !== 'summary') {
@@ -130,74 +118,6 @@ function addParam(params, key, value) {
 function safeNumber(v) {
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
-}
-
-function capArray(items, maxItems) {
-  if (!Array.isArray(items)) return items;
-  return items.slice(0, maxItems);
-}
-
-function capObjectByDateKey(obj, maxItems) {
-  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return obj;
-  const keys = Object.keys(obj).sort().reverse();
-  const out = {};
-  for (let i = 0; i < keys.length && i < maxItems; i++) {
-    const key = keys[i];
-    out[key] = obj[key];
-  }
-  return out;
-}
-
-function estimateJsonChars(value) {
-  try {
-    return JSON.stringify(value).length;
-  } catch (e) {
-    return null;
-  }
-}
-
-function trimFundamentalsPayload(payload, periodsLimit, listLimit) {
-  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return payload;
-
-  let out = payload;
-  try {
-    out = JSON.parse(JSON.stringify(payload));
-  } catch (e) {
-    return payload;
-  }
-
-  if (out.Financials && typeof out.Financials === 'object') {
-    const financialBlocks = Object.keys(out.Financials);
-    for (let i = 0; i < financialBlocks.length; i++) {
-      const block = out.Financials[financialBlocks[i]];
-      if (!block || typeof block !== 'object') continue;
-      if (block.yearly && typeof block.yearly === 'object' && !Array.isArray(block.yearly)) {
-        block.yearly = capObjectByDateKey(block.yearly, periodsLimit);
-      }
-      if (block.quarterly && typeof block.quarterly === 'object' && !Array.isArray(block.quarterly)) {
-        block.quarterly = capObjectByDateKey(block.quarterly, periodsLimit);
-      }
-    }
-  }
-
-  if (out.Earnings && typeof out.Earnings === 'object') {
-    if (Array.isArray(out.Earnings.History)) out.Earnings.History = capArray(out.Earnings.History, periodsLimit);
-    else if (out.Earnings.History && typeof out.Earnings.History === 'object') out.Earnings.History = capObjectByDateKey(out.Earnings.History, periodsLimit);
-    if (Array.isArray(out.Earnings.Trend)) out.Earnings.Trend = capArray(out.Earnings.Trend, periodsLimit);
-  }
-
-  if (out.outstandingShares && typeof out.outstandingShares === 'object') {
-    if (Array.isArray(out.outstandingShares.annual)) out.outstandingShares.annual = capArray(out.outstandingShares.annual, periodsLimit);
-    if (Array.isArray(out.outstandingShares.quarterly)) out.outstandingShares.quarterly = capArray(out.outstandingShares.quarterly, periodsLimit);
-  }
-
-  if (Array.isArray(out.Holders)) out.Holders = capArray(out.Holders, listLimit);
-  if (Array.isArray(out.InsiderTransactions)) out.InsiderTransactions = capArray(out.InsiderTransactions, listLimit);
-  if (out.InsiderTransactions && Array.isArray(out.InsiderTransactions.transactions)) {
-    out.InsiderTransactions.transactions = capArray(out.InsiderTransactions.transactions, listLimit);
-  }
-
-  return out;
 }
 
 async function fetchJson(url, label) {
@@ -302,41 +222,8 @@ try {
     updatedAt: (general.UpdatedAt || '').toString() || null,
   };
 
-  const truncationNotes = [];
-  let rawPayloadChars = null;
-  let responseFormat = formatInput;
-  let dataOut = summary;
-
-  if (formatInput === 'raw') {
-    const selectedSizeChars = estimateJsonChars(selected);
-    let trimmed = trimFundamentalsPayload(selected, periodsLimit, listLimit);
-    let trimmedSizeChars = estimateJsonChars(trimmed);
-
-    if (Number.isFinite(selectedSizeChars) && Number.isFinite(trimmedSizeChars) && trimmedSizeChars < selectedSizeChars) {
-      truncationNotes.push('Raw payload trimmed for model consumption (period/list caps applied).');
-    }
-
-    if (Number.isFinite(trimmedSizeChars) && trimmedSizeChars > maxOutputChars) {
-      trimmed = trimFundamentalsPayload(trimmed, Math.min(periodsLimit, 4), Math.min(listLimit, 20));
-      trimmedSizeChars = estimateJsonChars(trimmed);
-      truncationNotes.push('Applied aggressive second-pass trimming to fit response size constraints.');
-    }
-
-    if (Number.isFinite(trimmedSizeChars) && trimmedSizeChars > maxOutputChars) {
-      responseFormat = 'summary_fallback';
-      dataOut = summary;
-      truncationNotes.push(`Raw payload still exceeded ${maxOutputChars} chars; returned summary instead.`);
-    } else {
-      responseFormat = 'raw';
-      dataOut = trimmed;
-      rawPayloadChars = trimmedSizeChars;
-    }
-  } else {
-    dataOut = summary;
-  }
-
   return {
-    data: dataOut,
+    data: formatInput === 'summary' ? summary : selected,
     summary,
     endpointDiagnostics: {
       endpoint: '/api/fundamentals/{symbol}',
@@ -346,20 +233,11 @@ try {
       allowedFields: ALLOWED_TOP_LEVEL_FIELDS,
       availableTopLevelKeys,
       responseType: Array.isArray(raw) ? 'array' : typeof raw,
-      responseFormat,
-      sizeControls: {
-        periodsLimit,
-        listLimit,
-        maxOutputChars,
-        rawPayloadChars,
-        truncated: truncationNotes.length > 0,
-        truncationNotes,
-      },
     },
     metadata: {
       source: 'EODHD atomic action: get_fundamentals',
       generatedAt: new Date().toISOString(),
-      parameters: { symbol, format: responseFormat, fields, fieldsPreset: fieldsPresetInput || null },
+      parameters: { symbol, format: formatInput, fields, fieldsPreset: fieldsPresetInput || null },
     },
   };
 } catch (error) {

@@ -11,7 +11,6 @@
 // order = Optional order a|d (default: d)
 // maxPoints = Maximum points to return (default: 120, min: 1, max: 2000)
 // outputMode = compact|full (default: compact)
-// includeRaw = true|false include raw endpoint row objects in each returned point (default: false)
 
 function asBool(value, defaultValue) {
   if (value === undefined || value === null || value === '') return defaultValue;
@@ -110,8 +109,7 @@ const from = (data.input.from || '').toString().trim();
 const to = (data.input.to || '').toString().trim();
 const order = (data.input.order || 'd').toString().trim().toLowerCase();
 const outputMode = (data.input.outputMode || 'compact').toString().trim().toLowerCase();
-const includeRaw = asBool(data.input.includeRaw, false);
-const requestedMaxPoints = clampNumber(data.input.maxPoints, 120, 1, 2000);
+const maxPoints = clampNumber(data.input.maxPoints, 120, 1, 2000);
 
 if (!symbol) return { error: true, message: 'symbol is required.' };
 if (analysisType && !Object.prototype.hasOwnProperty.call(ANALYSIS_TYPE_MAP, analysisType)) {
@@ -218,11 +216,8 @@ try {
 
   const url = `https://eodhd.com/api/technical/${encodeURIComponent(symbol)}?${params.join('&')}`;
   const payload = await fetchJson(url, 'technical');
-  const rowsFull = normalizeRows(payload, outputMode === 'full' && includeRaw);
-  const hardPointCap = outputMode === 'compact' ? 200 : (includeRaw ? 150 : 400);
-  const appliedMaxPoints = Math.min(requestedMaxPoints, hardPointCap);
-  const rows = rowsFull.slice(0, appliedMaxPoints);
-  const truncated = rowsFull.length > rows.length;
+  const rowsFull = normalizeRows(payload, outputMode === 'full');
+  const rows = rowsFull.slice(0, maxPoints);
 
   return {
     data: {
@@ -243,13 +238,9 @@ try {
         from: from || null,
         to: to || null,
         analysisType: analysisType || null,
-        requestedMaxPoints,
-        appliedMaxPoints,
+        maxPoints,
         outputMode,
-        includeRaw: outputMode === 'full' ? includeRaw : false,
       },
-      truncated,
-      truncationNotes: truncated ? [`Returned ${rows.length}/${rowsFull.length} rows. Reduce date range or increase precision by segmenting requests.`] : [],
       commonFunctions: COMMON_FUNCTIONS,
       analysisTypes: ANALYSIS_TYPE_MAP,
       rowCount: rows.length,
