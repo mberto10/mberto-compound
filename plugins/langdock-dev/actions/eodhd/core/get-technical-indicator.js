@@ -2,20 +2,22 @@
 // description = Fetches one technical indicator series for a symbol from EODHD technical endpoint.
 //
 // symbol = EODHD symbol (required, e.g. AAPL.US)
-// function = Indicator function (required). Common options: rsi,sma,ema,wma,macd,atr,adx,stochastic,cci,williams,mfi,bbands
-// period = Optional indicator period (default: 14)
+// help = true|false (optional, default false). If true, returns a decision guide and exits.
+// analysisType = Optional beginner shortcut: momentum|trend_short|trend_medium|trend_strength|volatility|mean_reversion
+// function = Indicator function (required unless analysisType is used). Common: rsi,sma,ema,wma,macd,atr,adx,stochastic,cci,williams,mfi,bbands
+// period = Optional indicator period (default: 14, or analysisType default if provided)
 // from = Optional YYYY-MM-DD date lower bound
 // to = Optional YYYY-MM-DD date upper bound
 // order = Optional order a|d (default: d)
 
-const apiKey = (data.auth.apiKey || '').toString().trim();
-if (!apiKey) return { error: true, message: 'Missing auth.apiKey' };
-
-const symbol = (data.input.symbol || '').toString().trim().toUpperCase();
-const indicatorFunction = (data.input.function || '').toString().trim().toLowerCase();
-const from = (data.input.from || '').toString().trim();
-const to = (data.input.to || '').toString().trim();
-const order = (data.input.order || 'd').toString().trim().toLowerCase();
+function asBool(value, defaultValue) {
+  if (value === undefined || value === null || value === '') return defaultValue;
+  if (value === true || value === false) return value;
+  const normalized = String(value).trim().toLowerCase();
+  if (normalized === 'true' || normalized === '1' || normalized === 'yes') return true;
+  if (normalized === 'false' || normalized === '0' || normalized === 'no') return false;
+  return defaultValue;
+}
 
 function clampNumber(value, fallback, minValue, maxValue) {
   const n = Number(value);
@@ -23,11 +25,12 @@ function clampNumber(value, fallback, minValue, maxValue) {
   return Math.min(Math.max(Math.floor(n), minValue), maxValue);
 }
 
-const period = clampNumber(data.input.period, 14, 1, 500);
-
-if (!symbol) return { error: true, message: 'symbol is required.' };
-if (!indicatorFunction) return { error: true, message: 'function is required (e.g. rsi, sma, ema, macd).' };
-if (order !== 'a' && order !== 'd') return { error: true, message: 'order must be a or d.' };
+function isValidDateString(dateStr) {
+  if (!dateStr) return true;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return false;
+  const d = new Date(dateStr + 'T00:00:00Z');
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === dateStr;
+}
 
 const COMMON_FUNCTIONS = [
   'rsi',
@@ -44,16 +47,88 @@ const COMMON_FUNCTIONS = [
   'bbands',
 ];
 
-function isValidDateString(dateStr) {
-  if (!dateStr) return true;
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return false;
-  const d = new Date(dateStr + 'T00:00:00Z');
-  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === dateStr;
+const ANALYSIS_TYPE_MAP = {
+  momentum: { function: 'rsi', period: 14, description: 'Momentum/overbought-oversold check.' },
+  trend_short: { function: 'ema', period: 20, description: 'Short-term trend check.' },
+  trend_medium: { function: 'sma', period: 50, description: 'Medium-term trend check.' },
+  trend_strength: { function: 'adx', period: 14, description: 'How strong the trend is.' },
+  volatility: { function: 'atr', period: 14, description: 'Volatility/range behavior.' },
+  mean_reversion: { function: 'cci', period: 20, description: 'Mean-reversion pressure.' },
+};
+
+const help = asBool(data.input.help, false);
+const analysisType = (data.input.analysisType || '').toString().trim().toLowerCase();
+
+if (help) {
+  return {
+    data: {
+      action: 'get_technical_indicator',
+      decisionGuide: {
+        whenToUse: 'Use this when you want one technical series for a symbol.',
+        firstDecision: 'If unsure, choose analysisType instead of raw function.',
+        quickChoices: [
+          { goal: 'Momentum state', use: { symbol: 'AAPL.US', analysisType: 'momentum' } },
+          { goal: 'Short-term trend', use: { symbol: 'AAPL.US', analysisType: 'trend_short' } },
+          { goal: 'Volatility check', use: { symbol: 'AAPL.US', analysisType: 'volatility' } },
+        ],
+      },
+      analysisTypes: ANALYSIS_TYPE_MAP,
+      commonFunctions: COMMON_FUNCTIONS,
+      orderOptions: ['a', 'd'],
+    },
+    endpointDiagnostics: {
+      endpoint: '/api/technical/{symbol}',
+      helpOnly: true,
+    },
+    metadata: {
+      source: 'EODHD atomic action: get_technical_indicator',
+      generatedAt: new Date().toISOString(),
+    },
+  };
 }
 
+const apiKey = (data.auth.apiKey || '').toString().trim();
+if (!apiKey) return { error: true, message: 'Missing auth.apiKey' };
+
+const symbol = (data.input.symbol || '').toString().trim().toUpperCase();
+const indicatorFunctionInput = (data.input.function || '').toString().trim().toLowerCase();
+const from = (data.input.from || '').toString().trim();
+const to = (data.input.to || '').toString().trim();
+const order = (data.input.order || 'd').toString().trim().toLowerCase();
+
+if (!symbol) return { error: true, message: 'symbol is required.' };
+if (analysisType && !Object.prototype.hasOwnProperty.call(ANALYSIS_TYPE_MAP, analysisType)) {
+  return {
+    error: true,
+    message: 'Unknown analysisType value.',
+    details: {
+      analysisType,
+      allowedAnalysisTypes: Object.keys(ANALYSIS_TYPE_MAP),
+    },
+  };
+}
+if (order !== 'a' && order !== 'd') return { error: true, message: 'order must be a or d.' };
 if (!isValidDateString(from)) return { error: true, message: 'from must be YYYY-MM-DD.' };
 if (!isValidDateString(to)) return { error: true, message: 'to must be YYYY-MM-DD.' };
 if (from && to && from > to) return { error: true, message: 'from must be <= to.' };
+
+const analysisPreset = analysisType ? ANALYSIS_TYPE_MAP[analysisType] : null;
+const effectiveFunction = indicatorFunctionInput || (analysisPreset ? analysisPreset.function : '');
+if (!effectiveFunction) {
+  return {
+    error: true,
+    message: 'Provide function or analysisType.',
+    details: {
+      allowedAnalysisTypes: Object.keys(ANALYSIS_TYPE_MAP),
+      commonFunctions: COMMON_FUNCTIONS,
+    },
+  };
+}
+
+const hasUserPeriod = data.input.period !== undefined && data.input.period !== null && String(data.input.period).trim() !== '';
+const effectivePeriod = hasUserPeriod
+  ? clampNumber(data.input.period, 14, 1, 500)
+  : (analysisPreset ? analysisPreset.period : 14);
 
 function addParam(params, key, value) {
   if (value === undefined || value === null) return;
@@ -117,8 +192,8 @@ try {
   const params = [];
   addParam(params, 'api_token', apiKey);
   addParam(params, 'fmt', 'json');
-  addParam(params, 'function', indicatorFunction);
-  addParam(params, 'period', period);
+  addParam(params, 'function', effectiveFunction);
+  addParam(params, 'period', effectivePeriod);
   addParam(params, 'order', order);
   addParam(params, 'from', from);
   addParam(params, 'to', to);
@@ -130,14 +205,25 @@ try {
   return {
     data: {
       symbol,
-      function: indicatorFunction,
+      function: effectiveFunction,
+      analysisType: analysisType || null,
+      period: effectivePeriod,
       rows,
       latest: rows.length > 0 ? rows[0] : null,
     },
     endpointDiagnostics: {
       endpoint: '/api/technical/{symbol}',
-      parameters: { symbol, function: indicatorFunction, period, order, from: from || null, to: to || null },
+      parameters: {
+        symbol,
+        function: effectiveFunction,
+        period: effectivePeriod,
+        order,
+        from: from || null,
+        to: to || null,
+        analysisType: analysisType || null,
+      },
       commonFunctions: COMMON_FUNCTIONS,
+      analysisTypes: ANALYSIS_TYPE_MAP,
       rowCount: rows.length,
     },
     metadata: {

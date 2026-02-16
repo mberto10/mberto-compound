@@ -1,20 +1,23 @@
 // name = Get Calendar Events
 // description = Fetches calendar events from EODHD for a selected calendar type and date window.
 //
+// help = true|false (optional, default false). If true, returns a decision guide and exits.
 // calendarType = earnings|dividends|splits|ipos|economic_events (required)
-// from = Start date YYYY-MM-DD (required)
-// to = End date YYYY-MM-DD (required)
+// windowPreset = Optional beginner window: today|next_7d|next_30d|last_7d|last_30d
+// from = Start date YYYY-MM-DD (required unless windowPreset is used)
+// to = End date YYYY-MM-DD (required unless windowPreset is used)
 // symbols = Optional comma-separated symbols filter
 // limit = Optional max items (default: 100, min: 1, max: 1000)
 // offset = Optional pagination offset (default: 0, min: 0)
 
-const apiKey = (data.auth.apiKey || '').toString().trim();
-if (!apiKey) return { error: true, message: 'Missing auth.apiKey' };
-
-const calendarTypeRaw = (data.input.calendarType || '').toString().trim().toLowerCase();
-const from = (data.input.from || '').toString().trim();
-const to = (data.input.to || '').toString().trim();
-const symbols = (data.input.symbols || '').toString().trim();
+function asBool(value, defaultValue) {
+  if (value === undefined || value === null || value === '') return defaultValue;
+  if (value === true || value === false) return value;
+  const normalized = String(value).trim().toLowerCase();
+  if (normalized === 'true' || normalized === '1' || normalized === 'yes') return true;
+  if (normalized === 'false' || normalized === '0' || normalized === 'no') return false;
+  return defaultValue;
+}
 
 function clampNumber(value, fallback, minValue, maxValue) {
   const n = Number(value);
@@ -22,8 +25,15 @@ function clampNumber(value, fallback, minValue, maxValue) {
   return Math.min(Math.max(Math.floor(n), minValue), maxValue);
 }
 
-const limit = clampNumber(data.input.limit, 100, 1, 1000);
-const offset = clampNumber(data.input.offset, 0, 0, 1000000);
+function formatDate(d) {
+  return d.toISOString().slice(0, 10);
+}
+
+function shiftDays(baseDate, days) {
+  const d = new Date(baseDate + 'T00:00:00Z');
+  d.setUTCDate(d.getUTCDate() + days);
+  return formatDate(d);
+}
 
 function isValidDateString(dateStr) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return false;
@@ -31,12 +41,88 @@ function isValidDateString(dateStr) {
   return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === dateStr;
 }
 
+const help = asBool(data.input.help, false);
+const calendarTypeRaw = (data.input.calendarType || '').toString().trim().toLowerCase();
+const windowPreset = (data.input.windowPreset || '').toString().trim().toLowerCase();
+const symbols = (data.input.symbols || '').toString().trim();
+
+const CALENDAR_TYPE_OPTIONS = ['earnings', 'dividends', 'splits', 'ipos', 'economic_events'];
+const WINDOW_PRESETS = ['today', 'next_7d', 'next_30d', 'last_7d', 'last_30d'];
+
+if (help) {
+  return {
+    data: {
+      action: 'get_calendar_events',
+      decisionGuide: {
+        whenToUse: 'Use this to fetch catalysts (earnings/dividends/splits/IPO/economic events) for a date window.',
+        quickChoices: [
+          { goal: 'Upcoming earnings this week', use: { calendarType: 'earnings', windowPreset: 'next_7d' } },
+          { goal: 'Recent splits last month', use: { calendarType: 'splits', windowPreset: 'last_30d' } },
+          { goal: 'Upcoming dividends this month', use: { calendarType: 'dividends', windowPreset: 'next_30d' } },
+        ],
+      },
+      calendarTypeOptions: CALENDAR_TYPE_OPTIONS,
+      windowPresetOptions: WINDOW_PRESETS,
+    },
+    endpointDiagnostics: {
+      endpoint: '/api/calendar/{type}',
+      helpOnly: true,
+    },
+    metadata: {
+      source: 'EODHD atomic action: get_calendar_events',
+      generatedAt: new Date().toISOString(),
+    },
+  };
+}
+
+const apiKey = (data.auth.apiKey || '').toString().trim();
+if (!apiKey) return { error: true, message: 'Missing auth.apiKey' };
+
 if (!calendarTypeRaw) return { error: true, message: 'calendarType is required.' };
-if (!from || !to) return { error: true, message: 'from and to are required (YYYY-MM-DD).' };
+if (CALENDAR_TYPE_OPTIONS.indexOf(calendarTypeRaw) === -1) {
+  return {
+    error: true,
+    message: 'calendarType must be one of: earnings, dividends, splits, ipos, economic_events.',
+  };
+}
+if (windowPreset && WINDOW_PRESETS.indexOf(windowPreset) === -1) {
+  return {
+    error: true,
+    message: 'Unknown windowPreset value.',
+    details: { windowPreset, allowedWindowPresets: WINDOW_PRESETS },
+  };
+}
+
+let from = (data.input.from || '').toString().trim();
+let to = (data.input.to || '').toString().trim();
+if ((!from || !to) && windowPreset) {
+  const today = formatDate(new Date());
+  if (windowPreset === 'today') {
+    from = today;
+    to = today;
+  } else if (windowPreset === 'next_7d') {
+    from = today;
+    to = shiftDays(today, 7);
+  } else if (windowPreset === 'next_30d') {
+    from = today;
+    to = shiftDays(today, 30);
+  } else if (windowPreset === 'last_7d') {
+    from = shiftDays(today, -7);
+    to = today;
+  } else if (windowPreset === 'last_30d') {
+    from = shiftDays(today, -30);
+    to = today;
+  }
+}
+
+if (!from || !to) return { error: true, message: 'from and to are required (or set windowPreset).' };
 if (!isValidDateString(from) || !isValidDateString(to)) {
   return { error: true, message: 'from/to must be valid YYYY-MM-DD dates.' };
 }
 if (from > to) return { error: true, message: 'from must be <= to.' };
+
+const limit = clampNumber(data.input.limit, 100, 1, 1000);
+const offset = clampNumber(data.input.offset, 0, 0, 1000000);
 
 const endpointByType = {
   earnings: 'earnings',
@@ -45,14 +131,7 @@ const endpointByType = {
   ipos: 'ipos',
   economic_events: 'economic-events',
 };
-
 const endpointType = endpointByType[calendarTypeRaw];
-if (!endpointType) {
-  return {
-    error: true,
-    message: 'calendarType must be one of: earnings, dividends, splits, ipos, economic_events.',
-  };
-}
 
 function addParam(params, key, value) {
   if (value === undefined || value === null) return;
@@ -104,7 +183,9 @@ try {
     endpointDiagnostics: {
       endpoint: '/api/calendar/{type}',
       endpointType,
-      parameters: { from, to, symbols: symbols || null, limit, offset },
+      parameters: { from, to, symbols: symbols || null, limit, offset, windowPreset: windowPreset || null },
+      calendarTypeOptions: CALENDAR_TYPE_OPTIONS,
+      windowPresetOptions: WINDOW_PRESETS,
     },
     metadata: {
       source: 'EODHD atomic action: get_calendar_events',
@@ -119,4 +200,3 @@ try {
     status: error.status || null,
   };
 }
-

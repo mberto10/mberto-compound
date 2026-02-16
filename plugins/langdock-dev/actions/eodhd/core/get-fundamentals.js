@@ -2,19 +2,18 @@
 // description = Fetches EODHD fundamentals for one symbol with optional top-level field selection and compact summary.
 //
 // symbol = EODHD symbol (required, e.g. AAPL.US)
+// help = true|false (optional, default false). If true, returns a decision guide and exits.
+// fieldsPreset = Optional beginner preset: profile|valuation|financials|ownership|technical_snapshot|corporate_actions|full
 // fields = Optional comma-separated top-level keys to return. Allowed: General,Highlights,Valuation,SharesStats,SplitsDividends,Technicals,Holders,InsiderTransactions,ESGScores,outstandingShares,Earnings,Financials.
 // format = raw|summary (default: raw)
 
-const apiKey = (data.auth.apiKey || '').toString().trim();
-if (!apiKey) return { error: true, message: 'Missing auth.apiKey' };
-
-const symbol = (data.input.symbol || '').toString().trim().toUpperCase();
-const fieldsInput = (data.input.fields || '').toString().trim();
-const formatInput = (data.input.format || 'raw').toString().trim().toLowerCase();
-
-if (!symbol) return { error: true, message: 'symbol is required.' };
-if (formatInput !== 'raw' && formatInput !== 'summary') {
-  return { error: true, message: 'format must be raw or summary.' };
+function asBool(value, defaultValue) {
+  if (value === undefined || value === null || value === '') return defaultValue;
+  if (value === true || value === false) return value;
+  const normalized = String(value).trim().toLowerCase();
+  if (normalized === 'true' || normalized === '1' || normalized === 'yes') return true;
+  if (normalized === 'false' || normalized === '0' || normalized === 'no') return false;
+  return defaultValue;
 }
 
 const ALLOWED_TOP_LEVEL_FIELDS = [
@@ -31,6 +30,69 @@ const ALLOWED_TOP_LEVEL_FIELDS = [
   'Earnings',
   'Financials',
 ];
+
+const FIELDS_PRESET_MAP = {
+  profile: ['General', 'SharesStats'],
+  valuation: ['Highlights', 'Valuation'],
+  financials: ['Financials', 'Earnings', 'Highlights'],
+  ownership: ['Holders', 'InsiderTransactions', 'SharesStats'],
+  technical_snapshot: ['Technicals', 'Highlights'],
+  corporate_actions: ['SplitsDividends', 'outstandingShares'],
+  full: [],
+};
+
+const help = asBool(data.input.help, false);
+const fieldsPresetInput = (data.input.fieldsPreset || '').toString().trim().toLowerCase();
+
+if (help) {
+  return {
+    data: {
+      action: 'get_fundamentals',
+      decisionGuide: {
+        whenToUse: 'Use this when you need company profile, valuation, ownership, or accounting fundamentals for one symbol.',
+        quickChoices: [
+          { goal: 'Quick company snapshot', use: { symbol: 'AAPL.US', format: 'summary' } },
+          { goal: 'Valuation payload', use: { symbol: 'AAPL.US', fieldsPreset: 'valuation', format: 'raw' } },
+          { goal: 'Financial statement deep dive', use: { symbol: 'AAPL.US', fieldsPreset: 'financials', format: 'raw' } },
+        ],
+      },
+      allowedFields: ALLOWED_TOP_LEVEL_FIELDS,
+      fieldsPresetMap: FIELDS_PRESET_MAP,
+      formatOptions: ['raw', 'summary'],
+    },
+    endpointDiagnostics: {
+      endpoint: '/api/fundamentals/{symbol}',
+      helpOnly: true,
+    },
+    metadata: {
+      source: 'EODHD atomic action: get_fundamentals',
+      generatedAt: new Date().toISOString(),
+    },
+  };
+}
+
+const apiKey = (data.auth.apiKey || '').toString().trim();
+if (!apiKey) return { error: true, message: 'Missing auth.apiKey' };
+
+const symbol = (data.input.symbol || '').toString().trim().toUpperCase();
+const fieldsInput = (data.input.fields || '').toString().trim();
+const formatInput = (data.input.format || 'raw').toString().trim().toLowerCase();
+
+if (!symbol) return { error: true, message: 'symbol is required.' };
+if (formatInput !== 'raw' && formatInput !== 'summary') {
+  return { error: true, message: 'format must be raw or summary.' };
+}
+if (fieldsPresetInput && !Object.prototype.hasOwnProperty.call(FIELDS_PRESET_MAP, fieldsPresetInput)) {
+  return {
+    error: true,
+    message: 'Unknown fieldsPreset value.',
+    details: {
+      fieldsPresetInput,
+      allowedFieldsPresets: Object.keys(FIELDS_PRESET_MAP),
+    },
+  };
+}
+
 const allowedFieldsMap = {};
 for (let i = 0; i < ALLOWED_TOP_LEVEL_FIELDS.length; i++) {
   const key = ALLOWED_TOP_LEVEL_FIELDS[i];
@@ -111,6 +173,8 @@ try {
       }
       fields = canonical;
     }
+  } else if (fieldsPresetInput && fieldsPresetInput !== 'full') {
+    fields = FIELDS_PRESET_MAP[fieldsPresetInput].slice();
   }
 
   let selected = raw;
@@ -156,6 +220,7 @@ try {
       endpoint: '/api/fundamentals/{symbol}',
       symbol,
       requestedFields: fields,
+      fieldsPreset: fieldsPresetInput || null,
       allowedFields: ALLOWED_TOP_LEVEL_FIELDS,
       availableTopLevelKeys,
       responseType: Array.isArray(raw) ? 'array' : typeof raw,
@@ -163,7 +228,7 @@ try {
     metadata: {
       source: 'EODHD atomic action: get_fundamentals',
       generatedAt: new Date().toISOString(),
-      parameters: { symbol, format: formatInput, fields },
+      parameters: { symbol, format: formatInput, fields, fieldsPreset: fieldsPresetInput || null },
     },
   };
 } catch (error) {
