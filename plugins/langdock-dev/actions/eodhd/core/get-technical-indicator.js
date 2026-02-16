@@ -3,15 +3,19 @@
 //
 // symbol = EODHD symbol (required, e.g. AAPL.US)
 // help = true|false (optional, default false). If true, returns a decision guide and exits.
-// analysis_type = Optional beginner shortcut: momentum|trend_short|trend_medium|trend_strength|volatility|mean_reversion
-// function = Indicator function (required unless analysis_type is used). Common: rsi,sma,ema,wma,macd,atr,adx,stochastic,cci,williams,mfi,bbands
-// period = Optional indicator period (default: 14, or analysis_type default if provided)
+// analysisType = Optional beginner shortcut: momentum|trend_short|trend_medium|trend_strength|volatility|mean_reversion
+// analysis_type = snake_case alias for analysisType
+// function = Indicator function (required unless analysisType is used). Common: rsi,sma,ema,wma,macd,atr,adx,stochastic,cci,williams,mfi,bbands
+// period = Optional indicator period (default: 14, or analysisType default if provided)
 // from = Optional YYYY-MM-DD date lower bound
 // to = Optional YYYY-MM-DD date upper bound
 // order = Optional order a|d (default: d)
-// max_points = Maximum points to return (default: 120, min: 1, max: 2000)
-// output_mode = compact|full (default: compact)
-// canonical input naming uses snake_case. Legacy aliases are supported for compatibility.
+// maxPoints = Maximum points to return (default: 120, min: 1, max: 2000)
+// max_points = snake_case alias for maxPoints
+// maxPeriods = camelCase alias for maxPoints
+// max_periods = snake_case alias for maxPoints
+// outputMode = compact|full (default: compact)
+// output_mode = snake_case alias for outputMode
 
 function asBool(value, defaultValue) {
   if (value === undefined || value === null || value === '') return defaultValue;
@@ -22,38 +26,18 @@ function asBool(value, defaultValue) {
   return defaultValue;
 }
 
-function trimInput(value) {
-  if (value === undefined || value === null) return '';
-  return String(value).trim();
-}
-
-function recordLegacyAliasUsage(usageList, key) {
-  if (usageList.indexOf(key) === -1) usageList.push(key);
-}
-
-function getCanonicalInput(input, canonicalKey, aliases, fallback, legacyUsage) {
-  const canonicalRaw = trimInput(input[canonicalKey]);
-  const aliasValues = {};
-  for (let i = 0; i < aliases.length; i++) {
-    const alias = aliases[i];
-    const aliasRaw = trimInput(input[alias]);
-    if (aliasRaw !== '') {
-      aliasValues[alias] = aliasRaw;
-      if (legacyUsage) recordLegacyAliasUsage(legacyUsage, alias);
-    }
-  }
-  if (canonicalRaw !== '') return canonicalRaw;
-  for (let i = 0; i < aliases.length; i++) {
-    const alias = aliases[i];
-    if (aliasValues[alias] !== undefined) return aliasValues[alias];
-  }
-  return fallback;
-}
-
 function clampNumber(value, fallback, minValue, maxValue) {
   const n = Number(value);
   if (!Number.isFinite(n)) return fallback;
   return Math.min(Math.max(Math.floor(n), minValue), maxValue);
+}
+
+function firstDefined() {
+  for (let i = 0; i < arguments.length; i++) {
+    const value = arguments[i];
+    if (value !== undefined && value !== null) return value;
+  }
+  return undefined;
 }
 
 function isValidDateString(dateStr) {
@@ -87,21 +71,8 @@ const ANALYSIS_TYPE_MAP = {
   mean_reversion: { function: 'cci', period: 20, description: 'Mean-reversion pressure.' },
 };
 
-const INPUT_ALIASES = {
-  analysis_type: ['analysisType'],
-  max_points: ['maxPoints', 'maxPeriods', 'max_periods'],
-  output_mode: ['outputMode'],
-};
-
-function deprecationWarnings(inputCompatibility) {
-  if (!inputCompatibility || inputCompatibility.length === 0) return [];
-  return ['Deprecated legacy input key(s) used: ' + inputCompatibility.join(', ') + '. Use snake_case canonical names when possible.'];
-}
-
-const input = (data && data.input) ? data.input : {};
-const inputCompatibility = [];
-const help = asBool(getCanonicalInput(input, 'help', [], false, inputCompatibility), false);
-const analysisType = getCanonicalInput(input, 'analysis_type', INPUT_ALIASES.analysis_type, '', inputCompatibility).toLowerCase();
+const help = asBool(data.input.help, false);
+const analysisType = (data.input.analysisType || data.input.analysis_type || '').toString().trim().toLowerCase();
 
 if (help) {
   return {
@@ -109,11 +80,11 @@ if (help) {
       action: 'get_technical_indicator',
       decisionGuide: {
         whenToUse: 'Use this when you want one technical series for a symbol.',
-        firstDecision: 'If unsure, choose analysis_type instead of raw function.',
+        firstDecision: 'If unsure, choose analysisType instead of raw function.',
         quickChoices: [
-          { goal: 'Momentum state', use: { symbol: 'AAPL.US', analysis_type: 'momentum' } },
-          { goal: 'Short-term trend', use: { symbol: 'AAPL.US', analysis_type: 'trend_short' } },
-          { goal: 'Volatility check', use: { symbol: 'AAPL.US', analysis_type: 'volatility' } },
+          { goal: 'Momentum state', use: { symbol: 'AAPL.US', analysisType: 'momentum' } },
+          { goal: 'Short-term trend', use: { symbol: 'AAPL.US', analysisType: 'trend_short' } },
+          { goal: 'Volatility check', use: { symbol: 'AAPL.US', analysisType: 'volatility' } },
         ],
       },
       analysisTypes: ANALYSIS_TYPE_MAP,
@@ -121,20 +92,14 @@ if (help) {
       orderOptions: ['a', 'd'],
       outputModeOptions: ['compact', 'full'],
       maxPointsDefault: 120,
-      migrationNote: {
-        canonicalInputs: ['analysis_type', 'max_points', 'output_mode'],
-        legacyAliases: ['analysisType', 'maxPoints', 'maxPeriods', 'max_periods', 'outputMode'],
-      },
     },
     endpointDiagnostics: {
       endpoint: '/api/technical/{symbol}',
       helpOnly: true,
-      aliasWarnings: deprecationWarnings(inputCompatibility),
     },
     metadata: {
       source: 'EODHD atomic action: get_technical_indicator',
       generatedAt: new Date().toISOString(),
-      inputCompatibility,
     },
   };
 }
@@ -151,50 +116,38 @@ const apiKey = (
 ).toString().trim();
 if (!apiKey) return { error: true, message: 'Missing auth credential. Set one of: auth.apiKey, auth.apiToken, auth.api_key, auth.api_token, auth.eodhdApiKey' };
 
-const symbol = getCanonicalInput(input, 'symbol', [], '', inputCompatibility).toUpperCase();
-const indicatorFunctionInput = getCanonicalInput(input, 'function', [], '', inputCompatibility).toLowerCase();
-const from = getCanonicalInput(input, 'from', [], '', inputCompatibility).trim();
-const to = getCanonicalInput(input, 'to', [], '', inputCompatibility).trim();
-const order = getCanonicalInput(input, 'order', [], 'd', inputCompatibility).toLowerCase();
-const outputMode = getCanonicalInput(input, 'output_mode', INPUT_ALIASES.output_mode, 'compact', inputCompatibility).trim().toLowerCase();
-
-const maxPointsInput = getCanonicalInput(input, 'max_points', INPUT_ALIASES.max_points, null, inputCompatibility);
-let maxPoints = 120;
-if (maxPointsInput !== null) {
-  const parsedMaxPoints = Number(maxPointsInput);
-  if (!Number.isFinite(parsedMaxPoints) || Math.trunc(parsedMaxPoints) !== parsedMaxPoints || parsedMaxPoints < 1 || parsedMaxPoints > 2000) {
-    return {
-      error: true,
-      message: 'max_points must be an integer between 1 and 2000.',
-      details: { max_points: maxPointsInput },
-    };
-  }
-  maxPoints = parsedMaxPoints;
-}
+const symbol = (data.input.symbol || '').toString().trim().toUpperCase();
+const indicatorFunctionInput = (data.input.function || '').toString().trim().toLowerCase();
+const from = (data.input.from || '').toString().trim();
+const to = (data.input.to || '').toString().trim();
+const order = (data.input.order || 'd').toString().trim().toLowerCase();
+const outputMode = (data.input.outputMode || data.input.output_mode || 'compact').toString().trim().toLowerCase();
+const maxPointsInput = firstDefined(data.input.maxPoints, data.input.max_points, data.input.maxPeriods, data.input.max_periods);
+const maxPoints = clampNumber(maxPointsInput, 120, 1, 2000);
 
 if (!symbol) return { error: true, message: 'symbol is required.' };
 if (analysisType && !Object.prototype.hasOwnProperty.call(ANALYSIS_TYPE_MAP, analysisType)) {
   return {
     error: true,
-    message: 'Unknown analysis_type value.',
+    message: 'Unknown analysisType value.',
     details: {
-      analysis_type: analysisType,
-      allowed_analysis_types: Object.keys(ANALYSIS_TYPE_MAP),
+      analysisType,
+      allowedAnalysisTypes: Object.keys(ANALYSIS_TYPE_MAP),
     },
   };
 }
 if (order !== 'a' && order !== 'd') return { error: true, message: 'order must be a or d.' };
-if (outputMode !== 'compact' && outputMode !== 'full') return { error: true, message: 'output_mode must be compact or full.' };
+if (outputMode !== 'compact' && outputMode !== 'full') return { error: true, message: 'outputMode must be compact or full.' };
 if (!isValidDateString(from)) return { error: true, message: 'from must be YYYY-MM-DD.' };
 if (!isValidDateString(to)) return { error: true, message: 'to must be YYYY-MM-DD.' };
 if (from && to && from > to) return { error: true, message: 'from must be <= to.' };
 
 const analysisPreset = analysisType ? ANALYSIS_TYPE_MAP[analysisType] : null;
-const effectiveFunction = analysisType ? analysisPreset.function : indicatorFunctionInput;
+const effectiveFunction = indicatorFunctionInput || (analysisPreset ? analysisPreset.function : '');
 if (!effectiveFunction) {
   return {
     error: true,
-    message: 'Provide function or analysis_type.',
+    message: 'Provide function or analysisType.',
     details: {
       allowedAnalysisTypes: Object.keys(ANALYSIS_TYPE_MAP),
       commonFunctions: COMMON_FUNCTIONS,
@@ -202,12 +155,9 @@ if (!effectiveFunction) {
   };
 }
 
-const hasUserPeriod = (function () {
-  const raw = getCanonicalInput(input, 'period', [], null, inputCompatibility);
-  return raw !== null && raw !== '';
-})();
+const hasUserPeriod = data.input.period !== undefined && data.input.period !== null && String(data.input.period).trim() !== '';
 const effectivePeriod = hasUserPeriod
-  ? clampNumber(getCanonicalInput(input, 'period', [], 14, inputCompatibility), 14, 1, 500)
+  ? clampNumber(data.input.period, 14, 1, 500)
   : (analysisPreset ? analysisPreset.period : 14);
 
 function addParam(params, key, value) {
@@ -301,20 +251,17 @@ try {
         order,
         from: from || null,
         to: to || null,
-        analysis_type: analysisType || null,
-        max_points: maxPoints,
-        output_mode: outputMode,
+        analysisType: analysisType || null,
+        maxPoints,
+        outputMode,
       },
       commonFunctions: COMMON_FUNCTIONS,
       analysisTypes: ANALYSIS_TYPE_MAP,
       rowCount: rows.length,
-      aliasWarnings: deprecationWarnings(inputCompatibility),
-      inputCompatibility,
     },
     metadata: {
       source: 'EODHD atomic action: get_technical_indicator',
       generatedAt: new Date().toISOString(),
-      inputCompatibility,
     },
   };
 } catch (error) {

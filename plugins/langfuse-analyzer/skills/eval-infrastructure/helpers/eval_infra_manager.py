@@ -19,11 +19,12 @@ import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 # Shared Langfuse client
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "data-retrieval" / "helpers"))
 from langfuse_client import get_langfuse_client
+import langfuse_rest_client
 
 # Experiment runner for baseline execution
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "experiment-runner" / "helpers"))
@@ -315,8 +316,9 @@ def summarize_status(dataset_name: str, agent_name: str) -> Dict[str, Any]:
     baseline_name = baseline.get("run_name")
     baseline_metrics = baseline.get("metrics") if isinstance(baseline.get("metrics"), dict) else {}
 
-    runs = getattr(dataset, "runs", []) or []
-    run_names = {getattr(r, "name", "") for r in runs}
+    # Check if baseline run exists via REST API (SDK .runs is broken)
+    all_runs = langfuse_rest_client.get_dataset_runs(dataset_name)
+    run_names = {r.get("name") for r in all_runs if r.get("name")}
     baseline_run_present = bool(baseline_name and baseline_name in run_names)
 
     return {
@@ -442,6 +444,36 @@ def export_snapshots(agent_name: str, dataset_name: str, snapshot_dir: str) -> D
     }
 
 
+def write_contract_file(agent_name: str, content: Dict[str, Any], output_dir: str = ".claude/eval-infra") -> Dict[str, str]:
+    """Write contract content to local files."""
+    base = Path(output_dir)
+    json_path = base / f"{agent_name}.json"
+    yaml_path = base / f"{agent_name}.yaml"
+    
+    write_text(json_path, json.dumps(content, indent=2))
+    write_text(yaml_path, "\n".join(to_yaml_lines(content)) + "\n")
+    
+    return {
+        "json_path": str(json_path),
+        "yaml_path": str(yaml_path)
+    }
+
+
+def write_contract_file(agent_name: str, content: Dict[str, Any], output_dir: str = ".claude/eval-infra") -> Dict[str, str]:
+    """Write contract content to local files."""
+    base = Path(output_dir)
+    json_path = base / f"{agent_name}.json"
+    yaml_path = base / f"{agent_name}.yaml"
+    
+    write_text(json_path, json.dumps(content, indent=2))
+    write_text(yaml_path, "\n".join(to_yaml_lines(content)) + "\n")
+    
+    return {
+        "json_path": str(json_path),
+        "yaml_path": str(yaml_path)
+    }
+
+
 def format_assess(result: Dict[str, Any]) -> str:
     lines = ["# Eval Infra Status", ""]
     lines.append(f"**Dataset:** `{result.get('dataset')}`")
@@ -550,6 +582,87 @@ def cmd_bootstrap(args: argparse.Namespace) -> int:
         for detail in update_result.get("details", []):
             print(f"- detail: {detail}")
 
+    return 0
+
+
+def cmd_bootstrap_live(args: argparse.Namespace) -> int:
+    try:
+        raw_dimensions = json.loads(args.dimensions)
+        if not isinstance(raw_dimensions, list):
+            raise ValueError("dimensions must be a JSON list")
+    except Exception as exc:
+        print(f"Error: invalid --dimensions JSON: {exc}", file=sys.stderr)
+        return 1
+
+    dimensions = normalize_dimensions(raw_dimensions)
+    if not dimensions:
+        print("Error: at least one valid dimension is required", file=sys.stderr)
+        return 1
+
+    # 1. Ensure judges (unless skipped)
+    judges_created = []
+    judges_existing = []
+    judges_failed = []
+    
+    if not args.skip_judges:
+        judges_result = ensure_judge_prompts(dimensions)
+        judges_created = judges_result.get("created", [])
+        judges_existing = judges_result.get("existing", [])
+        judges_failed = judges_result.get("failed", [])
+    
+    # 2. Build live contract
+    judges_list = [d["judge_prompt"] for d in dimensions]
+    
+    contract = {
+        "schema_version": SCHEMA_VERSION,
+        "agent": {
+            "name": args.agent,
+            "entry_point": args.entry_point or "",
+        },
+        "source": {
+            "type": "live",
+            "count": args.sample_size,
+        },
+        "score_scale": DEFAULT_SCORE_SCALE,
+        "dimensions": dimensions,
+        "judge_prompts": judges_list,
+        "judges_external": args.skip_judges,
+        "baseline": {
+            "run_name": "", # Live mode typically relies on previous live iterations or creates a new baseline ad-hoc
+            "created_at": "",
+            "metrics": {},
+        },
+        "status": {
+            "dataset_ready": False, # No dataset
+            "judges_ready": (len(judges_failed) == 0),
+            "baseline_ready": False,
+            "live_mode": True,
+        },
+    }
+
+    # 3. Write locally
+    paths = write_contract_file(args.agent, contract)
+
+    print("# Eval Infra Bootstrap (Live Mode)")
+    print("")
+    print(f"**Agent:** `{args.agent}`")
+    print(f"**Source:** Live Traces (last {args.sample_size})")
+    print(f"**Judges Managed:** {'External' if args.skip_judges else 'Internal'}")
+    print("")
+    
+    if not args.skip_judges:
+        print(f"**Judges Created:** {len(judges_created)}")
+        print(f"**Judges Existing:** {len(judges_existing)}")
+        print(f"**Judges Failed:** {len(judges_failed)}")
+        if judges_failed:
+            for failed in judges_failed:
+                print(f"- ❌ `{failed['prompt']}`: {failed['error']}")
+        print("")
+
+    print(f"**Contract Written:**")
+    print(f"- JSON: `{paths['json_path']}`")
+    print(f"- YAML: `{paths['yaml_path']}`")
+    
     return 0
 
 
@@ -673,6 +786,13 @@ def build_parser() -> argparse.ArgumentParser:
     bootstrap.add_argument("--entry-point", default="", help="Agent invocation/entry point")
     bootstrap.add_argument("--description", default="", help="Dataset description when creating")
 
+    bootstrap_live = sub.add_parser("bootstrap-live", help="Bootstrap local live-mode contract (no dataset)")
+    bootstrap_live.add_argument("--agent", required=True, help="Agent name")
+    bootstrap_live.add_argument("--dimensions", required=True, help="JSON list of dimension objects")
+    bootstrap_live.add_argument("--entry-point", default="", help="Agent invocation/entry point")
+    bootstrap_live.add_argument("--sample-size", type=int, default=10, help="Number of recent traces to fetch")
+    bootstrap_live.add_argument("--skip-judges", action="store_true", help="Do not create judge prompts (external)")
+
     ensure = sub.add_parser("ensure-judges", help="Create missing judge prompts")
     ensure.add_argument("--dataset", required=True, help="Dataset name")
     ensure.add_argument("--dimensions", required=True, help="JSON list of dimension objects")
@@ -701,6 +821,8 @@ def main() -> None:
         raise SystemExit(cmd_assess(args))
     if args.command == "bootstrap":
         raise SystemExit(cmd_bootstrap(args))
+    if args.command == "bootstrap-live":
+        raise SystemExit(cmd_bootstrap_live(args))
     if args.command == "ensure-judges":
         raise SystemExit(cmd_ensure_judges(args))
     if args.command == "baseline":

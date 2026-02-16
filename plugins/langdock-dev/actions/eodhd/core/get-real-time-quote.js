@@ -3,8 +3,8 @@
 //
 // help = true|false (optional, default false). If true, returns a decision guide and exits.
 // symbol = EODHD symbol (required, e.g. AAPL.US)
-// output_mode = compact|full (default: compact)
-// canonical input naming uses snake_case. Legacy camelCase aliases are supported for compatibility.
+// outputMode = compact|full (default: compact)
+// output_mode = snake_case alias for outputMode
 
 function asBool(value, defaultValue) {
   if (value === undefined || value === null || value === '') return defaultValue;
@@ -15,38 +15,44 @@ function asBool(value, defaultValue) {
   return defaultValue;
 }
 
-function trimInput(value) {
-  if (value === undefined || value === null) return '';
-  return String(value).trim();
+const help = asBool(data.input.help, false);
+const outputMode = (data.input.outputMode || data.input.output_mode || 'compact').toString().trim().toLowerCase();
+if (help) {
+  return {
+    data: {
+      action: 'get_real_time_quote',
+      decisionGuide: {
+        whenToUse: 'Use this for latest live quote checks (price now, daily range, volume) for a single symbol.',
+        quickChoice: { symbol: 'AAPL.US' },
+      },
+      outputModeOptions: ['compact', 'full'],
+    },
+    endpointDiagnostics: {
+      endpoint: '/api/real-time/{symbol}',
+      helpOnly: true,
+    },
+    metadata: {
+      source: 'EODHD atomic action: get_real_time_quote',
+      generatedAt: new Date().toISOString(),
+    },
+  };
 }
 
-function recordLegacyAliasUsage(usageList, key) {
-  if (usageList.indexOf(key) === -1) usageList.push(key);
-}
+const auth = (data && data.auth) ? data.auth : {};
+const apiKey = (
+  auth.apiKey ||
+  auth.api_key ||
+  auth.apiToken ||
+  auth.api_token ||
+  auth.eodhdApiKey ||
+  auth.EODHD_API_KEY ||
+  ''
+).toString().trim();
+if (!apiKey) return { error: true, message: 'Missing auth credential. Set one of: auth.apiKey, auth.apiToken, auth.api_key, auth.api_token, auth.eodhdApiKey' };
+if (outputMode !== 'compact' && outputMode !== 'full') return { error: true, message: 'outputMode must be compact or full.' };
 
-function getCanonicalInput(input, canonicalKey, aliases, fallback, legacyUsage) {
-  const canonicalRaw = trimInput(input[canonicalKey]);
-  const aliasValues = {};
-  for (let i = 0; i < aliases.length; i++) {
-    const alias = aliases[i];
-    const aliasRaw = trimInput(input[alias]);
-    if (aliasRaw !== '') {
-      aliasValues[alias] = aliasRaw;
-      if (legacyUsage) recordLegacyAliasUsage(legacyUsage, alias);
-    }
-  }
-  if (canonicalRaw !== '') return canonicalRaw;
-  for (let i = 0; i < aliases.length; i++) {
-    const alias = aliases[i];
-    if (aliasValues[alias] !== undefined) return aliasValues[alias];
-  }
-  return fallback;
-}
-
-function deprecationWarnings(inputCompatibility) {
-  if (!inputCompatibility || inputCompatibility.length === 0) return [];
-  return ['Deprecated legacy input key(s) used: ' + inputCompatibility.join(', ') + '. Use snake_case canonical names when possible.'];
-}
+const symbol = (data.input.symbol || '').toString().trim().toUpperCase();
+if (!symbol) return { error: true, message: 'symbol is required.' };
 
 function addParam(params, key, value) {
   if (value === undefined || value === null) return;
@@ -77,54 +83,6 @@ async function fetchJson(url, label) {
 
   return response.json;
 }
-
-const input = (data && data.input) ? data.input : {};
-const inputCompatibility = [];
-const help = asBool(getCanonicalInput(input, 'help', [], false, inputCompatibility), false);
-const outputMode = getCanonicalInput(input, 'output_mode', ['outputMode'], 'compact', inputCompatibility).trim().toLowerCase();
-
-if (help) {
-  return {
-    data: {
-      action: 'get_real_time_quote',
-      decisionGuide: {
-        whenToUse: 'Use this for latest live quote checks (price now, daily range, volume) for a single symbol.',
-        quickChoice: { symbol: 'AAPL.US' },
-      },
-      outputModeOptions: ['compact', 'full'],
-      migrationNote: {
-        canonicalInputs: ['output_mode'],
-        legacyAliases: ['outputMode'],
-      },
-    },
-    endpointDiagnostics: {
-      endpoint: '/api/real-time/{symbol}',
-      helpOnly: true,
-      aliasWarnings: deprecationWarnings(inputCompatibility),
-    },
-    metadata: {
-      source: 'EODHD atomic action: get_real_time_quote',
-      generatedAt: new Date().toISOString(),
-      inputCompatibility,
-    },
-  };
-}
-
-const auth = (data && data.auth) ? data.auth : {};
-const apiKey = (
-  auth.apiKey ||
-  auth.api_key ||
-  auth.apiToken ||
-  auth.api_token ||
-  auth.eodhdApiKey ||
-  auth.EODHD_API_KEY ||
-  ''
-).toString().trim();
-if (!apiKey) return { error: true, message: 'Missing auth credential. Set one of: auth.apiKey, auth.apiToken, auth.api_key, auth.api_token, auth.eodhdApiKey' };
-if (outputMode !== 'compact' && outputMode !== 'full') return { error: true, message: 'output_mode must be compact or full.' };
-
-const symbol = getCanonicalInput(input, 'symbol', [], '', inputCompatibility).toUpperCase();
-if (!symbol) return { error: true, message: 'symbol is required.' };
 
 try {
   const params = [];
@@ -157,13 +115,10 @@ try {
       endpoint: '/api/real-time/{symbol}',
       symbol,
       outputMode,
-      aliasWarnings: deprecationWarnings(inputCompatibility),
-      inputCompatibility,
     },
     metadata: {
       source: 'EODHD atomic action: get_real_time_quote',
       generatedAt: new Date().toISOString(),
-      inputCompatibility,
     },
   };
 } catch (error) {
