@@ -62,6 +62,13 @@ function dateDaysAgo(days) {
   return formatDate(d);
 }
 
+function dateDaysBefore(dateStr, days) {
+  const base = new Date(String(dateStr || '').trim() + 'T00:00:00Z');
+  if (!Number.isFinite(base.getTime())) return dateDaysAgo(days);
+  base.setUTCDate(base.getUTCDate() - days);
+  return formatDate(base);
+}
+
 function addParam(params, key, value) {
   if (value === undefined || value === null) return;
   const str = String(value).trim();
@@ -175,6 +182,7 @@ const newsLimit = clampNumber(data.input.newsLimit, 40, 1, 100);
 const minAbsMovePct = clampNumber(data.input.minAbsMovePct, 2.0, 0.1, 20);
 const outputMode = (data.input.outputMode || 'full').toString().trim().toLowerCase();
 const tableLimit = clampNumber(data.input.tableLimit, outputMode === 'compact' ? 50 : 200, 1, 500);
+const eodFrom = dateDaysBefore(from, 40);
 
 if (intradayInterval !== '1m' && intradayInterval !== '5m' && intradayInterval !== '1h') {
   return { error: true, message: 'intradayInterval must be 1m, 5m, or 1h' };
@@ -293,7 +301,7 @@ try {
       addParam(eodParams, 'fmt', 'json');
       addParam(eodParams, 'period', 'd');
       addParam(eodParams, 'order', 'a');
-      addParam(eodParams, 'from', dateDaysAgo(40));
+      addParam(eodParams, 'from', eodFrom);
       addParam(eodParams, 'to', to);
       const eodUrl = `https://eodhd.com/api/eod/${encodeURIComponent(symbol)}?${eodParams.join('&')}`;
       diagnostics.calls.eod += 1;
@@ -427,7 +435,9 @@ try {
 
   const sorted = validRows.slice().sort((a, b) => b.dailyMovePct - a.dailyMovePct);
   const positive = sorted.filter((r) => Number.isFinite(r.dailyMovePct) && r.dailyMovePct > 0);
-  const negative = sorted.filter((r) => Number.isFinite(r.dailyMovePct) && r.dailyMovePct < 0);
+  const negative = sorted
+    .filter((r) => Number.isFinite(r.dailyMovePct) && r.dailyMovePct < 0)
+    .sort((a, b) => a.dailyMovePct - b.dailyMovePct);
   const topTableLimit = outputMode === 'compact' ? Math.min(topN, 10) : topN;
   let topPositiveReactions = positive.slice(0, topTableLimit);
   let topNegativeReactions = negative.slice(0, topTableLimit);
