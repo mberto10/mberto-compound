@@ -28,6 +28,7 @@ Atomic wrappers are reusable building blocks for assistants and bundles.
 Input vocabulary reference (allowed/common values) is documented in:
 
 - `core/README.md` under `Input Vocabularies`
+- Every core action supports `help=true` for a no-API-call usage guide.
 
 Already available in your Langdock workspace:
 

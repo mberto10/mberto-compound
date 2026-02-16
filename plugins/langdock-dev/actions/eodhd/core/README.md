@@ -28,10 +28,26 @@ Single-endpoint Langdock actions for EODHD. These are building blocks for bundle
 - Auth input: `auth.apiKey` (mapped to EODHD `api_token`).
 - No hardcoded default symbols.
 - Sequential `await ld.request(...)` usage for Langdock runtime compatibility.
+- All core actions support `help=true` to return a decision guide without calling EODHD.
 - Deterministic output shape:
   - `data`
   - `endpointDiagnostics`
   - `metadata`
+
+## Quick Decision Matrix
+
+| If your goal is... | Use action | Starter input |
+|---|---|---|
+| Find a universe to analyze | `run_screener` | `{ \"preset\": \"market_leaders\" }` |
+| Check movers quickly | `run_screener` | `{ \"preset\": \"top_gainers\" }` or `{ \"preset\": \"top_losers\" }` |
+| Get company valuation/profile facts | `get_fundamentals` | `{ \"symbol\": \"AAPL.US\", \"fieldsPreset\": \"valuation\" }` |
+| Pull accounting statements | `get_fundamentals` | `{ \"symbol\": \"AAPL.US\", \"fieldsPreset\": \"financials\" }` |
+| Check momentum/trend/volatility indicator | `get_technical_indicator` | `{ \"symbol\": \"AAPL.US\", \"analysisType\": \"momentum\" }` |
+| Get upcoming catalysts | `get_calendar_events` | `{ \"calendarType\": \"earnings\", \"windowPreset\": \"next_7d\" }` |
+| Fetch recent headlines | `get_news_sentiment` | `{ \"symbols\": \"AAPL.US,MSFT.US\", \"windowPreset\": \"last_7d\" }` |
+| Get current quote snapshot | `get_real_time_quote` | `{ \"symbol\": \"AAPL.US\" }` |
+
+If you are unsure which inputs to choose, call the same action first with `{ \"help\": true }`.
 
 ## Input Vocabularies
 
@@ -74,3 +90,27 @@ Single-endpoint Langdock actions for EODHD. These are building blocks for bundle
   - `name.desc`
   - `volume.desc`
   - `change_p.desc`
+- `run_screener.preset` beginner values:
+  - `market_leaders`
+  - `top_gainers`
+  - `top_losers`
+  - `oversold`
+  - `overbought`
+  - `high_volume`
+- `get_technical_indicator.analysisType` beginner values:
+  - `momentum`
+  - `trend_short`
+  - `trend_medium`
+  - `trend_strength`
+  - `volatility`
+  - `mean_reversion`
+- `get_calendar_events.windowPreset` values:
+  - `today`
+  - `next_7d`
+  - `next_30d`
+  - `last_7d`
+  - `last_30d`
+- `get_news_sentiment.windowPreset` values:
+  - `today`
+  - `last_7d`
+  - `last_30d`
