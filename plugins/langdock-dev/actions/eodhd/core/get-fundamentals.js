@@ -4,9 +4,10 @@
 // symbol = EODHD symbol (required, e.g. AAPL.US)
 // help = true|false (optional, default false). If true, returns a decision guide and exits.
 // fieldsPreset = Optional beginner preset: profile|valuation|financials|ownership|technical_snapshot|corporate_actions|full
+// fields_preset = Optional alias for fieldsPreset
 // fields = Optional comma-separated top-level keys to return. Allowed: General,Highlights,Valuation,SharesStats,SplitsDividends,Technicals,Holders,InsiderTransactions,ESGScores,outstandingShares,Earnings,Financials.
 // format = raw|summary (default: summary)
-// periods = Optional cap for yearly/quarterly history blocks in raw output (default: no cap, min: 1, max: 120)
+// periods = Optional cap for yearly/quarterly history blocks in raw output (default: no cap, min: 1, max: 120). Primary parameter.
 // maxPeriods = Optional alias for periods
 // max_periods = Optional alias for periods
 
