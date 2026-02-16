@@ -9,6 +9,7 @@
 // outputMode = compact|full (default: compact)
 // limit = Max rows (default: 25, min: 1, max: 500)
 // offset = Pagination offset (default: 0, min: 0)
+// outputRowsLimit = Max rows returned to the model after normalization (default: compact=60, full=120, min: 1, max: 200)
 
 function asBool(value, defaultValue) {
   if (value === undefined || value === null || value === '') return defaultValue;
@@ -148,6 +149,8 @@ if (!hasUserLimit && preset && Number.isFinite(preset.limit)) {
   limit = clampNumber(preset.limit, 50, 1, 500);
 }
 const offset = clampNumber(data.input.offset, 0, 0, 1000000);
+const outputRowsDefault = outputMode === 'compact' ? 60 : 120;
+const outputRowsLimit = clampNumber(data.input.outputRowsLimit, outputRowsDefault, 1, 200);
 
 const sortInput = sortInputRaw || (preset ? preset.sort : 'market_capitalization.desc');
 const signalsInput = signalsInputRaw || (preset ? preset.signals : '');
@@ -236,7 +239,6 @@ try {
     ? payload
     : (Array.isArray(payload.data) ? payload.data : (Array.isArray(payload.results) ? payload.results : []));
 
-  const symbols = dedupe(rows.map(extractSymbol).filter(Boolean));
   const compactRows = rows.map((row) => ({
     symbol: extractSymbol(row),
     code: firstText(row, ['code', 'Code', 'ticker']),
@@ -250,12 +252,17 @@ try {
     marketCap: safeNumber(row.market_capitalization || row.marketCap),
   }));
 
+  const rowsForOutput = outputMode === 'full' ? rows : compactRows;
+  const rowsOut = rowsForOutput.slice(0, outputRowsLimit);
+  const symbolsOut = dedupe(rowsOut.map(extractSymbol).filter(Boolean));
+  const truncated = rowsForOutput.length > rowsOut.length;
+
   const dataBlock = {
-    rows: outputMode === 'full' ? rows : compactRows,
-    symbols,
+    rows: rowsOut,
+    symbols: symbolsOut,
     count: rows.length,
+    returnedRows: rowsOut.length,
   };
-  if (outputMode === 'full') dataBlock.rawRows = rows;
 
   return {
     data: dataBlock,
@@ -269,7 +276,10 @@ try {
         signals: signalsInput || null,
         preset: presetInput || null,
         outputMode,
+        outputRowsLimit,
       },
+      truncated,
+      truncationNotes: truncated ? [`Returned ${rowsOut.length}/${rowsForOutput.length} rows. Narrow with filters/signals or raise outputRowsLimit (max 200).`] : [],
       commonSortOptions: COMMON_SORT_OPTIONS,
       commonSignals: COMMON_SIGNALS,
       presets: PRESET_MAP,

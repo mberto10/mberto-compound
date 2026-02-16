@@ -10,7 +10,8 @@
 // offset = Optional pagination offset (default: 0, min: 0)
 // s = Optional direct EODHD news s-query override (if set, it is used as-is; example: AAPL.US,MSFT.US)
 // outputMode = compact|full (default: compact)
-// contentMaxChars = Maximum content chars per item in compact mode (default: 280, min: 80, max: 5000)
+// contentMaxChars = Maximum content chars per item (default: compact=280, full=1200, min: 80, max: 4000)
+// outputRowsLimit = Max rows returned to the model after normalization (default: compact=20, full=40, min: 1, max: 80)
 
 function asBool(value, defaultValue) {
   if (value === undefined || value === null || value === '') return defaultValue;
@@ -57,14 +58,12 @@ function toSymbolsQuery(symbols) {
   return parts.join(',');
 }
 
-function normalizeItem(item, outputMode, contentMaxChars) {
+function normalizeItem(item, contentMaxChars) {
   const symbols = Array.isArray(item.symbols)
     ? item.symbols
     : (item.symbol ? [item.symbol] : []);
   const contentRaw = (item.content || item.text || '').toString();
-  const content = outputMode === 'full'
-    ? (contentRaw || null)
-    : (contentRaw ? contentRaw.slice(0, contentMaxChars) : null);
+  const content = contentRaw ? contentRaw.slice(0, contentMaxChars) : null;
   return {
     date: (item.date || item.publishedAt || '').toString() || null,
     title: (item.title || '').toString() || null,
@@ -143,7 +142,6 @@ const windowPreset = (data.input.windowPreset || '').toString().trim().toLowerCa
 const outputMode = (data.input.outputMode || 'compact').toString().trim().toLowerCase();
 let from = (data.input.from || '').toString().trim();
 let to = (data.input.to || '').toString().trim();
-const contentMaxChars = clampNumber(data.input.contentMaxChars, 280, 80, 5000);
 
 if (outputMode !== 'compact' && outputMode !== 'full') {
   return { error: true, message: 'outputMode must be compact or full.' };
@@ -179,6 +177,10 @@ if (from && to && from > to) return { error: true, message: 'from must be <= to.
 
 const limit = clampNumber(data.input.limit, 20, 1, 200);
 const offset = clampNumber(data.input.offset, 0, 0, 1000000);
+const contentMaxCharsDefault = outputMode === 'compact' ? 280 : 1200;
+const contentMaxChars = clampNumber(data.input.contentMaxChars, contentMaxCharsDefault, 80, 4000);
+const outputRowsDefault = outputMode === 'compact' ? 20 : 40;
+const outputRowsLimit = clampNumber(data.input.outputRowsLimit, outputRowsDefault, 1, 80);
 
 try {
   const sParam = sOverride || toSymbolsQuery(symbolsInput);
@@ -198,13 +200,15 @@ try {
   const rows = Array.isArray(payload)
     ? payload
     : (Array.isArray(payload.data) ? payload.data : (Array.isArray(payload.results) ? payload.results : []));
-  const normalized = rows.map((item) => normalizeItem(item, outputMode, contentMaxChars));
+  const normalized = rows.map((item) => normalizeItem(item, contentMaxChars));
+  const rowsOut = normalized.slice(0, outputRowsLimit);
+  const truncated = normalized.length > rowsOut.length;
 
   const dataBlock = {
     count: normalized.length,
-    rows: normalized,
+    returnedRows: rowsOut.length,
+    rows: rowsOut,
   };
-  if (outputMode === 'full') dataBlock.rawRows = rows;
 
   return {
     data: dataBlock,
@@ -218,8 +222,11 @@ try {
         offset,
         windowPreset: windowPreset || null,
         outputMode,
-        contentMaxChars: outputMode === 'compact' ? contentMaxChars : null,
+        contentMaxChars,
+        outputRowsLimit,
       },
+      truncated,
+      truncationNotes: truncated ? [`Returned ${rowsOut.length}/${normalized.length} rows. Narrow date window or adjust outputRowsLimit (max 80).`] : [],
       queryMode,
       windowPresetOptions: WINDOW_PRESETS,
     },
