@@ -7,8 +7,11 @@
 // signals = Optional comma-separated screener signals (common: top_gainers,top_losers,oversold,overbought)
 // sort = Optional sort field. Common: market_capitalization.desc,market_capitalization.asc,name.asc,name.desc,volume.desc,change_p.desc
 // outputMode = compact|full (default: compact)
+// output_mode = snake_case alias for outputMode
 // limit = Max rows (default: 25, min: 1, max: 500)
 // offset = Pagination offset (default: 0, min: 0)
+// resultLimit = Optional max returned rows after fetch (default: limit, min: 1, max: 500)
+// result_limit = snake_case alias for resultLimit
 
 function asBool(value, defaultValue) {
   if (value === undefined || value === null || value === '') return defaultValue;
@@ -24,7 +27,7 @@ const presetInput = (data.input.preset || '').toString().trim().toLowerCase();
 const filtersInput = (data.input.filters || '').toString().trim();
 const signalsInputRaw = (data.input.signals || '').toString().trim();
 const sortInputRaw = (data.input.sort || '').toString().trim();
-const outputMode = (data.input.outputMode || 'compact').toString().trim().toLowerCase();
+const outputMode = (data.input.outputMode || data.input.output_mode || 'compact').toString().trim().toLowerCase();
 
 const COMMON_SORT_OPTIONS = [
   'market_capitalization.desc',
@@ -130,6 +133,10 @@ function clampNumber(value, fallback, minValue, maxValue) {
   return Math.min(Math.max(Math.floor(n), minValue), maxValue);
 }
 
+function firstDefined(a, b) {
+  return a !== undefined && a !== null ? a : b;
+}
+
 if (presetInput && !Object.prototype.hasOwnProperty.call(PRESET_MAP, presetInput)) {
   return {
     error: true,
@@ -148,6 +155,8 @@ if (!hasUserLimit && preset && Number.isFinite(preset.limit)) {
   limit = clampNumber(preset.limit, 50, 1, 500);
 }
 const offset = clampNumber(data.input.offset, 0, 0, 1000000);
+const resultLimitInput = firstDefined(data.input.resultLimit, data.input.result_limit);
+const resultLimit = clampNumber(resultLimitInput, limit, 1, 500);
 
 const sortInput = sortInputRaw || (preset ? preset.sort : 'market_capitalization.desc');
 const signalsInput = signalsInputRaw || (preset ? preset.signals : '');
@@ -235,8 +244,6 @@ try {
   const rows = Array.isArray(payload)
     ? payload
     : (Array.isArray(payload.data) ? payload.data : (Array.isArray(payload.results) ? payload.results : []));
-
-  const symbols = dedupe(rows.map(extractSymbol).filter(Boolean));
   const compactRows = rows.map((row) => ({
     symbol: extractSymbol(row),
     code: firstText(row, ['code', 'Code', 'ticker']),
@@ -249,13 +256,18 @@ try {
     volume: safeNumber(row.volume),
     marketCap: safeNumber(row.market_capitalization || row.marketCap),
   }));
+  const truncated = compactRows.length > resultLimit;
+  const compactRowsLimited = compactRows.slice(0, resultLimit);
+  const rawRowsLimited = rows.slice(0, resultLimit);
+  const symbols = dedupe(compactRowsLimited.map((row) => row.symbol).filter(Boolean));
 
   const dataBlock = {
-    rows: outputMode === 'full' ? rows : compactRows,
+    rows: compactRowsLimited,
     symbols,
-    count: rows.length,
+    fetchedCount: rows.length,
+    count: compactRowsLimited.length,
   };
-  if (outputMode === 'full') dataBlock.rawRows = rows;
+  if (outputMode === 'full') dataBlock.rawRows = rawRowsLimited;
 
   return {
     data: dataBlock,
@@ -264,12 +276,15 @@ try {
       parameters: {
         limit,
         offset,
+        resultLimit,
         sort: sortInput,
         hasFilters: !!parsedFilters,
         signals: signalsInput || null,
         preset: presetInput || null,
         outputMode,
       },
+      truncated,
+      truncationNotes: truncated ? [`Returned ${compactRowsLimited.length} of ${rows.length} rows (resultLimit=${resultLimit}).`] : [],
       commonSortOptions: COMMON_SORT_OPTIONS,
       commonSignals: COMMON_SIGNALS,
       presets: PRESET_MAP,

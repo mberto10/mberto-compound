@@ -4,8 +4,12 @@
 // symbol = EODHD symbol (required, e.g. AAPL.US)
 // help = true|false (optional, default false). If true, returns a decision guide and exits.
 // fieldsPreset = Optional beginner preset: profile|valuation|financials|ownership|technical_snapshot|corporate_actions|full
+// fields_preset = snake_case alias for fieldsPreset
 // fields = Optional comma-separated top-level keys to return. Allowed: General,Highlights,Valuation,SharesStats,SplitsDividends,Technicals,Holders,InsiderTransactions,ESGScores,outstandingShares,Earnings,Financials.
 // format = raw|summary (default: summary)
+// periods = Optional max historical periods in raw mode for Financials/Earnings/outstandingShares (min: 1, max: 40)
+// maxPeriods = camelCase alias for periods
+// max_periods = snake_case alias for periods
 
 function asBool(value, defaultValue) {
   if (value === undefined || value === null || value === '') return defaultValue;
@@ -14,6 +18,20 @@ function asBool(value, defaultValue) {
   if (normalized === 'true' || normalized === '1' || normalized === 'yes') return true;
   if (normalized === 'false' || normalized === '0' || normalized === 'no') return false;
   return defaultValue;
+}
+
+function clampNumber(value, fallback, minValue, maxValue) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(Math.max(Math.floor(n), minValue), maxValue);
+}
+
+function firstDefined() {
+  for (let i = 0; i < arguments.length; i++) {
+    const value = arguments[i];
+    if (value !== undefined && value !== null) return value;
+  }
+  return undefined;
 }
 
 const ALLOWED_TOP_LEVEL_FIELDS = [
@@ -31,6 +49,8 @@ const ALLOWED_TOP_LEVEL_FIELDS = [
   'Financials',
 ];
 
+const SUMMARY_FILTER_FIELDS = ['General', 'Highlights', 'Valuation', 'SharesStats', 'Technicals'];
+
 const FIELDS_PRESET_MAP = {
   profile: ['General', 'SharesStats'],
   valuation: ['Highlights', 'Valuation'],
@@ -41,8 +61,95 @@ const FIELDS_PRESET_MAP = {
   full: [],
 };
 
+function addParam(params, key, value) {
+  if (value === undefined || value === null) return;
+  const str = String(value).trim();
+  if (!str) return;
+  params.push(key + '=' + encodeURIComponent(str));
+}
+
+function safeNumber(v) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+function trimObjectPeriods(obj, maxPeriods) {
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return obj;
+  const keys = Object.keys(obj);
+  if (keys.length <= maxPeriods) return obj;
+  const trimmed = {};
+  for (let i = 0; i < maxPeriods; i++) {
+    const key = keys[i];
+    trimmed[key] = obj[key];
+  }
+  return trimmed;
+}
+
+function trimArrayPeriods(arr, maxPeriods) {
+  if (!Array.isArray(arr)) return arr;
+  return arr.slice(0, maxPeriods);
+}
+
+function applyPeriodLimit(payload, maxPeriods) {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload) || !maxPeriods) return payload;
+  const out = { ...payload };
+
+  if (out.Earnings && typeof out.Earnings === 'object' && !Array.isArray(out.Earnings)) {
+    const earnings = { ...out.Earnings };
+    earnings.History = trimObjectPeriods(earnings.History, maxPeriods);
+    earnings.history = trimObjectPeriods(earnings.history, maxPeriods);
+    out.Earnings = earnings;
+  }
+
+  if (out.outstandingShares && typeof out.outstandingShares === 'object' && !Array.isArray(out.outstandingShares)) {
+    const shares = { ...out.outstandingShares };
+    shares.annual = trimObjectPeriods(shares.annual, maxPeriods);
+    shares.yearly = trimObjectPeriods(shares.yearly, maxPeriods);
+    shares.quarterly = trimObjectPeriods(shares.quarterly, maxPeriods);
+    shares.quarters = trimObjectPeriods(shares.quarters, maxPeriods);
+    out.outstandingShares = shares;
+  }
+
+  if (out.Financials && typeof out.Financials === 'object' && !Array.isArray(out.Financials)) {
+    const financials = { ...out.Financials };
+    const statements = ['Balance_Sheet', 'Income_Statement', 'Cash_Flow'];
+    for (let i = 0; i < statements.length; i++) {
+      const statementKey = statements[i];
+      const statement = financials[statementKey];
+      if (!statement || typeof statement !== 'object' || Array.isArray(statement)) continue;
+      const statementOut = { ...statement };
+      statementOut.yearly = trimObjectPeriods(statementOut.yearly, maxPeriods);
+      statementOut.quarterly = trimObjectPeriods(statementOut.quarterly, maxPeriods);
+      statementOut.annual = trimObjectPeriods(statementOut.annual, maxPeriods);
+      statementOut.trend = trimArrayPeriods(statementOut.trend, maxPeriods);
+      financials[statementKey] = statementOut;
+    }
+    out.Financials = financials;
+  }
+
+  return out;
+}
+
+async function fetchJson(url, label) {
+  const response = await ld.request({
+    url,
+    method: 'GET',
+    headers: { Accept: 'application/json' },
+    body: null,
+  });
+
+  if (response.status < 200 || response.status >= 300) {
+    const err = new Error(label + ' request failed');
+    err.status = response.status;
+    err.details = response.json || null;
+    throw err;
+  }
+
+  return response.json;
+}
+
 const help = asBool(data.input.help, false);
-const fieldsPresetInput = (data.input.fieldsPreset || '').toString().trim().toLowerCase();
+const fieldsPresetInput = (data.input.fieldsPreset || data.input.fields_preset || '').toString().trim().toLowerCase();
 
 if (help) {
   return {
@@ -53,7 +160,7 @@ if (help) {
         quickChoices: [
           { goal: 'Quick company snapshot', use: { symbol: 'AAPL.US', format: 'summary' } },
           { goal: 'Valuation payload', use: { symbol: 'AAPL.US', fieldsPreset: 'valuation', format: 'raw' } },
-          { goal: 'Financial statement deep dive', use: { symbol: 'AAPL.US', fieldsPreset: 'financials', format: 'raw' } },
+          { goal: 'Financial statement deep dive', use: { symbol: 'AAPL.US', fieldsPreset: 'financials', format: 'raw', periods: 4 } },
         ],
       },
       allowedFields: ALLOWED_TOP_LEVEL_FIELDS,
@@ -86,6 +193,9 @@ if (!apiKey) return { error: true, message: 'Missing auth credential. Set one of
 const symbol = (data.input.symbol || '').toString().trim().toUpperCase();
 const fieldsInput = (data.input.fields || '').toString().trim();
 const formatInput = (data.input.format || 'summary').toString().trim().toLowerCase();
+const periodsInput = firstDefined(data.input.periods, data.input.maxPeriods, data.input.max_periods);
+const hasPeriodsInput = periodsInput !== undefined && periodsInput !== null && String(periodsInput).trim() !== '';
+const periods = hasPeriodsInput ? clampNumber(periodsInput, 8, 1, 40) : null;
 
 if (!symbol) return { error: true, message: 'symbol is required.' };
 if (formatInput !== 'raw' && formatInput !== 'summary') {
@@ -108,40 +218,52 @@ for (let i = 0; i < ALLOWED_TOP_LEVEL_FIELDS.length; i++) {
   allowedFieldsMap[key.toLowerCase()] = key;
 }
 
-function addParam(params, key, value) {
-  if (value === undefined || value === null) return;
-  const str = String(value).trim();
-  if (!str) return;
-  params.push(key + '=' + encodeURIComponent(str));
-}
-
-function safeNumber(v) {
-  const n = Number(v);
-  return Number.isFinite(n) ? n : null;
-}
-
-async function fetchJson(url, label) {
-  const response = await ld.request({
-    url,
-    method: 'GET',
-    headers: { Accept: 'application/json' },
-    body: null,
-  });
-
-  if (response.status < 200 || response.status >= 300) {
-    const err = new Error(label + ' request failed');
-    err.status = response.status;
-    err.details = response.json || null;
-    throw err;
+let fields = [];
+if (fieldsInput) {
+  const parsed = fieldsInput.split(',').map((s) => s.trim()).filter(Boolean);
+  const useAll = parsed.some((v) => v.toLowerCase() === 'all' || v === '*');
+  if (!useAll) {
+    const unknownFields = [];
+    const canonical = [];
+    const seen = {};
+    for (let i = 0; i < parsed.length; i++) {
+      const lower = parsed[i].toLowerCase();
+      const mapped = allowedFieldsMap[lower];
+      if (!mapped) {
+        unknownFields.push(parsed[i]);
+        continue;
+      }
+      if (!seen[mapped]) {
+        seen[mapped] = true;
+        canonical.push(mapped);
+      }
+    }
+    if (unknownFields.length > 0) {
+      return {
+        error: true,
+        message: 'Unknown fields value(s) for fundamentals.',
+        details: {
+          unknownFields,
+          allowedFields: ALLOWED_TOP_LEVEL_FIELDS,
+        },
+      };
+    }
+    fields = canonical;
   }
-
-  return response.json;
+} else if (fieldsPresetInput && fieldsPresetInput !== 'full') {
+  fields = FIELDS_PRESET_MAP[fieldsPresetInput].slice();
 }
 
 try {
   const params = [];
   addParam(params, 'api_token', apiKey);
   addParam(params, 'fmt', 'json');
+  const requestFilterFields = formatInput === 'summary'
+    ? SUMMARY_FILTER_FIELDS
+    : fields;
+  if (requestFilterFields.length > 0) {
+    addParam(params, 'filter', requestFilterFields.join(','));
+  }
   const url = `https://eodhd.com/api/fundamentals/${encodeURIComponent(symbol)}?${params.join('&')}`;
 
   const raw = await fetchJson(url, 'fundamentals');
@@ -149,45 +271,8 @@ try {
     ? Object.keys(raw).sort()
     : [];
 
-  let fields = [];
-  if (fieldsInput) {
-    const parsed = fieldsInput.split(',').map((s) => s.trim()).filter(Boolean);
-    const useAll = parsed.some((v) => v.toLowerCase() === 'all' || v === '*');
-    if (!useAll) {
-      const unknownFields = [];
-      const canonical = [];
-      const seen = {};
-      for (let i = 0; i < parsed.length; i++) {
-        const lower = parsed[i].toLowerCase();
-        const mapped = allowedFieldsMap[lower];
-        if (!mapped) {
-          unknownFields.push(parsed[i]);
-          continue;
-        }
-        if (!seen[mapped]) {
-          seen[mapped] = true;
-          canonical.push(mapped);
-        }
-      }
-      if (unknownFields.length > 0) {
-        return {
-          error: true,
-          message: 'Unknown fields value(s) for fundamentals.',
-          details: {
-            unknownFields,
-            allowedFields: ALLOWED_TOP_LEVEL_FIELDS,
-            availableTopLevelKeys,
-          },
-        };
-      }
-      fields = canonical;
-    }
-  } else if (fieldsPresetInput && fieldsPresetInput !== 'full') {
-    fields = FIELDS_PRESET_MAP[fieldsPresetInput].slice();
-  }
-
   let selected = raw;
-  if (fields.length > 0) {
+  if (formatInput === 'raw' && fields.length > 0) {
     selected = {};
     for (let i = 0; i < fields.length; i++) {
       const key = fields[i];
@@ -195,6 +280,9 @@ try {
         selected[key] = raw[key];
       }
     }
+  }
+  if (formatInput === 'raw' && periods) {
+    selected = applyPeriodLimit(selected, periods);
   }
 
   const general = raw && raw.General ? raw.General : {};
@@ -228,8 +316,10 @@ try {
     endpointDiagnostics: {
       endpoint: '/api/fundamentals/{symbol}',
       symbol,
+      requestFilterFields,
       requestedFields: fields,
       fieldsPreset: fieldsPresetInput || null,
+      periods: periods || null,
       allowedFields: ALLOWED_TOP_LEVEL_FIELDS,
       availableTopLevelKeys,
       responseType: Array.isArray(raw) ? 'array' : typeof raw,
@@ -237,7 +327,13 @@ try {
     metadata: {
       source: 'EODHD atomic action: get_fundamentals',
       generatedAt: new Date().toISOString(),
-      parameters: { symbol, format: formatInput, fields, fieldsPreset: fieldsPresetInput || null },
+      parameters: {
+        symbol,
+        format: formatInput,
+        fields,
+        fieldsPreset: fieldsPresetInput || null,
+        periods: periods || null,
+      },
     },
   };
 } catch (error) {
