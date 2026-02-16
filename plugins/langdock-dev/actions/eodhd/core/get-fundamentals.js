@@ -3,11 +3,13 @@
 //
 // symbol = EODHD symbol (required, e.g. AAPL.US)
 // help = true|false (optional, default false). If true, returns a decision guide and exits.
-// fields_preset = Optional beginner preset: profile|valuation|financials|ownership|technical_snapshot|corporate_actions|full
+// fieldsPreset = Optional beginner preset: profile|valuation|financials|ownership|technical_snapshot|corporate_actions|full
+// fields_preset = snake_case alias for fieldsPreset
 // fields = Optional comma-separated top-level keys to return. Allowed: General,Highlights,Valuation,SharesStats,SplitsDividends,Technicals,Holders,InsiderTransactions,ESGScores,outstandingShares,Earnings,Financials.
 // format = raw|summary (default: summary)
-// max_periods = Optional max historical periods in raw mode for Financials/Earnings/outstandingShares (min: 1, max: 40)
-// canonical input naming uses snake_case. Legacy aliases are still supported for compatibility.
+// periods = Optional max historical periods in raw mode for Financials/Earnings/outstandingShares (min: 1, max: 40)
+// maxPeriods = camelCase alias for periods
+// max_periods = snake_case alias for periods
 
 function asBool(value, defaultValue) {
   if (value === undefined || value === null || value === '') return defaultValue;
@@ -18,38 +20,18 @@ function asBool(value, defaultValue) {
   return defaultValue;
 }
 
-function trimInput(value) {
-  if (value === undefined || value === null) return '';
-  return String(value).trim();
-}
-
-function recordLegacyAliasUsage(usageList, key) {
-  if (usageList.indexOf(key) === -1) usageList.push(key);
-}
-
-function getCanonicalInput(input, canonicalKey, aliases, fallback, legacyUsage) {
-  const canonicalRaw = trimInput(input[canonicalKey]);
-  const aliasValues = {};
-  for (let i = 0; i < aliases.length; i++) {
-    const alias = aliases[i];
-    const aliasRaw = trimInput(input[alias]);
-    if (aliasRaw !== '') {
-      aliasValues[alias] = aliasRaw;
-      if (legacyUsage) recordLegacyAliasUsage(legacyUsage, alias);
-    }
-  }
-  if (canonicalRaw !== '') return canonicalRaw;
-  for (let i = 0; i < aliases.length; i++) {
-    const alias = aliases[i];
-    if (aliasValues[alias] !== undefined) return aliasValues[alias];
-  }
-  return fallback;
-}
-
 function clampNumber(value, fallback, minValue, maxValue) {
   const n = Number(value);
   if (!Number.isFinite(n)) return fallback;
   return Math.min(Math.max(Math.floor(n), minValue), maxValue);
+}
+
+function firstDefined() {
+  for (let i = 0; i < arguments.length; i++) {
+    const value = arguments[i];
+    if (value !== undefined && value !== null) return value;
+  }
+  return undefined;
 }
 
 const ALLOWED_TOP_LEVEL_FIELDS = [
@@ -166,35 +148,8 @@ async function fetchJson(url, label) {
   return response.json;
 }
 
-function deprecationWarnings(inputCompatibility) {
-  if (!inputCompatibility || inputCompatibility.length === 0) return [];
-  return ['Deprecated legacy input key(s) used: ' + inputCompatibility.join(', ') + '. Use snake_case canonical names when possible.'];
-}
-
-const INPUT_ALIASES = {
-  fields_preset: ['fieldsPreset'],
-  max_periods: ['maxPeriods', 'periods'],
-};
-
-const input = (data && data.input) ? data.input : {};
-const inputCompatibility = [];
-const help = asBool(getCanonicalInput(input, 'help', [], false, inputCompatibility), false);
-const fieldsPresetInput = getCanonicalInput(input, 'fields_preset', INPUT_ALIASES.fields_preset, '', inputCompatibility).toLowerCase();
-const fieldsInput = getCanonicalInput(input, 'fields', [], '', inputCompatibility);
-const formatInput = getCanonicalInput(input, 'format', [], 'summary', inputCompatibility).toLowerCase();
-const maxPeriodsInput = getCanonicalInput(input, 'max_periods', INPUT_ALIASES.max_periods, null, inputCompatibility);
-let periods = null;
-if (maxPeriodsInput !== null) {
-  const parsed = Number(maxPeriodsInput);
-  if (!Number.isFinite(parsed) || Math.trunc(parsed) !== parsed || parsed < 1 || parsed > 40) {
-    return {
-      error: true,
-      message: 'max_periods must be an integer between 1 and 40.',
-      details: { max_periods: maxPeriodsInput },
-    };
-  }
-  periods = parsed;
-}
+const help = asBool(data.input.help, false);
+const fieldsPresetInput = (data.input.fieldsPreset || data.input.fields_preset || '').toString().trim().toLowerCase();
 
 if (help) {
   return {
@@ -204,27 +159,21 @@ if (help) {
         whenToUse: 'Use this when you need company profile, valuation, ownership, or accounting fundamentals for one symbol.',
         quickChoices: [
           { goal: 'Quick company snapshot', use: { symbol: 'AAPL.US', format: 'summary' } },
-          { goal: 'Valuation payload', use: { symbol: 'AAPL.US', fields_preset: 'valuation', format: 'raw' } },
-          { goal: 'Financial statement deep dive', use: { symbol: 'AAPL.US', fields_preset: 'financials', format: 'raw', max_periods: 4 } },
+          { goal: 'Valuation payload', use: { symbol: 'AAPL.US', fieldsPreset: 'valuation', format: 'raw' } },
+          { goal: 'Financial statement deep dive', use: { symbol: 'AAPL.US', fieldsPreset: 'financials', format: 'raw', periods: 4 } },
         ],
       },
       allowedFields: ALLOWED_TOP_LEVEL_FIELDS,
       fieldsPresetMap: FIELDS_PRESET_MAP,
       formatOptions: ['raw', 'summary'],
-      migrationNote: {
-        canonicalInputs: ['fields_preset', 'max_periods', 'format'],
-        legacyAliases: ['fieldsPreset', 'maxPeriods', 'periods'],
-      },
     },
     endpointDiagnostics: {
       endpoint: '/api/fundamentals/{symbol}',
       helpOnly: true,
-      aliasWarnings: deprecationWarnings(inputCompatibility),
     },
     metadata: {
       source: 'EODHD atomic action: get_fundamentals',
       generatedAt: new Date().toISOString(),
-      inputCompatibility,
     },
   };
 }
@@ -241,7 +190,12 @@ const apiKey = (
 ).toString().trim();
 if (!apiKey) return { error: true, message: 'Missing auth credential. Set one of: auth.apiKey, auth.apiToken, auth.api_key, auth.api_token, auth.eodhdApiKey' };
 
-const symbol = getCanonicalInput(input, 'symbol', [], '', inputCompatibility).toUpperCase();
+const symbol = (data.input.symbol || '').toString().trim().toUpperCase();
+const fieldsInput = (data.input.fields || '').toString().trim();
+const formatInput = (data.input.format || 'summary').toString().trim().toLowerCase();
+const periodsInput = firstDefined(data.input.periods, data.input.maxPeriods, data.input.max_periods);
+const hasPeriodsInput = periodsInput !== undefined && periodsInput !== null && String(periodsInput).trim() !== '';
+const periods = hasPeriodsInput ? clampNumber(periodsInput, 8, 1, 40) : null;
 
 if (!symbol) return { error: true, message: 'symbol is required.' };
 if (formatInput !== 'raw' && formatInput !== 'summary') {
@@ -250,9 +204,9 @@ if (formatInput !== 'raw' && formatInput !== 'summary') {
 if (fieldsPresetInput && !Object.prototype.hasOwnProperty.call(FIELDS_PRESET_MAP, fieldsPresetInput)) {
   return {
     error: true,
-    message: 'Unknown fields_preset value.',
+    message: 'Unknown fieldsPreset value.',
     details: {
-      fields_preset: fieldsPresetInput,
+      fieldsPresetInput,
       allowedFieldsPresets: Object.keys(FIELDS_PRESET_MAP),
     },
   };
@@ -369,8 +323,6 @@ try {
       allowedFields: ALLOWED_TOP_LEVEL_FIELDS,
       availableTopLevelKeys,
       responseType: Array.isArray(raw) ? 'array' : typeof raw,
-      aliasWarnings: deprecationWarnings(inputCompatibility),
-      inputCompatibility,
     },
     metadata: {
       source: 'EODHD atomic action: get_fundamentals',
@@ -379,10 +331,9 @@ try {
         symbol,
         format: formatInput,
         fields,
-        fields_preset: fieldsPresetInput || null,
-        max_periods: periods || null,
+        fieldsPreset: fieldsPresetInput || null,
+        periods: periods || null,
       },
-      inputCompatibility,
     },
   };
 } catch (error) {
