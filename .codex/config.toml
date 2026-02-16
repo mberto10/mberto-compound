@@ -1,0 +1,22 @@
+# Project-scoped Codex configuration.
+# Note: this file is only applied after you mark the project as Trusted in the Codex app.
+
+[shell_environment_policy]
+# Start from a minimal, safer baseline.
+inherit = "core"
+
+# Forward only the variables you explicitly allow.
+# Add your project's prefixes/vars here.
+include_only = [
+  "PATH",
+  "HOME",
+  "MY_APP_*",
+  "YOUTRACK_API_TOKEN",
+]
+
+# If you need to forward vars that contain TOKEN/KEY/SECRET in the name (e.g. SENTRY_API_TOKEN),
+# Codex may drop them by default unless you enable this.
+ignore_default_excludes = true
+
+# If you want Codex to always inject specific values for this repo, use `set`.
+# set = { NODE_ENV = "test" }
