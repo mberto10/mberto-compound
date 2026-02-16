@@ -1,7 +1,38 @@
 // name = Get Real Time Quote
 // description = Fetches real-time quote snapshot for one symbol from EODHD.
 //
+// help = true|false (optional, default false). If true, returns a decision guide and exits.
 // symbol = EODHD symbol (required, e.g. AAPL.US)
+
+function asBool(value, defaultValue) {
+  if (value === undefined || value === null || value === '') return defaultValue;
+  if (value === true || value === false) return value;
+  const normalized = String(value).trim().toLowerCase();
+  if (normalized === 'true' || normalized === '1' || normalized === 'yes') return true;
+  if (normalized === 'false' || normalized === '0' || normalized === 'no') return false;
+  return defaultValue;
+}
+
+const help = asBool(data.input.help, false);
+if (help) {
+  return {
+    data: {
+      action: 'get_real_time_quote',
+      decisionGuide: {
+        whenToUse: 'Use this for latest live quote checks (price now, daily range, volume) for a single symbol.',
+        quickChoice: { symbol: 'AAPL.US' },
+      },
+    },
+    endpointDiagnostics: {
+      endpoint: '/api/real-time/{symbol}',
+      helpOnly: true,
+    },
+    metadata: {
+      source: 'EODHD atomic action: get_real_time_quote',
+      generatedAt: new Date().toISOString(),
+    },
+  };
+}
 
 const apiKey = (data.auth.apiKey || '').toString().trim();
 if (!apiKey) return { error: true, message: 'Missing auth.apiKey' };
@@ -81,4 +112,3 @@ try {
     status: error.status || null,
   };
 }
-
