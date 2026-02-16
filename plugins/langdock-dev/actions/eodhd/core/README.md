@@ -32,3 +32,45 @@ Single-endpoint Langdock actions for EODHD. These are building blocks for bundle
   - `data`
   - `endpointDiagnostics`
   - `metadata`
+
+## Input Vocabularies
+
+- `get_fundamentals.fields` allowed keys:
+  - `General`
+  - `Highlights`
+  - `Valuation`
+  - `SharesStats`
+  - `SplitsDividends`
+  - `Technicals`
+  - `Holders`
+  - `InsiderTransactions`
+  - `ESGScores`
+  - `outstandingShares`
+  - `Earnings`
+  - `Financials`
+- `get_calendar_events.calendarType` allowed values:
+  - `earnings`
+  - `dividends`
+  - `splits`
+  - `ipos`
+  - `economic_events`
+- `get_technical_indicator.function` common values:
+  - `rsi`
+  - `sma`
+  - `ema`
+  - `wma`
+  - `macd`
+  - `atr`
+  - `adx`
+  - `stochastic`
+  - `cci`
+  - `williams`
+  - `mfi`
+  - `bbands`
+- `run_screener.sort` common values:
+  - `market_capitalization.desc`
+  - `market_capitalization.asc`
+  - `name.asc`
+  - `name.desc`
+  - `volume.desc`
+  - `change_p.desc`

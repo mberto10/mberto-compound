@@ -2,7 +2,7 @@
 // description = Fetches EODHD fundamentals for one symbol with optional top-level field selection and compact summary.
 //
 // symbol = EODHD symbol (required, e.g. AAPL.US)
-// fields = Optional comma-separated top-level keys to return (e.g. General,Highlights,Valuation)
+// fields = Optional comma-separated top-level keys to return. Allowed: General,Highlights,Valuation,SharesStats,SplitsDividends,Technicals,Holders,InsiderTransactions,ESGScores,outstandingShares,Earnings,Financials.
 // format = raw|summary (default: raw)
 
 const apiKey = (data.auth.apiKey || '').toString().trim();
@@ -15,6 +15,26 @@ const formatInput = (data.input.format || 'raw').toString().trim().toLowerCase()
 if (!symbol) return { error: true, message: 'symbol is required.' };
 if (formatInput !== 'raw' && formatInput !== 'summary') {
   return { error: true, message: 'format must be raw or summary.' };
+}
+
+const ALLOWED_TOP_LEVEL_FIELDS = [
+  'General',
+  'Highlights',
+  'Valuation',
+  'SharesStats',
+  'SplitsDividends',
+  'Technicals',
+  'Holders',
+  'InsiderTransactions',
+  'ESGScores',
+  'outstandingShares',
+  'Earnings',
+  'Financials',
+];
+const allowedFieldsMap = {};
+for (let i = 0; i < ALLOWED_TOP_LEVEL_FIELDS.length; i++) {
+  const key = ALLOWED_TOP_LEVEL_FIELDS[i];
+  allowedFieldsMap[key.toLowerCase()] = key;
 }
 
 function addParam(params, key, value) {
@@ -54,9 +74,44 @@ try {
   const url = `https://eodhd.com/api/fundamentals/${encodeURIComponent(symbol)}?${params.join('&')}`;
 
   const raw = await fetchJson(url, 'fundamentals');
-  const fields = fieldsInput
-    ? fieldsInput.split(',').map((s) => s.trim()).filter(Boolean)
+  const availableTopLevelKeys = raw && typeof raw === 'object' && !Array.isArray(raw)
+    ? Object.keys(raw).sort()
     : [];
+
+  let fields = [];
+  if (fieldsInput) {
+    const parsed = fieldsInput.split(',').map((s) => s.trim()).filter(Boolean);
+    const useAll = parsed.some((v) => v.toLowerCase() === 'all' || v === '*');
+    if (!useAll) {
+      const unknownFields = [];
+      const canonical = [];
+      const seen = {};
+      for (let i = 0; i < parsed.length; i++) {
+        const lower = parsed[i].toLowerCase();
+        const mapped = allowedFieldsMap[lower];
+        if (!mapped) {
+          unknownFields.push(parsed[i]);
+          continue;
+        }
+        if (!seen[mapped]) {
+          seen[mapped] = true;
+          canonical.push(mapped);
+        }
+      }
+      if (unknownFields.length > 0) {
+        return {
+          error: true,
+          message: 'Unknown fields value(s) for fundamentals.',
+          details: {
+            unknownFields,
+            allowedFields: ALLOWED_TOP_LEVEL_FIELDS,
+            availableTopLevelKeys,
+          },
+        };
+      }
+      fields = canonical;
+    }
+  }
 
   let selected = raw;
   if (fields.length > 0) {
@@ -101,6 +156,8 @@ try {
       endpoint: '/api/fundamentals/{symbol}',
       symbol,
       requestedFields: fields,
+      allowedFields: ALLOWED_TOP_LEVEL_FIELDS,
+      availableTopLevelKeys,
       responseType: Array.isArray(raw) ? 'array' : typeof raw,
     },
     metadata: {
@@ -117,4 +174,3 @@ try {
     status: error.status || null,
   };
 }
-

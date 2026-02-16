@@ -25,6 +25,10 @@ Atomic wrappers are reusable building blocks for assistants and bundles.
 | `get_news_sentiment` | `core/get-news-sentiment.js` | `/api/news` |
 | `get_real_time_quote` | `core/get-real-time-quote.js` | `/api/real-time/{symbol}` |
 
+Input vocabulary reference (allowed/common values) is documented in:
+
+- `core/README.md` under `Input Vocabularies`
+
 Already available in your Langdock workspace:
 
 - `search_instruments`
@@ -54,4 +58,3 @@ Editorial-grade actions combining multiple EODHD endpoints.
 - Sequential `await ld.request(...)` calls (Langdock runtime compatible).
 - Avoid `URLSearchParams`; use manual query-string encoding.
 - Explicit outputs with diagnostics for reliability.
-
