@@ -587,13 +587,16 @@ try {
       alignedBenchmarkReturns.push(Math.log(bCurr / bPrev));
     }
 
-    const cov = covariance(alignedSymbolReturns, alignedBenchmarkReturns);
-    const benchVar = stddev(alignedBenchmarkReturns);
+    const betaWindow = 60;
+    const betaSymbolReturns = alignedSymbolReturns.slice(Math.max(0, alignedSymbolReturns.length - betaWindow));
+    const betaBenchmarkReturns = alignedBenchmarkReturns.slice(Math.max(0, alignedBenchmarkReturns.length - betaWindow));
+    const cov = covariance(betaSymbolReturns, betaBenchmarkReturns);
+    const benchVar = stddev(betaBenchmarkReturns);
     const benchVariance = Number.isFinite(benchVar) ? benchVar * benchVar : null;
     const beta = Number.isFinite(cov) && Number.isFinite(benchVariance) && benchVariance > 0 ? cov / benchVariance : null;
 
     const benchmarkCloses = benchmarkRows.map((r) => r.close).filter((v) => Number.isFinite(v));
-    const benchmarkReturn1m = computeReturnByOffset(benchmarkCloses, 21);
+    const benchmarkReturn1m = computeReturnByOffset(benchmarkCloses, 20);
     const benchmarkReturn3m = computeReturnByOffset(benchmarkCloses, 63);
 
     relativePerformance = {
