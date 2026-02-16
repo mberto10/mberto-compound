@@ -1,5 +1,5 @@
-// name = Screen To Story
-// description = Converts screener output into an editorial shortlist with scored rationale and key risks.
+// name = Screen To Story Details
+// description = Returns full ranked candidate tables and score decomposition for screen-to-story runs.
 //
 // screenerFilters = Screener filters JSON string (optional if screenerSignals provided)
 // screenerSignals = Screener signals (comma-separated, optional if screenerFilters provided)
@@ -12,7 +12,8 @@
 // includeNews = Include news intensity/rationale (default: true)
 // newsDays = News lookback days (default: 7, min: 1, max: 60)
 // newsLimit = Max news items to fetch (default: 100, min: 1, max: 250)
-// outputMode = compact|full (default: compact)
+// outputMode = compact|full (default: full)
+// tableLimit = Max rows for full ranked candidate tables (default: compact=50, full=200, min: 1, max: 500)
 
 const auth = (data && data.auth) ? data.auth : {};
 const apiKey = (
@@ -195,13 +196,12 @@ const rsiPeriod = clampNumber(data.input.rsiPeriod, 14, 2, 50);
 const includeNews = asBool(data.input.includeNews, true);
 const newsDays = clampNumber(data.input.newsDays, 7, 1, 60);
 const newsLimit = clampNumber(data.input.newsLimit, 100, 1, 250);
-const outputMode = (data.input.outputMode || 'compact').toString().trim().toLowerCase();
+const outputMode = (data.input.outputMode || 'full').toString().trim().toLowerCase();
+if (outputMode !== 'compact' && outputMode !== 'full') return { error: true, message: 'outputMode must be compact or full.' };
+const tableLimit = clampNumber(data.input.tableLimit, outputMode === 'compact' ? 50 : 200, 1, 500);
 
 if (!screenerFilters && !screenerSignals) {
   return { error: true, message: 'Provide screenerFilters or screenerSignals for screen_to_story.' };
-}
-if (outputMode !== 'compact' && outputMode !== 'full') {
-  return { error: true, message: 'outputMode must be compact or full.' };
 }
 
 let parsedFilters = null;
@@ -454,25 +454,27 @@ try {
   }
 
   scoredCandidates.sort((a, b) => b.compositeScore - a.compositeScore);
-  const compactTableCap = 10;
-  const shortlistLimit = outputMode === 'compact' ? Math.min(shortlistSize, compactTableCap) : shortlistSize;
-  const shortlist = scoredCandidates.slice(0, shortlistLimit);
+  const fullRankedCandidates = scoredCandidates.slice(0, tableLimit);
+  let shortlist = fullRankedCandidates.slice(0, shortlistSize);
+  if (shortlist.length === fullRankedCandidates.length) shortlist = [];
+  const rejected = shortlist.length === 0 ? [] : fullRankedCandidates.slice(shortlistSize);
 
   const keyTakeaways = [];
   keyTakeaways.push(`Screen generated ${scoredCandidates.length} scored candidates; shortlist contains ${shortlist.length}.`);
-  keyTakeaways.push(`Top idea: ${shortlist[0].symbol} (composite ${shortlist[0].compositeScore}).`);
-  keyTakeaways.push(`Median shortlist composite score: ${round(mean(shortlist.map((x) => x.compositeScore)), 2)}.`);
+  const topIdeaRow = shortlist[0] || fullRankedCandidates[0] || null;
+  if (topIdeaRow) keyTakeaways.push(`Top idea: ${topIdeaRow.symbol} (composite ${topIdeaRow.compositeScore}).`);
+  if (shortlist.length > 0) keyTakeaways.push(`Median shortlist composite score: ${round(mean(shortlist.map((x) => x.compositeScore)), 2)}.`);
 
   if (diagnostics.errors.length > 0) {
     riskFlags.push(`${diagnostics.errors.length} endpoint call(s) failed; results are based on partial enrichment for affected symbols.`);
   }
 
   const truncationNotes = [];
-  if (outputMode === 'compact' && shortlistSize > compactTableCap) {
-    truncationNotes.push(`Compact mode capped shortlist to ${compactTableCap} rows.`);
+  if (scoredCandidates.length > fullRankedCandidates.length) {
+    truncationNotes.push(`fullRankedCandidates truncated to ${fullRankedCandidates.length} rows.`);
   }
-  if (scoredCandidates.length > shortlist.length) {
-    truncationNotes.push(`Summary output omits ${scoredCandidates.length - shortlist.length} additional ranked candidates; use screen_to_story_details for full ranking.`);
+  if (shortlist.length === 0 && fullRankedCandidates.length > 0) {
+    truncationNotes.push('shortlist and outsideShortlist omitted because they would duplicate fullRankedCandidates.');
   }
   const endpointDiagnostics = Object.assign({}, diagnostics, {
     outputMode,
@@ -484,11 +486,13 @@ try {
     headline_summary: {
       candidatesAnalyzed: scoredCandidates.length,
       shortlistSize: shortlist.length,
-      topIdea: shortlist[0] ? { symbol: shortlist[0].symbol, compositeScore: shortlist[0].compositeScore } : null,
+      topIdea: topIdeaRow ? { symbol: topIdeaRow.symbol, compositeScore: topIdeaRow.compositeScore } : null,
       screenerSort,
     },
     tables: {
       shortlist,
+      fullRankedCandidates,
+      outsideShortlist: rejected,
     },
     key_takeaways: keyTakeaways,
     risk_flags: riskFlags,
@@ -511,9 +515,9 @@ try {
       narrativeScore: 'heuristic from recent headline intensity',
     },
     metadata: {
-      source: 'EODHD bundle action: screen_to_story',
-      actionType: 'summary',
-      pairedAction: 'screen_to_story_details',
+      source: 'EODHD bundle action: screen_to_story_details',
+      actionType: 'details',
+      pairedAction: 'screen_to_story',
       generatedAt: new Date().toISOString(),
       parameters: {
         candidateLimit,
@@ -527,13 +531,14 @@ try {
         screenerFiltersProvided: Boolean(parsedFilters),
         screenerSignals: screenerSignals || null,
         outputMode,
+        tableLimit,
       },
     },
   };
 } catch (error) {
   return {
     error: true,
-    message: 'screen_to_story failed',
+    message: 'screen_to_story_details failed',
     details: error.message || String(error),
   };
 }

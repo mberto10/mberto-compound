@@ -6,9 +6,11 @@
 // windowPreset = Optional date shortcut: today|last_7d|last_30d
 // from = Optional YYYY-MM-DD start date (or use windowPreset)
 // to = Optional YYYY-MM-DD end date (or use windowPreset)
-// limit = Optional max items (default: 50, min: 1, max: 200)
+// limit = Optional max items (default: 20, min: 1, max: 200)
 // offset = Optional pagination offset (default: 0, min: 0)
 // s = Optional direct EODHD news s-query override (if set, it is used as-is; example: AAPL.US,MSFT.US)
+// outputMode = compact|full (default: compact)
+// contentMaxChars = Maximum content chars per item in compact mode (default: 280, min: 80, max: 5000)
 
 function asBool(value, defaultValue) {
   if (value === undefined || value === null || value === '') return defaultValue;
@@ -55,14 +57,18 @@ function toSymbolsQuery(symbols) {
   return parts.join(',');
 }
 
-function normalizeItem(item) {
+function normalizeItem(item, outputMode, contentMaxChars) {
   const symbols = Array.isArray(item.symbols)
     ? item.symbols
     : (item.symbol ? [item.symbol] : []);
+  const contentRaw = (item.content || item.text || '').toString();
+  const content = outputMode === 'full'
+    ? (contentRaw || null)
+    : (contentRaw ? contentRaw.slice(0, contentMaxChars) : null);
   return {
     date: (item.date || item.publishedAt || '').toString() || null,
     title: (item.title || '').toString() || null,
-    content: (item.content || item.text || '').toString() || null,
+    content,
     source: (item.source || item.site || '').toString() || null,
     link: (item.link || item.url || '').toString() || null,
     symbols,
@@ -105,6 +111,8 @@ if (help) {
         ],
       },
       windowPresetOptions: WINDOW_PRESETS,
+      outputModeOptions: ['compact', 'full'],
+      contentMaxCharsDefault: 280,
     },
     endpointDiagnostics: {
       endpoint: '/api/news',
@@ -117,14 +125,29 @@ if (help) {
   };
 }
 
-const apiKey = (data.auth.apiKey || '').toString().trim();
-if (!apiKey) return { error: true, message: 'Missing auth.apiKey' };
+const auth = (data && data.auth) ? data.auth : {};
+const apiKey = (
+  auth.apiKey ||
+  auth.api_key ||
+  auth.apiToken ||
+  auth.api_token ||
+  auth.eodhdApiKey ||
+  auth.EODHD_API_KEY ||
+  ''
+).toString().trim();
+if (!apiKey) return { error: true, message: 'Missing auth credential. Set one of: auth.apiKey, auth.apiToken, auth.api_key, auth.api_token, auth.eodhdApiKey' };
 
 const symbolsInput = (data.input.symbols || '').toString().trim();
 const sOverride = (data.input.s || '').toString().trim();
 const windowPreset = (data.input.windowPreset || '').toString().trim().toLowerCase();
+const outputMode = (data.input.outputMode || 'compact').toString().trim().toLowerCase();
 let from = (data.input.from || '').toString().trim();
 let to = (data.input.to || '').toString().trim();
+const contentMaxChars = clampNumber(data.input.contentMaxChars, 280, 80, 5000);
+
+if (outputMode !== 'compact' && outputMode !== 'full') {
+  return { error: true, message: 'outputMode must be compact or full.' };
+}
 
 if (windowPreset) {
   if (WINDOW_PRESETS.indexOf(windowPreset) === -1) {
@@ -154,7 +177,7 @@ if (!isValidDateString(from) || !isValidDateString(to)) {
 }
 if (from && to && from > to) return { error: true, message: 'from must be <= to.' };
 
-const limit = clampNumber(data.input.limit, 50, 1, 200);
+const limit = clampNumber(data.input.limit, 20, 1, 200);
 const offset = clampNumber(data.input.offset, 0, 0, 1000000);
 
 try {
@@ -175,14 +198,16 @@ try {
   const rows = Array.isArray(payload)
     ? payload
     : (Array.isArray(payload.data) ? payload.data : (Array.isArray(payload.results) ? payload.results : []));
-  const normalized = rows.map(normalizeItem);
+  const normalized = rows.map((item) => normalizeItem(item, outputMode, contentMaxChars));
+
+  const dataBlock = {
+    count: normalized.length,
+    rows: normalized,
+  };
+  if (outputMode === 'full') dataBlock.rawRows = rows;
 
   return {
-    data: {
-      count: normalized.length,
-      rows: normalized,
-      rawRows: rows,
-    },
+    data: dataBlock,
     endpointDiagnostics: {
       endpoint: '/api/news',
       parameters: {
@@ -192,6 +217,8 @@ try {
         limit,
         offset,
         windowPreset: windowPreset || null,
+        outputMode,
+        contentMaxChars: outputMode === 'compact' ? contentMaxChars : null,
       },
       queryMode,
       windowPresetOptions: WINDOW_PRESETS,

@@ -1,5 +1,5 @@
-// name = Single Stock Deep Dive
-// description = Produces a comprehensive single-stock dossier combining fundamentals, price action, technical state, catalysts, and sentiment context.
+// name = Single Stock Deep Dive Details
+// description = Returns full detailed single-stock dossier tables (news set, catalysts, and deep metrics).
 //
 // symbol = EODHD symbol (e.g. AAPL.US) (required)
 // benchmarkSymbol = Optional benchmark symbol for relative performance (no default)
@@ -12,7 +12,9 @@
 // includeTechnicals = Include RSI and trend assessment (default: true)
 // rsiPeriod = RSI period (default: 14, min: 2, max: 50)
 // newsLimit = News items limit (default: 30, min: 1, max: 100)
-// outputMode = compact|full (default: compact)
+// outputMode = compact|full (default: full)
+// headlineLimit = Max rows in detailed news table (default: compact=20, full=newsLimit, min: 1, max: 200)
+// catalystLimit = Max rows per catalyst type (default: compact=20, full=60, min: 1, max: 200)
 
 const auth = (data && data.auth) ? data.auth : {};
 const apiKey = (
@@ -363,10 +365,12 @@ const calendarForwardDays = clampNumber(data.input.calendarForwardDays, 180, 7, 
 const includeTechnicals = asBool(data.input.includeTechnicals, true);
 const rsiPeriod = clampNumber(data.input.rsiPeriod, 14, 2, 50);
 const newsLimit = clampNumber(data.input.newsLimit, 30, 1, 100);
-const outputMode = (data.input.outputMode || 'compact').toString().trim().toLowerCase();
+const outputMode = (data.input.outputMode || 'full').toString().trim().toLowerCase();
+if (outputMode !== 'compact' && outputMode !== 'full') return { error: true, message: 'outputMode must be compact or full.' };
+const headlineLimit = clampNumber(data.input.headlineLimit, outputMode === 'compact' ? 20 : newsLimit, 1, 200);
+const catalystLimit = clampNumber(data.input.catalystLimit, outputMode === 'compact' ? 20 : 60, 1, 200);
 
 if (!symbol) return { error: true, message: 'symbol is required' };
-if (outputMode !== 'compact' && outputMode !== 'full') return { error: true, message: 'outputMode must be compact or full.' };
 
 const diagnostics = {
   calls: {
@@ -646,43 +650,47 @@ try {
     riskFlags.push('Fundamentals unavailable; accounting/valuation sections are partial.');
   }
 
-  const compactNestedCap = 3;
-  const headlineLimit = outputMode === 'compact' ? compactNestedCap : 8;
-  const catalystItemLimit = outputMode === 'compact' ? compactNestedCap : 10;
-  const topHeadlines = newsItems.slice(0, headlineLimit).map((item) => ({
+  const newsItemsOut = newsItems.slice(0, headlineLimit).map((item) => ({
     date: item.date || null,
     title: item.title || null,
     source: item.source || null,
     link: item.link || null,
+    symbols: item.symbols || null,
+    tags: item.tags || null,
   }));
-  const upcomingEarnings = calendarTimeline.earnings.slice(0, catalystItemLimit).map((item) => ({
-    date: item.date || null,
-    title: item.title || null,
-    type: item.type || 'earnings',
-  }));
-  const upcomingDividends = calendarTimeline.dividends.slice(0, catalystItemLimit).map((item) => ({
-    date: item.date || null,
-    title: item.title || null,
-    type: item.type || 'dividends',
-  }));
-  const upcomingSplits = calendarTimeline.splits.slice(0, catalystItemLimit).map((item) => ({
-    date: item.date || null,
-    title: item.title || null,
-    type: item.type || 'splits',
-  }));
+  const calendarTimelineOut = {
+    earnings: calendarTimeline.earnings.slice(0, catalystLimit).map((item) => ({
+      date: item.date || null,
+      type: item.type || 'earnings',
+      title: item.title || null,
+      ...(outputMode === 'full' ? { payload: item.payload || null } : {}),
+    })),
+    dividends: calendarTimeline.dividends.slice(0, catalystLimit).map((item) => ({
+      date: item.date || null,
+      type: item.type || 'dividends',
+      title: item.title || null,
+      ...(outputMode === 'full' ? { payload: item.payload || null } : {}),
+    })),
+    splits: calendarTimeline.splits.slice(0, catalystLimit).map((item) => ({
+      date: item.date || null,
+      type: item.type || 'splits',
+      title: item.title || null,
+      ...(outputMode === 'full' ? { payload: item.payload || null } : {}),
+    })),
+  };
 
   const truncationNotes = [];
-  if (newsItems.length > topHeadlines.length) {
-    truncationNotes.push(`Top headlines truncated to ${topHeadlines.length} rows.`);
+  if (newsItems.length > newsItemsOut.length) {
+    truncationNotes.push(`newsItems truncated to ${newsItemsOut.length} rows.`);
   }
-  if (calendarTimeline.earnings.length > upcomingEarnings.length) {
-    truncationNotes.push(`Earnings timeline truncated to ${upcomingEarnings.length} rows.`);
+  if (calendarTimeline.earnings.length > calendarTimelineOut.earnings.length) {
+    truncationNotes.push(`earnings catalyst timeline truncated to ${calendarTimelineOut.earnings.length} rows.`);
   }
-  if (calendarTimeline.dividends.length > upcomingDividends.length) {
-    truncationNotes.push(`Dividends timeline truncated to ${upcomingDividends.length} rows.`);
+  if (calendarTimeline.dividends.length > calendarTimelineOut.dividends.length) {
+    truncationNotes.push(`dividends catalyst timeline truncated to ${calendarTimelineOut.dividends.length} rows.`);
   }
-  if (calendarTimeline.splits.length > upcomingSplits.length) {
-    truncationNotes.push(`Splits timeline truncated to ${upcomingSplits.length} rows.`);
+  if (calendarTimeline.splits.length > calendarTimelineOut.splits.length) {
+    truncationNotes.push(`splits catalyst timeline truncated to ${calendarTimelineOut.splits.length} rows.`);
   }
   const endpointDiagnostics = Object.assign({}, diagnostics, {
     outputMode,
@@ -798,10 +806,8 @@ try {
       splitsCount: calendarTimeline.splits.length,
     },
     tables: {
-      topHeadlines,
-      upcomingEarnings,
-      upcomingDividends,
-      upcomingSplits,
+      newsItems: newsItemsOut,
+      catalystTimeline: calendarTimelineOut,
     },
     key_takeaways: keyTakeaways,
     risk_flags: riskFlags,
@@ -817,9 +823,9 @@ try {
       trendState: 'derived from close vs SMA20/SMA50/SMA200 hierarchy',
     },
     metadata: {
-      source: 'EODHD bundle action: single_stock_deep_dive',
-      actionType: 'summary',
-      pairedAction: 'single_stock_deep_dive_details',
+      source: 'EODHD bundle action: single_stock_deep_dive_details',
+      actionType: 'details',
+      pairedAction: 'single_stock_deep_dive',
       generatedAt: new Date().toISOString(),
       parameters: {
         symbol,
@@ -833,13 +839,15 @@ try {
         includeTechnicals,
         rsiPeriod,
         outputMode,
+        headlineLimit,
+        catalystLimit,
       },
     },
   };
 } catch (error) {
   return {
     error: true,
-    message: 'single_stock_deep_dive failed',
+    message: 'single_stock_deep_dive_details failed',
     details: error.message || String(error),
   };
 }

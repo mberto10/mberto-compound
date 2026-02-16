@@ -1,5 +1,5 @@
-// name = Valuation Vs Momentum Conflicts
-// description = Detects cheap/expensive valuation regimes against momentum state and ranks convergence/conflict setups.
+// name = Valuation Vs Momentum Conflicts Details
+// description = Returns full ranked valuation-vs-momentum setup tables and bucketed detail rows.
 //
 // symbols = Optional comma-separated symbols to analyze (e.g. AAPL.US,MSFT.US)
 // screenerFilters = Optional screener filters JSON string (required if symbols not provided)
@@ -14,7 +14,8 @@
 // peExpensiveThreshold = Expensive PE threshold (default: 30)
 // pbCheapThreshold = Cheap P/B threshold (default: 2)
 // pbExpensiveThreshold = Expensive P/B threshold (default: 5)
-// outputMode = compact|full (default: compact)
+// outputMode = compact|full (default: full)
+// tableLimit = Max rows for fullRanked table (default: compact=50, full=200, min: 1, max: 500)
 
 const auth = (data && data.auth) ? data.auth : {};
 const apiKey = (
@@ -92,6 +93,11 @@ function dedupeSymbols(symbols) {
     out.push(s);
   }
   return out;
+}
+
+function sameRows(a, b) {
+  if (!Array.isArray(a) || !Array.isArray(b)) return false;
+  return JSON.stringify(a) === JSON.stringify(b);
 }
 
 function extractSymbol(row) {
@@ -208,8 +214,9 @@ const peCheapThreshold = clampNumber(data.input.peCheapThreshold, 15, 1, 100);
 const peExpensiveThreshold = clampNumber(data.input.peExpensiveThreshold, 30, 2, 200);
 const pbCheapThreshold = clampNumber(data.input.pbCheapThreshold, 2, 0.1, 30);
 const pbExpensiveThreshold = clampNumber(data.input.pbExpensiveThreshold, 5, 0.2, 50);
-const outputMode = (data.input.outputMode || 'compact').toString().trim().toLowerCase();
+const outputMode = (data.input.outputMode || 'full').toString().trim().toLowerCase();
 if (outputMode !== 'compact' && outputMode !== 'full') return { error: true, message: 'outputMode must be compact or full.' };
+const tableLimit = clampNumber(data.input.tableLimit, outputMode === 'compact' ? 50 : 200, 1, 500);
 
 let parsedFilters = null;
 if (screenerFilters) {
@@ -370,13 +377,14 @@ try {
 
   rows.sort((a, b) => b.convictionScore - a.convictionScore);
 
-  const compactTableCap = 10;
-  const tableLimit = outputMode === 'compact' ? Math.min(resultLimit, compactTableCap) : resultLimit;
-  const bullishConvergence = rows.filter((r) => r.setupType === 'bullish-convergence').slice(0, tableLimit);
-  const bearishConvergence = rows.filter((r) => r.setupType === 'bearish-convergence').slice(0, tableLimit);
-  const conflictExpensiveStrong = rows.filter((r) => r.setupType === 'conflict-expensive-strong').slice(0, tableLimit);
-  const conflictCheapWeak = rows.filter((r) => r.setupType === 'conflict-cheap-weak').slice(0, tableLimit);
-  const neutralOrOther = rows.filter((r) => r.setupType === 'unclassified').slice(0, tableLimit);
+  const bucketLimit = outputMode === 'compact' ? Math.min(resultLimit, 10) : resultLimit;
+  const bullishConvergence = rows.filter((r) => r.setupType === 'bullish-convergence').slice(0, bucketLimit);
+  const bearishConvergence = rows.filter((r) => r.setupType === 'bearish-convergence').slice(0, bucketLimit);
+  const conflictExpensiveStrong = rows.filter((r) => r.setupType === 'conflict-expensive-strong').slice(0, bucketLimit);
+  const conflictCheapWeak = rows.filter((r) => r.setupType === 'conflict-cheap-weak').slice(0, bucketLimit);
+  const neutralOrOtherRaw = rows.filter((r) => r.setupType === 'unclassified').slice(0, bucketLimit);
+  const fullRanked = rows.slice(0, tableLimit);
+  const neutralOrOther = sameRows(fullRanked, neutralOrOtherRaw) ? [] : neutralOrOtherRaw;
 
   const keyTakeaways = [];
   keyTakeaways.push(`Analyzed ${rows.length} symbols for valuation-momentum relationship.`);
@@ -389,11 +397,14 @@ try {
   }
 
   const truncationNotes = [];
-  if (outputMode === 'compact' && resultLimit > compactTableCap) {
-    truncationNotes.push(`Compact mode capped bucket tables to ${compactTableCap} rows each.`);
+  if (rows.length > fullRanked.length) {
+    truncationNotes.push(`fullRanked truncated to ${fullRanked.length} rows.`);
   }
-  if (rows.length > tableLimit) {
-    truncationNotes.push(`Summary output omits ${rows.length - tableLimit} additional ranked setups; use valuation_vs_momentum_conflicts_details for full ranking.`);
+  if (outputMode === 'compact' && resultLimit > 10) {
+    truncationNotes.push('Compact mode capped bucket tables to 10 rows.');
+  }
+  if (neutralOrOther.length === 0 && neutralOrOtherRaw.length > 0) {
+    truncationNotes.push('neutralOrOther omitted because it duplicated fullRanked for this dataset.');
   }
   const endpointDiagnostics = Object.assign({}, diagnostics, {
     outputMode,
@@ -413,6 +424,7 @@ try {
       },
     },
     tables: {
+      fullRanked,
       bullishConvergence,
       bearishConvergence,
       conflictExpensiveStrong,
@@ -438,9 +450,9 @@ try {
       convictionScore: 'valuation stretch beyond thresholds + momentum magnitude',
     },
     metadata: {
-      source: 'EODHD bundle action: valuation_vs_momentum_conflicts',
-      actionType: 'summary',
-      pairedAction: 'valuation_vs_momentum_conflicts_details',
+      source: 'EODHD bundle action: valuation_vs_momentum_conflicts_details',
+      actionType: 'details',
+      pairedAction: 'valuation_vs_momentum_conflicts',
       generatedAt: new Date().toISOString(),
       parameters: {
         candidateLimit,
@@ -456,13 +468,14 @@ try {
         screenerFiltersProvided: Boolean(parsedFilters),
         screenerSignals: screenerSignals || null,
         outputMode,
+        tableLimit,
       },
     },
   };
 } catch (error) {
   return {
     error: true,
-    message: 'valuation_vs_momentum_conflicts failed',
+    message: 'valuation_vs_momentum_conflicts_details failed',
     details: error.message || String(error),
   };
 }

@@ -3,6 +3,7 @@
 //
 // help = true|false (optional, default false). If true, returns a decision guide and exits.
 // symbol = EODHD symbol (required, e.g. AAPL.US)
+// outputMode = compact|full (default: compact)
 
 function asBool(value, defaultValue) {
   if (value === undefined || value === null || value === '') return defaultValue;
@@ -14,6 +15,7 @@ function asBool(value, defaultValue) {
 }
 
 const help = asBool(data.input.help, false);
+const outputMode = (data.input.outputMode || 'compact').toString().trim().toLowerCase();
 if (help) {
   return {
     data: {
@@ -22,6 +24,7 @@ if (help) {
         whenToUse: 'Use this for latest live quote checks (price now, daily range, volume) for a single symbol.',
         quickChoice: { symbol: 'AAPL.US' },
       },
+      outputModeOptions: ['compact', 'full'],
     },
     endpointDiagnostics: {
       endpoint: '/api/real-time/{symbol}',
@@ -34,8 +37,18 @@ if (help) {
   };
 }
 
-const apiKey = (data.auth.apiKey || '').toString().trim();
-if (!apiKey) return { error: true, message: 'Missing auth.apiKey' };
+const auth = (data && data.auth) ? data.auth : {};
+const apiKey = (
+  auth.apiKey ||
+  auth.api_key ||
+  auth.apiToken ||
+  auth.api_token ||
+  auth.eodhdApiKey ||
+  auth.EODHD_API_KEY ||
+  ''
+).toString().trim();
+if (!apiKey) return { error: true, message: 'Missing auth credential. Set one of: auth.apiKey, auth.apiToken, auth.api_key, auth.api_token, auth.eodhdApiKey' };
+if (outputMode !== 'compact' && outputMode !== 'full') return { error: true, message: 'outputMode must be compact or full.' };
 
 const symbol = (data.input.symbol || '').toString().trim().toUpperCase();
 if (!symbol) return { error: true, message: 'symbol is required.' };
@@ -81,23 +94,26 @@ try {
   const lastPrice = safeNumber(payload.close);
   const changePct = lastClose && lastPrice ? ((lastPrice - lastClose) / lastClose) * 100 : null;
 
+  const dataBlock = {
+    symbol,
+    timestamp: payload.timestamp || payload.latestUpdate || null,
+    close: lastPrice,
+    previousClose: lastClose,
+    change: safeNumber(payload.change),
+    changePct,
+    open: safeNumber(payload.open),
+    high: safeNumber(payload.high),
+    low: safeNumber(payload.low),
+    volume: safeNumber(payload.volume),
+  };
+  if (outputMode === 'full') dataBlock.raw = payload;
+
   return {
-    data: {
-      symbol,
-      timestamp: payload.timestamp || payload.latestUpdate || null,
-      close: lastPrice,
-      previousClose: lastClose,
-      change: safeNumber(payload.change),
-      changePct,
-      open: safeNumber(payload.open),
-      high: safeNumber(payload.high),
-      low: safeNumber(payload.low),
-      volume: safeNumber(payload.volume),
-      raw: payload,
-    },
+    data: dataBlock,
     endpointDiagnostics: {
       endpoint: '/api/real-time/{symbol}',
       symbol,
+      outputMode,
     },
     metadata: {
       source: 'EODHD atomic action: get_real_time_quote',
