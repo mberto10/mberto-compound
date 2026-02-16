@@ -9,6 +9,8 @@
 // from = Optional YYYY-MM-DD date lower bound
 // to = Optional YYYY-MM-DD date upper bound
 // order = Optional order a|d (default: d)
+// maxPoints = Maximum points to return (default: 120, min: 1, max: 2000)
+// outputMode = compact|full (default: compact)
 
 function asBool(value, defaultValue) {
   if (value === undefined || value === null || value === '') return defaultValue;
@@ -75,6 +77,8 @@ if (help) {
       analysisTypes: ANALYSIS_TYPE_MAP,
       commonFunctions: COMMON_FUNCTIONS,
       orderOptions: ['a', 'd'],
+      outputModeOptions: ['compact', 'full'],
+      maxPointsDefault: 120,
     },
     endpointDiagnostics: {
       endpoint: '/api/technical/{symbol}',
@@ -87,14 +91,25 @@ if (help) {
   };
 }
 
-const apiKey = (data.auth.apiKey || '').toString().trim();
-if (!apiKey) return { error: true, message: 'Missing auth.apiKey' };
+const auth = (data && data.auth) ? data.auth : {};
+const apiKey = (
+  auth.apiKey ||
+  auth.api_key ||
+  auth.apiToken ||
+  auth.api_token ||
+  auth.eodhdApiKey ||
+  auth.EODHD_API_KEY ||
+  ''
+).toString().trim();
+if (!apiKey) return { error: true, message: 'Missing auth credential. Set one of: auth.apiKey, auth.apiToken, auth.api_key, auth.api_token, auth.eodhdApiKey' };
 
 const symbol = (data.input.symbol || '').toString().trim().toUpperCase();
 const indicatorFunctionInput = (data.input.function || '').toString().trim().toLowerCase();
 const from = (data.input.from || '').toString().trim();
 const to = (data.input.to || '').toString().trim();
 const order = (data.input.order || 'd').toString().trim().toLowerCase();
+const outputMode = (data.input.outputMode || 'compact').toString().trim().toLowerCase();
+const maxPoints = clampNumber(data.input.maxPoints, 120, 1, 2000);
 
 if (!symbol) return { error: true, message: 'symbol is required.' };
 if (analysisType && !Object.prototype.hasOwnProperty.call(ANALYSIS_TYPE_MAP, analysisType)) {
@@ -108,6 +123,7 @@ if (analysisType && !Object.prototype.hasOwnProperty.call(ANALYSIS_TYPE_MAP, ana
   };
 }
 if (order !== 'a' && order !== 'd') return { error: true, message: 'order must be a or d.' };
+if (outputMode !== 'compact' && outputMode !== 'full') return { error: true, message: 'outputMode must be compact or full.' };
 if (!isValidDateString(from)) return { error: true, message: 'from must be YYYY-MM-DD.' };
 if (!isValidDateString(to)) return { error: true, message: 'to must be YYYY-MM-DD.' };
 if (from && to && from > to) return { error: true, message: 'from must be <= to.' };
@@ -160,7 +176,7 @@ async function fetchJson(url, label) {
   return response.json;
 }
 
-function normalizeRows(payload) {
+function normalizeRows(payload, includeRaw) {
   if (!Array.isArray(payload)) return [];
   const out = [];
   for (let i = 0; i < payload.length; i++) {
@@ -169,8 +185,8 @@ function normalizeRows(payload) {
       date: (row.date || row.datetime || '').toString() || null,
       timestamp: safeNumber(row.timestamp),
       value: null,
-      raw: row,
     };
+    if (includeRaw) normalized.raw = row;
 
     const keys = Object.keys(row);
     for (let k = 0; k < keys.length; k++) {
@@ -200,7 +216,8 @@ try {
 
   const url = `https://eodhd.com/api/technical/${encodeURIComponent(symbol)}?${params.join('&')}`;
   const payload = await fetchJson(url, 'technical');
-  const rows = normalizeRows(payload);
+  const rowsFull = normalizeRows(payload, outputMode === 'full');
+  const rows = rowsFull.slice(0, maxPoints);
 
   return {
     data: {
@@ -221,6 +238,8 @@ try {
         from: from || null,
         to: to || null,
         analysisType: analysisType || null,
+        maxPoints,
+        outputMode,
       },
       commonFunctions: COMMON_FUNCTIONS,
       analysisTypes: ANALYSIS_TYPE_MAP,

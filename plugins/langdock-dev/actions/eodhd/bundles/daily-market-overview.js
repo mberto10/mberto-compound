@@ -5,9 +5,19 @@
 // universeLimit = Number of screener symbols to inspect (default: 80, min: 10, max: 300)
 // topN = Number of top gainers/losers/movers to return (default: 10, min: 1, max: 30)
 // lookbackDays = EOD lookback window for volatility and context (default: 60, min: 15, max: 365)
+// outputMode = compact|full (default: compact)
 
-const apiKey = (data.auth.apiKey || '').toString().trim();
-if (!apiKey) return { error: true, message: 'Missing auth.apiKey' };
+const auth = (data && data.auth) ? data.auth : {};
+const apiKey = (
+  auth.apiKey ||
+  auth.api_key ||
+  auth.apiToken ||
+  auth.api_token ||
+  auth.eodhdApiKey ||
+  auth.EODHD_API_KEY ||
+  ''
+).toString().trim();
+if (!apiKey) return { error: true, message: 'Missing auth credential. Set one of: auth.apiKey, auth.apiToken, auth.api_key, auth.api_token, auth.eodhdApiKey' };
 
 function clampNumber(value, fallback, minValue, maxValue) {
   const n = Number(value);
@@ -126,6 +136,11 @@ function findAsOfIndex(rows, asOfDate) {
   return idx;
 }
 
+function sameRows(a, b) {
+  if (!Array.isArray(a) || !Array.isArray(b)) return false;
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
 async function fetchJson(url, label) {
   const response = await ld.request({
     url,
@@ -146,9 +161,11 @@ const asOfDate = (data.input.asOfDate || '').toString().trim();
 const universeLimit = clampNumber(data.input.universeLimit, 80, 10, 300);
 const topN = clampNumber(data.input.topN, 10, 1, 30);
 const lookbackDays = clampNumber(data.input.lookbackDays, 60, 15, 365);
+const outputMode = (data.input.outputMode || 'compact').toString().trim().toLowerCase();
 
 if (!asOfDate) return { error: true, message: 'asOfDate is required (YYYY-MM-DD).' };
 if (!isValidDateString(asOfDate)) return { error: true, message: 'Invalid asOfDate format. Use YYYY-MM-DD.' };
+if (outputMode !== 'compact' && outputMode !== 'full') return { error: true, message: 'outputMode must be compact or full.' };
 
 const diagnostics = {
   calls: { screener: 0, eod: 0 },
@@ -220,10 +237,13 @@ try {
 
   const validReturns = snapshots.filter((r) => Number.isFinite(r.return1dPct));
   const sortedByReturn = validReturns.slice().sort((a, b) => b.return1dPct - a.return1dPct);
-  const topGainers = sortedByReturn.slice(0, topN);
-  const topLosers = sortedByReturn.slice(-topN).reverse();
-  const topMoversAbs = validReturns.slice().sort((a, b) => Math.abs(b.return1dPct) - Math.abs(a.return1dPct)).slice(0, topN);
-  const topVolume = snapshots.slice().filter((r) => Number.isFinite(r.volume)).sort((a, b) => b.volume - a.volume).slice(0, topN);
+  const compactTableCap = 10;
+  const tableLimit = outputMode === 'compact' ? Math.min(topN, compactTableCap) : topN;
+  const topGainers = sortedByReturn.slice(0, tableLimit);
+  const topLosers = sortedByReturn.slice(-tableLimit).reverse();
+  const topMoversAbsRaw = validReturns.slice().sort((a, b) => Math.abs(b.return1dPct) - Math.abs(a.return1dPct)).slice(0, tableLimit);
+  const topMoversAbs = (sameRows(topMoversAbsRaw, topGainers) || sameRows(topMoversAbsRaw, topLosers)) ? [] : topMoversAbsRaw;
+  const topVolume = snapshots.slice().filter((r) => Number.isFinite(r.volume)).sort((a, b) => b.volume - a.volume).slice(0, tableLimit);
 
   const advancers = validReturns.filter((r) => r.return1dPct > 0.05).length;
   const decliners = validReturns.filter((r) => r.return1dPct < -0.05).length;
@@ -241,6 +261,19 @@ try {
   if (diagnostics.errors.length > 0) {
     riskFlags.push(`${diagnostics.errors.length} endpoint call(s) failed; rankings are based on available symbols.`);
   }
+
+  const truncationNotes = [];
+  if (outputMode === 'compact' && topN > compactTableCap) {
+    truncationNotes.push(`Compact mode capped leaderboard tables to ${compactTableCap} rows each.`);
+  }
+  if (topMoversAbs.length === 0 && topMoversAbsRaw.length > 0) {
+    truncationNotes.push('topMoversAbs omitted because it duplicated topGainers/topLosers for this dataset.');
+  }
+  const endpointDiagnostics = Object.assign({}, diagnostics, {
+    outputMode,
+    truncated: truncationNotes.length > 0,
+    truncationNotes,
+  });
 
   return {
     headline_summary: {
@@ -264,11 +297,10 @@ try {
       topLosers,
       topMoversAbs,
       topVolume,
-      symbolSnapshots: snapshots,
     },
     key_takeaways: keyTakeaways,
     risk_flags: riskFlags,
-    endpointDiagnostics: diagnostics,
+    endpointDiagnostics,
     calculation_notes: {
       return1dPct: '(asOf_close - previous_close) / previous_close * 100',
       return5dPct: '(asOf_close - close_5_sessions_ago) / close_5_sessions_ago * 100',
@@ -278,8 +310,10 @@ try {
     },
     metadata: {
       source: 'EODHD bundle action: daily_market_overview',
+      actionType: 'summary',
+      pairedAction: 'daily_market_overview_details',
       generatedAt: new Date().toISOString(),
-      parameters: { asOfDate, universeLimit, topN, lookbackDays },
+      parameters: { asOfDate, universeLimit, topN, lookbackDays, outputMode },
     },
   };
 } catch (error) {

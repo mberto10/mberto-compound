@@ -25,10 +25,11 @@ Single-endpoint Langdock actions for EODHD. These are building blocks for bundle
 
 ## Conventions
 
-- Auth input: `auth.apiKey` (mapped to EODHD `api_token`).
+- Auth input: accepts `auth.apiKey`, `auth.apiToken`, `auth.api_key`, `auth.api_token`, or `auth.eodhdApiKey` (mapped to EODHD `api_token`).
 - No hardcoded default symbols.
 - Sequential `await ld.request(...)` usage for Langdock runtime compatibility.
 - All core actions support `help=true` to return a decision guide without calling EODHD.
+- Core actions default to compact/agent-friendly output. Use `outputMode: \"full\"` only when raw payload is explicitly needed.
 - Deterministic output shape:
   - `data`
   - `endpointDiagnostics`

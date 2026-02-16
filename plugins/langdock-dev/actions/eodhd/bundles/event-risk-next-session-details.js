@@ -1,5 +1,5 @@
-// name = Event Risk Next Session
-// description = Builds a next-session risk briefing from upcoming events, recent volatility, and current news flow.
+// name = Event Risk Next Session Details
+// description = Returns detailed ranked event risk tables with bounded symbol-level event/headline context.
 //
 // symbols = Optional comma-separated symbols to prioritize (e.g. AAPL.US,MSFT.US)
 // from = Start date YYYY-MM-DD (default: today)
@@ -11,8 +11,10 @@
 // newsLookbackDays = News lookback in days (default: 3, min: 1, max: 30)
 // newsLimit = Maximum news items to fetch (default: 60, min: 1, max: 200)
 // maxSymbols = Maximum symbols to score (default: 40, min: 5, max: 100)
-// outputMode = compact|full (default: compact)
-// resultLimit = Maximum rows in summary risk tables (default: 10, min: 1, max: 50)
+// outputMode = compact|full (default: full)
+// resultLimit = Max rows in ranked risk tables (default: compact=25, full=100, min: 1, max: 300)
+// headlineLimitPerSymbol = Max headlines kept per symbol (default: 5, min: 1, max: 20)
+// eventLimitPerSymbol = Max events kept per symbol (default: 6, min: 1, max: 30)
 
 const auth = (data && data.auth) ? data.auth : {};
 const apiKey = (
@@ -196,9 +198,11 @@ const includeNews = asBool(data.input.includeNews, true);
 const newsLookbackDays = clampNumber(data.input.newsLookbackDays, 3, 1, 30);
 const newsLimit = clampNumber(data.input.newsLimit, 60, 1, 200);
 const maxSymbols = clampNumber(data.input.maxSymbols, 40, 5, 100);
-const outputMode = (data.input.outputMode || 'compact').toString().trim().toLowerCase();
-const resultLimit = clampNumber(data.input.resultLimit, 10, 1, 50);
+const outputMode = (data.input.outputMode || 'full').toString().trim().toLowerCase();
 if (outputMode !== 'compact' && outputMode !== 'full') return { error: true, message: 'outputMode must be compact or full.' };
+const resultLimit = clampNumber(data.input.resultLimit, outputMode === 'compact' ? 25 : 100, 1, 300);
+const headlineLimitPerSymbol = clampNumber(data.input.headlineLimitPerSymbol, 5, 1, 20);
+const eventLimitPerSymbol = clampNumber(data.input.eventLimitPerSymbol, 6, 1, 30);
 
 const from = fromInput || formatDate(new Date());
 const to = toInput || dateDaysAhead(daysAhead);
@@ -303,7 +307,7 @@ try {
         for (let j = 0; j < normalized.length; j++) {
           const s = normalized[j];
           if (!newsBySymbol[s]) newsBySymbol[s] = [];
-          if (newsBySymbol[s].length < 5) {
+          if (newsBySymbol[s].length < headlineLimitPerSymbol) {
             newsBySymbol[s].push({
               date: item.date || null,
               title: item.title || null,
@@ -371,7 +375,7 @@ try {
       riskScore,
       eventTypes,
       eventCount: symbolEvents.length,
-      nextEvents: symbolEvents.slice(0, 6),
+      nextEvents: symbolEvents.slice(0, eventLimitPerSymbol),
       dailyMovePct: round(dailyMovePct, 3),
       annualizedVol20dPct: round(vol20Pct, 3),
       headlineCount,
@@ -384,12 +388,10 @@ try {
   const highRisk = scored.filter((s) => s.riskLevel === 'high');
   const mediumRisk = scored.filter((s) => s.riskLevel === 'medium');
   const lowRisk = scored.filter((s) => s.riskLevel === 'low');
-  const compactTableCap = 10;
-  const tableLimit = outputMode === 'compact' ? Math.min(resultLimit, compactTableCap) : resultLimit;
-  const topRiskSymbols = scored.slice(0, tableLimit);
-  const highRiskRows = highRisk.slice(0, tableLimit);
-  const mediumRiskRows = mediumRisk.slice(0, tableLimit);
-  const lowRiskRows = lowRisk.slice(0, tableLimit);
+  const rankedRiskTable = scored.slice(0, resultLimit);
+  const highRiskRows = highRisk.slice(0, resultLimit);
+  const mediumRiskRows = mediumRisk.slice(0, resultLimit);
+  const lowRiskRows = lowRisk.slice(0, resultLimit);
 
   const keyTakeaways = [];
   keyTakeaways.push(`Window ${from} to ${to}: ${allEvents.length} total events across ${universe.length} tracked symbols.`);
@@ -406,11 +408,8 @@ try {
   }
 
   const truncationNotes = [];
-  if (outputMode === 'compact' && resultLimit > compactTableCap) {
-    truncationNotes.push(`Compact mode capped summary risk tables to ${compactTableCap} rows.`);
-  }
-  if (scored.length > topRiskSymbols.length) {
-    truncationNotes.push(`Summary output truncated ranked risks to ${topRiskSymbols.length} rows; use event_risk_next_session_details for full ranking.`);
+  if (scored.length > rankedRiskTable.length) {
+    truncationNotes.push(`rankedRiskTable truncated to ${rankedRiskTable.length} rows.`);
   }
   const endpointDiagnostics = Object.assign({}, diagnostics, {
     outputMode,
@@ -437,9 +436,10 @@ try {
       trends: eventBuckets.trends.length,
     },
     tables: {
-      topRiskSymbols,
+      rankedRiskTable,
       highRisk: highRiskRows,
-      ...(outputMode === 'full' ? { mediumRisk: mediumRiskRows, lowRisk: lowRiskRows } : {}),
+      mediumRisk: mediumRiskRows,
+      lowRisk: lowRiskRows,
     },
     key_takeaways: keyTakeaways,
     risk_flags: riskFlags,
@@ -454,9 +454,9 @@ try {
       annualizedVol20dPct: 'stdev(log daily returns over last 20 sessions) * sqrt(252) * 100',
     },
     metadata: {
-      source: 'EODHD bundle action: event_risk_next_session',
-      actionType: 'summary',
-      pairedAction: 'event_risk_next_session_details',
+      source: 'EODHD bundle action: event_risk_next_session_details',
+      actionType: 'details',
+      pairedAction: 'event_risk_next_session',
       generatedAt: new Date().toISOString(),
       parameters: {
         explicitSymbols,
@@ -468,6 +468,8 @@ try {
         newsLimit,
         maxSymbols,
         resultLimit,
+        headlineLimitPerSymbol,
+        eventLimitPerSymbol,
         outputMode,
       },
     },
@@ -475,7 +477,7 @@ try {
 } catch (error) {
   return {
     error: true,
-    message: 'event_risk_next_session failed',
+    message: 'event_risk_next_session_details failed',
     details: error.message || String(error),
   };
 }

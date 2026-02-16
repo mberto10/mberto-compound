@@ -1,11 +1,12 @@
-// name = Daily Market Pulse Universe
-// description = Produces a daily market pulse for a fixed input universe of symbols.
+// name = Daily Market Pulse Universe Details
+// description = Returns detailed per-symbol tables for a fixed input universe pulse run.
 //
 // symbols = Comma-separated symbols (required, e.g. AAPL.US,MSFT.US,NVDA.US)
 // asOfDate = Analysis date in YYYY-MM-DD (required)
 // topN = Number of top gainers/losers/movers to return (default: 5, min: 1, max: 30)
 // lookbackDays = EOD lookback window for volatility and context (default: 90, min: 20, max: 365)
-// outputMode = compact|full (default: compact)
+// outputMode = compact|full (default: full)
+// tableLimit = Max rows for detail tables (default: compact=50, full=300, min: 1, max: 1000)
 
 const auth = (data && data.auth) ? data.auth : {};
 const apiKey = (
@@ -152,16 +153,15 @@ const symbolsInput = (data.input.symbols || '').toString().trim();
 const asOfDate = (data.input.asOfDate || '').toString().trim();
 const topN = clampNumber(data.input.topN, 5, 1, 30);
 const lookbackDays = clampNumber(data.input.lookbackDays, 90, 20, 365);
-const outputMode = (data.input.outputMode || 'compact').toString().trim().toLowerCase();
+const outputMode = (data.input.outputMode || 'full').toString().trim().toLowerCase();
+if (outputMode !== 'compact' && outputMode !== 'full') return { error: true, message: 'outputMode must be compact or full.' };
+const tableLimit = clampNumber(data.input.tableLimit, outputMode === 'compact' ? 50 : 300, 1, 1000);
 
 if (!symbolsInput) return { error: true, message: 'symbols is required. Provide comma-separated symbols.' };
 if (!asOfDate) return { error: true, message: 'asOfDate is required (YYYY-MM-DD).' };
 if (!isValidDateString(asOfDate)) return { error: true, message: 'Invalid asOfDate format. Use YYYY-MM-DD.' };
-if (outputMode !== 'compact' && outputMode !== 'full') return { error: true, message: 'outputMode must be compact or full.' };
 
-const symbolInputCap = 300;
-const parsedSymbols = dedupeSymbols(symbolsInput.split(',').map((s) => s.trim()).filter(Boolean));
-const symbols = parsedSymbols.slice(0, symbolInputCap);
+const symbols = dedupeSymbols(symbolsInput.split(',').map((s) => s.trim()).filter(Boolean));
 if (symbols.length === 0) return { error: true, message: 'No valid symbols after parsing input.' };
 
 const diagnostics = {
@@ -220,12 +220,12 @@ try {
 
   const validReturns = snapshots.filter((r) => Number.isFinite(r.return1dPct));
   const sortedByReturn = validReturns.slice().sort((a, b) => b.return1dPct - a.return1dPct);
-  const compactTableCap = 10;
-  const tableLimit = outputMode === 'compact' ? Math.min(topN, compactTableCap) : topN;
-  const topGainers = sortedByReturn.slice(0, tableLimit);
-  const topLosers = sortedByReturn.slice(-tableLimit).reverse();
-  const topMoversAbsRaw = validReturns.slice().sort((a, b) => Math.abs(b.return1dPct) - Math.abs(a.return1dPct)).slice(0, tableLimit);
+  const topTableLimit = outputMode === 'compact' ? Math.min(topN, 10) : topN;
+  const topGainers = sortedByReturn.slice(0, topTableLimit);
+  const topLosers = sortedByReturn.slice(-topTableLimit).reverse();
+  const topMoversAbsRaw = validReturns.slice().sort((a, b) => Math.abs(b.return1dPct) - Math.abs(a.return1dPct)).slice(0, topTableLimit);
   const topMoversAbs = (sameRows(topMoversAbsRaw, topGainers) || sameRows(topMoversAbsRaw, topLosers)) ? [] : topMoversAbsRaw;
+  const symbolSnapshots = snapshots.slice(0, tableLimit);
 
   const advancers = validReturns.filter((r) => r.return1dPct > 0.05).length;
   const decliners = validReturns.filter((r) => r.return1dPct < -0.05).length;
@@ -244,14 +244,14 @@ try {
   }
 
   const truncationNotes = [];
-  if (parsedSymbols.length > symbolInputCap) {
-    truncationNotes.push(`Symbol universe truncated to ${symbolInputCap} symbols.`);
-  }
-  if (outputMode === 'compact' && topN > compactTableCap) {
-    truncationNotes.push(`Compact mode capped leaderboard tables to ${compactTableCap} rows each.`);
+  if (outputMode === 'compact' && topN > 10) {
+    truncationNotes.push('Compact mode capped leaderboard tables to 10 rows.');
   }
   if (topMoversAbs.length === 0 && topMoversAbsRaw.length > 0) {
     truncationNotes.push('topMoversAbs omitted because it duplicated topGainers/topLosers for this dataset.');
+  }
+  if (snapshots.length > symbolSnapshots.length) {
+    truncationNotes.push(`symbolSnapshots truncated to ${symbolSnapshots.length} rows.`);
   }
   const endpointDiagnostics = Object.assign({}, diagnostics, {
     outputMode,
@@ -279,6 +279,7 @@ try {
       topGainers,
       topLosers,
       topMoversAbs,
+      symbolSnapshots,
     },
     key_takeaways: keyTakeaways,
     risk_flags: riskFlags,
@@ -291,17 +292,17 @@ try {
       annualizedVol20dPct: 'stdev(log daily returns over 20 sessions) * sqrt(252) * 100',
     },
     metadata: {
-      source: 'EODHD bundle action: daily_market_pulse_universe',
-      actionType: 'summary',
-      pairedAction: 'daily_market_pulse_universe_details',
+      source: 'EODHD bundle action: daily_market_pulse_universe_details',
+      actionType: 'details',
+      pairedAction: 'daily_market_pulse_universe',
       generatedAt: new Date().toISOString(),
-      parameters: { asOfDate, topN, lookbackDays, outputMode, symbols },
+      parameters: { asOfDate, topN, lookbackDays, symbols, outputMode, tableLimit },
     },
   };
 } catch (error) {
   return {
     error: true,
-    message: 'daily_market_pulse_universe failed',
+    message: 'daily_market_pulse_universe_details failed',
     details: error.message || String(error),
   };
 }

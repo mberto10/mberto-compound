@@ -6,7 +6,8 @@
 // filters = Optional advanced JSON string for EODHD screener filters
 // signals = Optional comma-separated screener signals (common: top_gainers,top_losers,oversold,overbought)
 // sort = Optional sort field. Common: market_capitalization.desc,market_capitalization.asc,name.asc,name.desc,volume.desc,change_p.desc
-// limit = Max rows (default: 50, min: 1, max: 500)
+// outputMode = compact|full (default: compact)
+// limit = Max rows (default: 25, min: 1, max: 500)
 // offset = Pagination offset (default: 0, min: 0)
 
 function asBool(value, defaultValue) {
@@ -23,6 +24,7 @@ const presetInput = (data.input.preset || '').toString().trim().toLowerCase();
 const filtersInput = (data.input.filters || '').toString().trim();
 const signalsInputRaw = (data.input.signals || '').toString().trim();
 const sortInputRaw = (data.input.sort || '').toString().trim();
+const outputMode = (data.input.outputMode || 'compact').toString().trim().toLowerCase();
 
 const COMMON_SORT_OPTIONS = [
   'market_capitalization.desc',
@@ -91,6 +93,7 @@ if (help) {
       presets: PRESET_MAP,
       commonSortOptions: COMMON_SORT_OPTIONS,
       commonSignals: COMMON_SIGNALS,
+      outputModeOptions: ['compact', 'full'],
       advancedNotes: {
         filters: 'filters is advanced raw JSON for EODHD screener. Prefer preset/signals first if unsure.',
       },
@@ -106,8 +109,20 @@ if (help) {
   };
 }
 
-const apiKey = (data.auth.apiKey || '').toString().trim();
-if (!apiKey) return { error: true, message: 'Missing auth.apiKey' };
+const auth = (data && data.auth) ? data.auth : {};
+const apiKey = (
+  auth.apiKey ||
+  auth.api_key ||
+  auth.apiToken ||
+  auth.api_token ||
+  auth.eodhdApiKey ||
+  auth.EODHD_API_KEY ||
+  ''
+).toString().trim();
+if (!apiKey) return { error: true, message: 'Missing auth credential. Set one of: auth.apiKey, auth.apiToken, auth.api_key, auth.api_token, auth.eodhdApiKey' };
+if (outputMode !== 'compact' && outputMode !== 'full') {
+  return { error: true, message: 'outputMode must be compact or full.' };
+}
 
 function clampNumber(value, fallback, minValue, maxValue) {
   const n = Number(value);
@@ -128,7 +143,7 @@ if (presetInput && !Object.prototype.hasOwnProperty.call(PRESET_MAP, presetInput
 
 const preset = presetInput ? PRESET_MAP[presetInput] : null;
 const hasUserLimit = data.input.limit !== undefined && data.input.limit !== null && String(data.input.limit).trim() !== '';
-let limit = clampNumber(data.input.limit, 50, 1, 500);
+let limit = clampNumber(data.input.limit, 25, 1, 500);
 if (!hasUserLimit && preset && Number.isFinite(preset.limit)) {
   limit = clampNumber(preset.limit, 50, 1, 500);
 }
@@ -192,6 +207,19 @@ function dedupe(items) {
   return out;
 }
 
+function safeNumber(v) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+function firstText(row, keys) {
+  for (let i = 0; i < keys.length; i++) {
+    const value = (row[keys[i]] || '').toString().trim();
+    if (value) return value;
+  }
+  return null;
+}
+
 try {
   const params = [];
   addParam(params, 'api_token', apiKey);
@@ -209,13 +237,28 @@ try {
     : (Array.isArray(payload.data) ? payload.data : (Array.isArray(payload.results) ? payload.results : []));
 
   const symbols = dedupe(rows.map(extractSymbol).filter(Boolean));
+  const compactRows = rows.map((row) => ({
+    symbol: extractSymbol(row),
+    code: firstText(row, ['code', 'Code', 'ticker']),
+    name: firstText(row, ['name', 'Name']),
+    exchange: firstText(row, ['exchange', 'Exchange']),
+    sector: firstText(row, ['sector', 'Sector']),
+    industry: firstText(row, ['industry', 'Industry']),
+    close: safeNumber(row.close),
+    changePct: safeNumber(row.change_p || row.changePercent || row.change_percentage),
+    volume: safeNumber(row.volume),
+    marketCap: safeNumber(row.market_capitalization || row.marketCap),
+  }));
+
+  const dataBlock = {
+    rows: outputMode === 'full' ? rows : compactRows,
+    symbols,
+    count: rows.length,
+  };
+  if (outputMode === 'full') dataBlock.rawRows = rows;
 
   return {
-    data: {
-      rows,
-      symbols,
-      count: rows.length,
-    },
+    data: dataBlock,
     endpointDiagnostics: {
       endpoint: '/api/screener',
       parameters: {
@@ -225,6 +268,7 @@ try {
         hasFilters: !!parsedFilters,
         signals: signalsInput || null,
         preset: presetInput || null,
+        outputMode,
       },
       commonSortOptions: COMMON_SORT_OPTIONS,
       commonSignals: COMMON_SIGNALS,

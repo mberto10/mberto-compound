@@ -1,5 +1,5 @@
-// name = Sector Rotation Monitor
-// description = Monitors sector leadership and rotation using screener-derived sector groups.
+// name = Sector Rotation Monitor Details
+// description = Returns expanded sector metric tables for sector rotation analysis.
 //
 // screenerFilters = Optional screener filters JSON string
 // screenerSignals = Optional screener signals (comma-separated)
@@ -9,7 +9,8 @@
 // topSectors = Number of top/bottom sectors shown (default: 5, min: 1, max: 11)
 // includeTechnicals = Include sector RSI proxy (default: true)
 // rsiPeriod = RSI period for proxy symbol (default: 14, min: 2, max: 50)
-// outputMode = compact|full (default: compact)
+// outputMode = compact|full (default: full)
+// tableLimit = Max rows for detail sector tables (default: compact=20, full=100, min: 1, max: 200)
 
 const auth = (data && data.auth) ? data.auth : {};
 const apiKey = (
@@ -119,19 +120,6 @@ function extractSymbol(row) {
   return null;
 }
 
-function dedupeByKey(rows, key) {
-  const out = [];
-  const seen = {};
-  for (let i = 0; i < rows.length; i++) {
-    const row = rows[i] || {};
-    const value = (row[key] || '').toString().trim();
-    if (!value || seen[value]) continue;
-    seen[value] = true;
-    out.push(row);
-  }
-  return out;
-}
-
 function normalizeEod(raw) {
   if (!Array.isArray(raw)) return [];
   const rows = raw.map((r) => ({
@@ -203,8 +191,9 @@ const lookbackDays = clampNumber(data.input.lookbackDays, 180, 60, 1500);
 const topSectors = clampNumber(data.input.topSectors, 5, 1, 11);
 const includeTechnicals = asBool(data.input.includeTechnicals, true);
 const rsiPeriod = clampNumber(data.input.rsiPeriod, 14, 2, 50);
-const outputMode = (data.input.outputMode || 'compact').toString().trim().toLowerCase();
+const outputMode = (data.input.outputMode || 'full').toString().trim().toLowerCase();
 if (outputMode !== 'compact' && outputMode !== 'full') return { error: true, message: 'outputMode must be compact or full.' };
+const tableLimit = clampNumber(data.input.tableLimit, outputMode === 'compact' ? 20 : 100, 1, 200);
 
 let parsedFilters = null;
 if (screenerFilters) {
@@ -375,7 +364,11 @@ try {
   const topLeaders1d = by1d.slice(0, topSectors);
   const bottomLaggers1d = by1d.slice(-topSectors).reverse();
   const topLeaders1m = by1m.slice(0, topSectors);
-  const compactSectorRows = dedupeByKey(topLeaders1d.concat(bottomLaggers1d).concat(topLeaders1m), 'sector').slice(0, 10);
+  const detailTableLimit = outputMode === 'compact' ? Math.min(tableLimit, 10) : tableLimit;
+  const sectorMetricsOut = sectorMetrics.slice(0, detailTableLimit);
+  const topLeaders1dOut = topLeaders1d.slice(0, detailTableLimit);
+  const bottomLaggers1dOut = bottomLaggers1d.slice(0, detailTableLimit);
+  const topLeaders1mOut = topLeaders1m.slice(0, detailTableLimit);
 
   const dayLeaderSet = {};
   for (let i = 0; i < topLeaders1d.length; i++) dayLeaderSet[topLeaders1d[i].sector] = true;
@@ -438,8 +431,8 @@ try {
   }
 
   const truncationNotes = [];
-  if (outputMode === 'compact' && sectorMetrics.length > compactSectorRows.length) {
-    truncationNotes.push(`Compact mode limited sectorMetrics to ${compactSectorRows.length} rows.`);
+  if (sectorMetrics.length > sectorMetricsOut.length) {
+    truncationNotes.push(`sectorMetrics truncated to ${sectorMetricsOut.length} rows.`);
   }
   const endpointDiagnostics = Object.assign({}, diagnostics, {
     outputMode,
@@ -463,10 +456,10 @@ try {
       monthLeaders: topLeaders1m.map((x) => x.sector),
     },
     tables: {
-      sectorMetrics: outputMode === 'compact' ? compactSectorRows : sectorMetrics,
-      topLeaders1d,
-      bottomLaggers1d,
-      topLeaders1m,
+      sectorMetrics: sectorMetricsOut,
+      topLeaders1d: topLeaders1dOut,
+      bottomLaggers1d: bottomLaggers1dOut,
+      topLeaders1m: topLeaders1mOut,
     },
     key_takeaways: keyTakeaways,
     risk_flags: riskFlags,
@@ -480,9 +473,9 @@ try {
       marketTilt: 'risk-on if tiltSpread>=0.4, risk-off if <=-0.4, else mixed',
     },
     metadata: {
-      source: 'EODHD bundle action: sector_rotation_monitor',
-      actionType: 'summary',
-      pairedAction: 'sector_rotation_monitor_details',
+      source: 'EODHD bundle action: sector_rotation_monitor_details',
+      actionType: 'details',
+      pairedAction: 'sector_rotation_monitor',
       generatedAt: new Date().toISOString(),
       parameters: {
         screenerLimit,
@@ -494,13 +487,14 @@ try {
         screenerSignals: screenerSignals || null,
         screenerFiltersProvided: Boolean(parsedFilters),
         outputMode,
+        tableLimit,
       },
     },
   };
 } catch (error) {
   return {
     error: true,
-    message: 'sector_rotation_monitor failed',
+    message: 'sector_rotation_monitor_details failed',
     details: error.message || String(error),
   };
 }

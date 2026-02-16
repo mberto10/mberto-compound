@@ -1,5 +1,5 @@
-// name = Earnings Reaction Brief
-// description = Produces a newsroom-ready earnings reaction brief with movers, reaction classification, and catalyst headlines.
+// name = Earnings Reaction Brief Details
+// description = Returns detailed symbol-level earnings reaction rows with full enrichment fields.
 //
 // from = Start date YYYY-MM-DD (default: 3 days ago)
 // to = End date YYYY-MM-DD (default: today)
@@ -11,7 +11,8 @@
 // includeNews = Include catalyst headlines from news endpoint (default: true)
 // newsLimit = Maximum total news items to fetch (default: 40, max: 100)
 // minAbsMovePct = Minimum absolute daily move to classify as strong reaction (default: 2.0)
-// outputMode = compact|full (default: compact)
+// outputMode = compact|full (default: full)
+// tableLimit = Max rows for detailed reactionTable (default: compact=50, full=200, min: 1, max: 500)
 
 const auth = (data && data.auth) ? data.auth : {};
 const apiKey = (
@@ -78,6 +79,11 @@ function dedupeSymbols(symbols) {
     out.push(s);
   }
   return out;
+}
+
+function sameRows(a, b) {
+  if (!Array.isArray(a) || !Array.isArray(b)) return false;
+  return JSON.stringify(a) === JSON.stringify(b);
 }
 
 function normalizeEod(raw) {
@@ -167,7 +173,8 @@ const intradayInterval = (data.input.intradayInterval || '5m').toString().trim()
 const includeNews = asBool(data.input.includeNews, true);
 const newsLimit = clampNumber(data.input.newsLimit, 40, 1, 100);
 const minAbsMovePct = clampNumber(data.input.minAbsMovePct, 2.0, 0.1, 20);
-const outputMode = (data.input.outputMode || 'compact').toString().trim().toLowerCase();
+const outputMode = (data.input.outputMode || 'full').toString().trim().toLowerCase();
+const tableLimit = clampNumber(data.input.tableLimit, outputMode === 'compact' ? 50 : 200, 1, 500);
 
 if (intradayInterval !== '1m' && intradayInterval !== '5m' && intradayInterval !== '1h') {
   return { error: true, message: 'intradayInterval must be 1m, 5m, or 1h' };
@@ -224,6 +231,7 @@ try {
         to,
       },
       tables: {
+        reactionTable: [],
         topPositiveReactions: [],
         topNegativeReactions: [],
         mutedReactions: [],
@@ -232,9 +240,9 @@ try {
       risk_flags: ['No symbols available for analysis.'],
       endpointDiagnostics,
       metadata: {
-        source: 'EODHD bundle action: earnings_reaction_brief',
-        actionType: 'summary',
-        pairedAction: 'earnings_reaction_brief_details',
+        source: 'EODHD bundle action: earnings_reaction_brief_details',
+        actionType: 'details',
+        pairedAction: 'earnings_reaction_brief',
         generatedAt: new Date().toISOString(),
       },
     };
@@ -420,14 +428,17 @@ try {
   const sorted = validRows.slice().sort((a, b) => b.dailyMovePct - a.dailyMovePct);
   const positive = sorted.filter((r) => Number.isFinite(r.dailyMovePct) && r.dailyMovePct > 0);
   const negative = sorted.filter((r) => Number.isFinite(r.dailyMovePct) && r.dailyMovePct < 0);
-  const compactTableCap = 10;
-  const tableLimit = outputMode === 'compact' ? Math.min(topN, compactTableCap) : topN;
-  const topPositiveReactions = positive.slice(0, tableLimit);
-  const topNegativeReactions = negative.slice(0, tableLimit);
+  const topTableLimit = outputMode === 'compact' ? Math.min(topN, 10) : topN;
+  let topPositiveReactions = positive.slice(0, topTableLimit);
+  let topNegativeReactions = negative.slice(0, topTableLimit);
   const excluded = {};
   for (let i = 0; i < topPositiveReactions.length; i++) excluded[topPositiveReactions[i].symbol] = true;
   for (let i = 0; i < topNegativeReactions.length; i++) excluded[topNegativeReactions[i].symbol] = true;
-  const mutedReactions = validRows.filter((r) => r.reactionClass === 'muted' && !excluded[r.symbol]).slice(0, tableLimit);
+  let mutedReactions = validRows.filter((r) => r.reactionClass === 'muted' && !excluded[r.symbol]).slice(0, topTableLimit);
+  const reactionTableOut = reactionTable.slice(0, tableLimit);
+  if (sameRows(topPositiveReactions, reactionTableOut)) topPositiveReactions = [];
+  if (sameRows(topNegativeReactions, reactionTableOut)) topNegativeReactions = [];
+  if (sameRows(mutedReactions, reactionTableOut)) mutedReactions = [];
 
   const strongCount = validRows.filter((r) => {
     const absMove = Math.abs(r.dailyMovePct);
@@ -445,11 +456,20 @@ try {
   }
 
   const truncationNotes = [];
-  if (outputMode === 'compact' && topN > compactTableCap) {
-    truncationNotes.push(`Compact mode capped leaderboard tables to ${compactTableCap} rows each.`);
+  if (outputMode === 'compact' && topN > 10) {
+    truncationNotes.push('Compact mode capped leaderboard tables to 10 rows.');
   }
-  if (reactionTable.length > topPositiveReactions.length + topNegativeReactions.length + mutedReactions.length) {
-    truncationNotes.push('Summary output omits full reactionTable; use earnings_reaction_brief_details for complete symbol-level reactions.');
+  if (reactionTable.length > reactionTableOut.length) {
+    truncationNotes.push(`reactionTable truncated to ${reactionTableOut.length} rows.`);
+  }
+  if (topPositiveReactions.length === 0 && positive.length > 0) {
+    truncationNotes.push('topPositiveReactions omitted because it duplicated reactionTable.');
+  }
+  if (topNegativeReactions.length === 0 && negative.length > 0) {
+    truncationNotes.push('topNegativeReactions omitted because it duplicated reactionTable.');
+  }
+  if (mutedReactions.length === 0 && validRows.some((r) => r.reactionClass === 'muted')) {
+    truncationNotes.push('mutedReactions omitted because it duplicated reactionTable.');
   }
   const endpointDiagnostics = Object.assign({}, diagnostics, {
     outputMode,
@@ -468,6 +488,7 @@ try {
       topNegative: topNegativeReactions[0] ? { symbol: topNegativeReactions[0].symbol, dailyMovePct: topNegativeReactions[0].dailyMovePct } : null,
     },
     tables: {
+      reactionTable: reactionTableOut,
       topPositiveReactions,
       topNegativeReactions,
       mutedReactions,
@@ -484,9 +505,9 @@ try {
       reactionClass: `Strong reaction threshold = minAbsMovePct (${minAbsMovePct}%)`,
     },
     metadata: {
-      source: 'EODHD bundle action: earnings_reaction_brief',
-      actionType: 'summary',
-      pairedAction: 'earnings_reaction_brief_details',
+      source: 'EODHD bundle action: earnings_reaction_brief_details',
+      actionType: 'details',
+      pairedAction: 'earnings_reaction_brief',
       generatedAt: new Date().toISOString(),
       universe,
       parameters: {
@@ -497,13 +518,14 @@ try {
         newsLimit,
         minAbsMovePct,
         outputMode,
+        tableLimit,
       },
     },
   };
 } catch (error) {
   return {
     error: true,
-    message: 'earnings_reaction_brief failed',
+    message: 'earnings_reaction_brief_details failed',
     details: error.message || String(error),
   };
 }
