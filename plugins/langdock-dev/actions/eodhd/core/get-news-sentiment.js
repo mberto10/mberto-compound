@@ -32,6 +32,10 @@ function clampNumber(value, fallback, minValue, maxValue) {
   return Math.min(Math.max(Math.floor(n), minValue), maxValue);
 }
 
+function firstDefined(a, b) {
+  return a !== undefined && a !== null ? a : b;
+}
+
 function formatDate(d) {
   return d.toISOString().slice(0, 10);
 }
@@ -148,7 +152,8 @@ const windowPreset = (data.input.windowPreset || data.input.window_preset || '')
 const outputMode = (data.input.outputMode || data.input.output_mode || 'compact').toString().trim().toLowerCase();
 let from = (data.input.from || '').toString().trim();
 let to = (data.input.to || '').toString().trim();
-const contentMaxChars = clampNumber(data.input.contentMaxChars || data.input.content_max_chars, 280, 80, 5000);
+const contentMaxCharsInput = firstDefined(data.input.contentMaxChars, data.input.content_max_chars);
+const contentMaxChars = clampNumber(contentMaxCharsInput, 280, 80, 5000);
 
 if (outputMode !== 'compact' && outputMode !== 'full') {
   return { error: true, message: 'outputMode must be compact or full.' };
@@ -184,7 +189,8 @@ if (from && to && from > to) return { error: true, message: 'from must be <= to.
 
 const limit = clampNumber(data.input.limit, 20, 1, 200);
 const offset = clampNumber(data.input.offset, 0, 0, 1000000);
-const resultLimit = clampNumber(data.input.resultLimit || data.input.result_limit, limit, 1, 200);
+const resultLimitInput = firstDefined(data.input.resultLimit, data.input.result_limit);
+const resultLimit = clampNumber(resultLimitInput, limit, 1, 200);
 
 try {
   const sParam = sOverride || toSymbolsQuery(symbolsInput);

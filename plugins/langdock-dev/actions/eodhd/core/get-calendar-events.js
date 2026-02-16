@@ -31,6 +31,10 @@ function clampNumber(value, fallback, minValue, maxValue) {
   return Math.min(Math.max(Math.floor(n), minValue), maxValue);
 }
 
+function firstDefined(a, b) {
+  return a !== undefined && a !== null ? a : b;
+}
+
 function formatDate(d) {
   return d.toISOString().slice(0, 10);
 }
@@ -141,7 +145,8 @@ if (from > to) return { error: true, message: 'from must be <= to.' };
 
 const limit = clampNumber(data.input.limit, 50, 1, 1000);
 const offset = clampNumber(data.input.offset, 0, 0, 1000000);
-const resultLimit = clampNumber(data.input.resultLimit || data.input.result_limit, limit, 1, 1000);
+const resultLimitInput = firstDefined(data.input.resultLimit, data.input.result_limit);
+const resultLimit = clampNumber(resultLimitInput, limit, 1, 1000);
 
 const endpointByType = {
   earnings: 'earnings',

@@ -26,6 +26,14 @@ function clampNumber(value, fallback, minValue, maxValue) {
   return Math.min(Math.max(Math.floor(n), minValue), maxValue);
 }
 
+function firstDefined() {
+  for (let i = 0; i < arguments.length; i++) {
+    const value = arguments[i];
+    if (value !== undefined && value !== null) return value;
+  }
+  return undefined;
+}
+
 const ALLOWED_TOP_LEVEL_FIELDS = [
   'General',
   'Highlights',
@@ -185,7 +193,7 @@ if (!apiKey) return { error: true, message: 'Missing auth credential. Set one of
 const symbol = (data.input.symbol || '').toString().trim().toUpperCase();
 const fieldsInput = (data.input.fields || '').toString().trim();
 const formatInput = (data.input.format || 'summary').toString().trim().toLowerCase();
-const periodsInput = data.input.periods || data.input.maxPeriods || data.input.max_periods;
+const periodsInput = firstDefined(data.input.periods, data.input.maxPeriods, data.input.max_periods);
 const hasPeriodsInput = periodsInput !== undefined && periodsInput !== null && String(periodsInput).trim() !== '';
 const periods = hasPeriodsInput ? clampNumber(periodsInput, 8, 1, 40) : null;
 

@@ -32,6 +32,14 @@ function clampNumber(value, fallback, minValue, maxValue) {
   return Math.min(Math.max(Math.floor(n), minValue), maxValue);
 }
 
+function firstDefined() {
+  for (let i = 0; i < arguments.length; i++) {
+    const value = arguments[i];
+    if (value !== undefined && value !== null) return value;
+  }
+  return undefined;
+}
+
 function isValidDateString(dateStr) {
   if (!dateStr) return true;
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return false;
@@ -114,7 +122,7 @@ const from = (data.input.from || '').toString().trim();
 const to = (data.input.to || '').toString().trim();
 const order = (data.input.order || 'd').toString().trim().toLowerCase();
 const outputMode = (data.input.outputMode || data.input.output_mode || 'compact').toString().trim().toLowerCase();
-const maxPointsInput = data.input.maxPoints || data.input.max_points || data.input.maxPeriods || data.input.max_periods;
+const maxPointsInput = firstDefined(data.input.maxPoints, data.input.max_points, data.input.maxPeriods, data.input.max_periods);
 const maxPoints = clampNumber(maxPointsInput, 120, 1, 2000);
 
 if (!symbol) return { error: true, message: 'symbol is required.' };

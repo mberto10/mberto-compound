@@ -133,6 +133,10 @@ function clampNumber(value, fallback, minValue, maxValue) {
   return Math.min(Math.max(Math.floor(n), minValue), maxValue);
 }
 
+function firstDefined(a, b) {
+  return a !== undefined && a !== null ? a : b;
+}
+
 if (presetInput && !Object.prototype.hasOwnProperty.call(PRESET_MAP, presetInput)) {
   return {
     error: true,
@@ -151,7 +155,8 @@ if (!hasUserLimit && preset && Number.isFinite(preset.limit)) {
   limit = clampNumber(preset.limit, 50, 1, 500);
 }
 const offset = clampNumber(data.input.offset, 0, 0, 1000000);
-const resultLimit = clampNumber(data.input.resultLimit || data.input.result_limit, limit, 1, 500);
+const resultLimitInput = firstDefined(data.input.resultLimit, data.input.result_limit);
+const resultLimit = clampNumber(resultLimitInput, limit, 1, 500);
 
 const sortInput = sortInputRaw || (preset ? preset.sort : 'market_capitalization.desc');
 const signalsInput = signalsInputRaw || (preset ? preset.signals : '');
