@@ -575,13 +575,16 @@ try {
       alignedBenchmarkReturns.push(Math.log(bCurr / bPrev));
     }
 
-    const cov = covariance(alignedSymbolReturns, alignedBenchmarkReturns);
-    const benchVar = stddev(alignedBenchmarkReturns);
+    const betaWindow = 60;
+    const betaSymbolReturns = alignedSymbolReturns.slice(Math.max(0, alignedSymbolReturns.length - betaWindow));
+    const betaBenchmarkReturns = alignedBenchmarkReturns.slice(Math.max(0, alignedBenchmarkReturns.length - betaWindow));
+    const cov = covariance(betaSymbolReturns, betaBenchmarkReturns);
+    const benchVar = stddev(betaBenchmarkReturns);
     const benchVariance = Number.isFinite(benchVar) ? benchVar * benchVar : null;
     const beta = Number.isFinite(cov) && Number.isFinite(benchVariance) && benchVariance > 0 ? cov / benchVariance : null;
 
     const benchmarkCloses = benchmarkRows.map((r) => r.close).filter((v) => Number.isFinite(v));
-    const benchmarkReturn1m = computeReturnByOffset(benchmarkCloses, 21);
+    const benchmarkReturn1m = computeReturnByOffset(benchmarkCloses, 20);
     const benchmarkReturn3m = computeReturnByOffset(benchmarkCloses, 63);
 
     relativePerformance = {
@@ -746,7 +749,7 @@ try {
       annualizedVolPct: 'stdev(log daily returns) * sqrt(252) * 100',
       distanceFrom52wHighPct: '(latest_close - 52w_high) / 52w_high * 100',
       distanceFrom52wLowPct: '(latest_close - 52w_low) / 52w_low * 100',
-      beta60dApprox: 'covariance(symbol_log_returns, benchmark_log_returns) / variance(benchmark_log_returns)',
+      beta60dApprox: 'covariance(trailing_60_aligned_symbol_log_returns, trailing_60_aligned_benchmark_log_returns) / variance(trailing_60_aligned_benchmark_log_returns)',
       freeCashFlow: 'operating_cash_flow - abs(capex)',
       momentumState: 'overbought RSI>=70, oversold RSI<=30, else neutral',
       trendState: 'derived from close vs SMA20/SMA50/SMA200 hierarchy',
