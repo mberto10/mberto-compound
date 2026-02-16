@@ -51,6 +51,18 @@ function dateDaysAgo(days) {
   return formatDate(d);
 }
 
+function dateDaysBefore(dateStr, days) {
+  const d = new Date(dateStr + 'T00:00:00Z');
+  d.setUTCDate(d.getUTCDate() - days);
+  return formatDate(d);
+}
+
+function isValidDateString(dateStr) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return false;
+  const d = new Date(dateStr + 'T00:00:00Z');
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === dateStr;
+}
+
 function addParam(params, key, value) {
   if (value === undefined || value === null) return;
   const str = String(value).trim();
@@ -161,6 +173,12 @@ const minAbsMovePct = clampNumber(data.input.minAbsMovePct, 2.0, 0.1, 20);
 if (intradayInterval !== '1m' && intradayInterval !== '5m' && intradayInterval !== '1h') {
   return { error: true, message: 'intradayInterval must be 1m, 5m, or 1h' };
 }
+if (!isValidDateString(from) || !isValidDateString(to)) {
+  return { error: true, message: 'from/to must be valid YYYY-MM-DD.' };
+}
+if (from > to) {
+  return { error: true, message: 'from must be <= to.' };
+}
 
 const diagnostics = {
   calls: {
@@ -228,6 +246,7 @@ try {
   const nowUnix = Math.floor(Date.now() / 1000);
   const intradayFromUnix = nowUnix - (48 * 3600);
   const reactionTable = [];
+  const eodFrom = dateDaysBefore(from, 40);
 
   for (let i = 0; i < universe.length; i++) {
     const symbol = universe[i];
@@ -265,7 +284,7 @@ try {
       addParam(eodParams, 'fmt', 'json');
       addParam(eodParams, 'period', 'd');
       addParam(eodParams, 'order', 'a');
-      addParam(eodParams, 'from', dateDaysAgo(40));
+      addParam(eodParams, 'from', eodFrom);
       addParam(eodParams, 'to', to);
       const eodUrl = `https://eodhd.com/api/eod/${encodeURIComponent(symbol)}?${eodParams.join('&')}`;
       diagnostics.calls.eod += 1;
