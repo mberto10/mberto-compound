@@ -3,13 +3,10 @@
 //
 // symbol = EODHD symbol (required, e.g. AAPL.US)
 // help = true|false (optional, default false). If true, returns a decision guide and exits.
-// fieldsPreset = Optional beginner preset: profile|valuation|financials|ownership|technical_snapshot|corporate_actions|full
-// fields_preset = snake_case alias for fieldsPreset
+// fields_preset = Optional beginner preset: profile|valuation|financials|ownership|technical_snapshot|corporate_actions|full
 // fields = Optional comma-separated top-level keys to return. Allowed: General,Highlights,Valuation,SharesStats,SplitsDividends,Technicals,Holders,InsiderTransactions,ESGScores,outstandingShares,Earnings,Financials.
-// format = raw|summary (default: summary)
-// periods = Optional max historical periods in raw mode for Financials/Earnings/outstandingShares (min: 1, max: 40)
-// maxPeriods = camelCase alias for periods
-// max_periods = snake_case alias for periods
+// max_periods = Required max historical periods for period-based fundamentals containers (min: 1, max: 40)
+// canonical input naming uses snake_case. Legacy aliases are still supported for compatibility.
 
 function asBool(value, defaultValue) {
   if (value === undefined || value === null || value === '') return defaultValue;
@@ -20,18 +17,38 @@ function asBool(value, defaultValue) {
   return defaultValue;
 }
 
+function trimInput(value) {
+  if (value === undefined || value === null) return '';
+  return String(value).trim();
+}
+
+function recordLegacyAliasUsage(usageList, key) {
+  if (usageList.indexOf(key) === -1) usageList.push(key);
+}
+
+function getCanonicalInput(input, canonicalKey, aliases, fallback, legacyUsage) {
+  const canonicalRaw = trimInput(input[canonicalKey]);
+  const aliasValues = {};
+  for (let i = 0; i < aliases.length; i++) {
+    const alias = aliases[i];
+    const aliasRaw = trimInput(input[alias]);
+    if (aliasRaw !== '') {
+      aliasValues[alias] = aliasRaw;
+      if (legacyUsage) recordLegacyAliasUsage(legacyUsage, alias);
+    }
+  }
+  if (canonicalRaw !== '') return canonicalRaw;
+  for (let i = 0; i < aliases.length; i++) {
+    const alias = aliases[i];
+    if (aliasValues[alias] !== undefined) return aliasValues[alias];
+  }
+  return fallback;
+}
+
 function clampNumber(value, fallback, minValue, maxValue) {
   const n = Number(value);
   if (!Number.isFinite(n)) return fallback;
   return Math.min(Math.max(Math.floor(n), minValue), maxValue);
-}
-
-function firstDefined() {
-  for (let i = 0; i < arguments.length; i++) {
-    const value = arguments[i];
-    if (value !== undefined && value !== null) return value;
-  }
-  return undefined;
 }
 
 const ALLOWED_TOP_LEVEL_FIELDS = [
@@ -73,61 +90,106 @@ function safeNumber(v) {
   return Number.isFinite(n) ? n : null;
 }
 
-function trimObjectPeriods(obj, maxPeriods) {
-  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return obj;
+function isPeriodKey(key) {
+  if (!key) return false;
+  return (
+    /^\d{4}$/.test(key) ||
+    /^\d{4}-\d{2}$/.test(key) ||
+    /^\d{4}-\d{2}-\d{2}$/.test(key) ||
+    /^\d{4}Q[1-4]$/i.test(key) ||
+    /^Q[1-4]\s?\d{4}$/i.test(key)
+  );
+}
+
+function periodKeyRank(key) {
+  if (/^\d{4}$/.test(key)) return Number(key) * 10000;
+  if (/^\d{4}-\d{2}$/.test(key)) {
+    const parts = key.split('-');
+    return Number(parts[0]) * 10000 + Number(parts[1]) * 100;
+  }
+  if (/^\d{4}-\d{2}-\d{2}$/.test(key)) {
+    const parts = key.split('-');
+    return Number(parts[0]) * 10000 + Number(parts[1]) * 100 + Number(parts[2]);
+  }
+  if (/^\d{4}Q[1-4]$/i.test(key)) {
+    const year = Number(key.slice(0, 4));
+    const quarter = Number(key.slice(5));
+    return year * 10 + quarter;
+  }
+  if (/^Q[1-4]\s?\d{4}$/i.test(key)) {
+    const quarter = Number(key.charAt(1));
+    const year = Number(key.replace(/^Q[1-4]\s?/i, ''));
+    return year * 10 + quarter;
+  }
+  return null;
+}
+
+function looksLikePeriodObject(obj) {
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return false;
   const keys = Object.keys(obj);
-  if (keys.length <= maxPeriods) return obj;
-  const trimmed = {};
-  for (let i = 0; i < maxPeriods; i++) {
+  if (keys.length < 2) return false;
+  let periodKeyCount = 0;
+  for (let i = 0; i < keys.length; i++) {
+    if (isPeriodKey(keys[i])) periodKeyCount++;
+  }
+  return periodKeyCount >= Math.max(2, Math.ceil(keys.length * 0.6));
+}
+
+function sortPeriodKeysDescending(keys) {
+  return keys.slice().sort((a, b) => {
+    const ra = periodKeyRank(a);
+    const rb = periodKeyRank(b);
+    if (ra !== null && rb !== null && ra !== rb) return rb - ra;
+    if (ra !== null && rb === null) return -1;
+    if (ra === null && rb !== null) return 1;
+    if (a < b) return 1;
+    if (a > b) return -1;
+    return 0;
+  });
+}
+
+function looksLikePeriodArray(arr, parentKey) {
+  if (!Array.isArray(arr) || arr.length < 2) return false;
+  const key = (parentKey || '').toLowerCase();
+  if (key === 'trend' || key === 'history' || key === 'annual' || key === 'yearly' || key === 'quarterly' || key === 'quarters') {
+    return true;
+  }
+  const first = arr[0];
+  if (!first || typeof first !== 'object' || Array.isArray(first)) return false;
+  return !!(
+    first.date ||
+    first.fiscalDateEnding ||
+    first.reportDate ||
+    first.period ||
+    first.calendarDate
+  );
+}
+
+function applyPeriodLimit(payload, maxPeriods, parentKey) {
+  if (payload === null || payload === undefined) return payload;
+  if (Array.isArray(payload)) {
+    const mapped = payload.map((item) => applyPeriodLimit(item, maxPeriods, parentKey));
+    if (looksLikePeriodArray(mapped, parentKey)) return mapped.slice(0, maxPeriods);
+    return mapped;
+  }
+  if (typeof payload !== 'object') return payload;
+
+  const out = {};
+  const keys = Object.keys(payload);
+  for (let i = 0; i < keys.length; i++) {
     const key = keys[i];
-    trimmed[key] = obj[key];
+    out[key] = applyPeriodLimit(payload[key], maxPeriods, key);
+  }
+
+  if (!looksLikePeriodObject(out)) return out;
+  const orderedKeys = sortPeriodKeysDescending(Object.keys(out));
+  const limitedKeys = orderedKeys.slice(0, maxPeriods);
+  const trimmed = {};
+  for (let i = 0; i < limitedKeys.length; i++) {
+    const key = limitedKeys[i];
+    trimmed[key] = out[key];
   }
   return trimmed;
-}
-
-function trimArrayPeriods(arr, maxPeriods) {
-  if (!Array.isArray(arr)) return arr;
-  return arr.slice(0, maxPeriods);
-}
-
-function applyPeriodLimit(payload, maxPeriods) {
-  if (!payload || typeof payload !== 'object' || Array.isArray(payload) || !maxPeriods) return payload;
-  const out = { ...payload };
-
-  if (out.Earnings && typeof out.Earnings === 'object' && !Array.isArray(out.Earnings)) {
-    const earnings = { ...out.Earnings };
-    earnings.History = trimObjectPeriods(earnings.History, maxPeriods);
-    earnings.history = trimObjectPeriods(earnings.history, maxPeriods);
-    out.Earnings = earnings;
-  }
-
-  if (out.outstandingShares && typeof out.outstandingShares === 'object' && !Array.isArray(out.outstandingShares)) {
-    const shares = { ...out.outstandingShares };
-    shares.annual = trimObjectPeriods(shares.annual, maxPeriods);
-    shares.yearly = trimObjectPeriods(shares.yearly, maxPeriods);
-    shares.quarterly = trimObjectPeriods(shares.quarterly, maxPeriods);
-    shares.quarters = trimObjectPeriods(shares.quarters, maxPeriods);
-    out.outstandingShares = shares;
-  }
-
-  if (out.Financials && typeof out.Financials === 'object' && !Array.isArray(out.Financials)) {
-    const financials = { ...out.Financials };
-    const statements = ['Balance_Sheet', 'Income_Statement', 'Cash_Flow'];
-    for (let i = 0; i < statements.length; i++) {
-      const statementKey = statements[i];
-      const statement = financials[statementKey];
-      if (!statement || typeof statement !== 'object' || Array.isArray(statement)) continue;
-      const statementOut = { ...statement };
-      statementOut.yearly = trimObjectPeriods(statementOut.yearly, maxPeriods);
-      statementOut.quarterly = trimObjectPeriods(statementOut.quarterly, maxPeriods);
-      statementOut.annual = trimObjectPeriods(statementOut.annual, maxPeriods);
-      statementOut.trend = trimArrayPeriods(statementOut.trend, maxPeriods);
-      financials[statementKey] = statementOut;
-    }
-    out.Financials = financials;
-  }
-
-  return out;
 }
 
 async function fetchJson(url, label) {
@@ -148,8 +210,38 @@ async function fetchJson(url, label) {
   return response.json;
 }
 
-const help = asBool(data.input.help, false);
-const fieldsPresetInput = (data.input.fieldsPreset || data.input.fields_preset || '').toString().trim().toLowerCase();
+function deprecationWarnings(inputCompatibility) {
+  if (!inputCompatibility || inputCompatibility.length === 0) return [];
+  return ['Deprecated legacy input key(s) used: ' + inputCompatibility.join(', ') + '. Use snake_case canonical names when possible.'];
+}
+
+const INPUT_ALIASES = {
+  fields_preset: ['fieldsPreset'],
+  max_periods: ['maxPeriods', 'periods'],
+};
+
+const input = (data && data.input) ? data.input : {};
+const inputCompatibility = [];
+const help = asBool(getCanonicalInput(input, 'help', [], false, inputCompatibility), false);
+const fieldsPresetInput = getCanonicalInput(input, 'fields_preset', INPUT_ALIASES.fields_preset, '', inputCompatibility).toLowerCase();
+const fieldsInput = getCanonicalInput(input, 'fields', [], '', inputCompatibility);
+const maxPeriodsInput = getCanonicalInput(input, 'max_periods', INPUT_ALIASES.max_periods, null, inputCompatibility);
+if (maxPeriodsInput === null) {
+  return {
+    error: true,
+    message: 'maxPeriods is required (supported aliases: max_periods, periods).',
+    details: { maxPeriods: null },
+  };
+}
+const parsedPeriods = Number(maxPeriodsInput);
+if (!Number.isFinite(parsedPeriods) || Math.trunc(parsedPeriods) !== parsedPeriods || parsedPeriods < 1 || parsedPeriods > 40) {
+  return {
+    error: true,
+    message: 'maxPeriods must be an integer between 1 and 40.',
+    details: { maxPeriods: maxPeriodsInput },
+  };
+}
+const periods = parsedPeriods;
 
 if (help) {
   return {
@@ -158,22 +250,27 @@ if (help) {
       decisionGuide: {
         whenToUse: 'Use this when you need company profile, valuation, ownership, or accounting fundamentals for one symbol.',
         quickChoices: [
-          { goal: 'Quick company snapshot', use: { symbol: 'AAPL.US', format: 'summary' } },
-          { goal: 'Valuation payload', use: { symbol: 'AAPL.US', fieldsPreset: 'valuation', format: 'raw' } },
-          { goal: 'Financial statement deep dive', use: { symbol: 'AAPL.US', fieldsPreset: 'financials', format: 'raw', periods: 4 } },
+          { goal: 'Quick company snapshot', use: { symbol: 'AAPL.US', maxPeriods: 4 } },
+          { goal: 'Valuation payload', use: { symbol: 'AAPL.US', fieldsPreset: 'valuation', maxPeriods: 4 } },
+          { goal: 'Financial statement deep dive', use: { symbol: 'AAPL.US', fieldsPreset: 'financials', maxPeriods: 4 } },
         ],
       },
       allowedFields: ALLOWED_TOP_LEVEL_FIELDS,
       fieldsPresetMap: FIELDS_PRESET_MAP,
-      formatOptions: ['raw', 'summary'],
+      migrationNote: {
+        canonicalInputs: ['fields_preset', 'max_periods'],
+        legacyAliases: ['fieldsPreset', 'maxPeriods', 'periods'],
+      },
     },
     endpointDiagnostics: {
       endpoint: '/api/fundamentals/{symbol}',
       helpOnly: true,
+      aliasWarnings: deprecationWarnings(inputCompatibility),
     },
     metadata: {
       source: 'EODHD atomic action: get_fundamentals',
       generatedAt: new Date().toISOString(),
+      inputCompatibility,
     },
   };
 }
@@ -190,25 +287,24 @@ const apiKey = (
 ).toString().trim();
 if (!apiKey) return { error: true, message: 'Missing auth credential. Set one of: auth.apiKey, auth.apiToken, auth.api_key, auth.api_token, auth.eodhdApiKey' };
 
-const symbol = (data.input.symbol || '').toString().trim().toUpperCase();
-const fieldsInput = (data.input.fields || '').toString().trim();
-const formatInput = (data.input.format || 'summary').toString().trim().toLowerCase();
-const periodsInput = firstDefined(data.input.periods, data.input.maxPeriods, data.input.max_periods);
-const hasPeriodsInput = periodsInput !== undefined && periodsInput !== null && String(periodsInput).trim() !== '';
-const periods = hasPeriodsInput ? clampNumber(periodsInput, 8, 1, 40) : null;
+const symbol = getCanonicalInput(input, 'symbol', [], '', inputCompatibility).toUpperCase();
 
 if (!symbol) return { error: true, message: 'symbol is required.' };
-if (formatInput !== 'raw' && formatInput !== 'summary') {
-  return { error: true, message: 'format must be raw or summary.' };
-}
 if (fieldsPresetInput && !Object.prototype.hasOwnProperty.call(FIELDS_PRESET_MAP, fieldsPresetInput)) {
   return {
     error: true,
-    message: 'Unknown fieldsPreset value.',
+    message: 'Unknown fields_preset value.',
     details: {
-      fieldsPresetInput,
+      fields_preset: fieldsPresetInput,
       allowedFieldsPresets: Object.keys(FIELDS_PRESET_MAP),
     },
+  };
+}
+if (fieldsPresetInput === 'full') {
+  return {
+    error: true,
+    message: 'fieldsPreset=full is not supported. Choose a bounded preset or explicit fields.',
+    details: { fieldsPreset: fieldsPresetInput },
   };
 }
 
@@ -222,34 +318,39 @@ let fields = [];
 if (fieldsInput) {
   const parsed = fieldsInput.split(',').map((s) => s.trim()).filter(Boolean);
   const useAll = parsed.some((v) => v.toLowerCase() === 'all' || v === '*');
-  if (!useAll) {
-    const unknownFields = [];
-    const canonical = [];
-    const seen = {};
-    for (let i = 0; i < parsed.length; i++) {
-      const lower = parsed[i].toLowerCase();
-      const mapped = allowedFieldsMap[lower];
-      if (!mapped) {
-        unknownFields.push(parsed[i]);
-        continue;
-      }
-      if (!seen[mapped]) {
-        seen[mapped] = true;
-        canonical.push(mapped);
-      }
-    }
-    if (unknownFields.length > 0) {
-      return {
-        error: true,
-        message: 'Unknown fields value(s) for fundamentals.',
-        details: {
-          unknownFields,
-          allowedFields: ALLOWED_TOP_LEVEL_FIELDS,
-        },
-      };
-    }
-    fields = canonical;
+  if (useAll) {
+    return {
+      error: true,
+      message: 'fields=all/* is not supported. Choose explicit bounded fields.',
+      details: { fields: parsed },
+    };
   }
+  const unknownFields = [];
+  const canonical = [];
+  const seen = {};
+  for (let i = 0; i < parsed.length; i++) {
+    const lower = parsed[i].toLowerCase();
+    const mapped = allowedFieldsMap[lower];
+    if (!mapped) {
+      unknownFields.push(parsed[i]);
+      continue;
+    }
+    if (!seen[mapped]) {
+      seen[mapped] = true;
+      canonical.push(mapped);
+    }
+  }
+  if (unknownFields.length > 0) {
+    return {
+      error: true,
+      message: 'Unknown fields value(s) for fundamentals.',
+      details: {
+        unknownFields,
+        allowedFields: ALLOWED_TOP_LEVEL_FIELDS,
+      },
+    };
+  }
+  fields = canonical;
 } else if (fieldsPresetInput && fieldsPresetInput !== 'full') {
   fields = FIELDS_PRESET_MAP[fieldsPresetInput].slice();
 }
@@ -258,9 +359,7 @@ try {
   const params = [];
   addParam(params, 'api_token', apiKey);
   addParam(params, 'fmt', 'json');
-  const requestFilterFields = formatInput === 'summary'
-    ? SUMMARY_FILTER_FIELDS
-    : fields;
+  const requestFilterFields = fields.length > 0 ? fields : SUMMARY_FILTER_FIELDS;
   if (requestFilterFields.length > 0) {
     addParam(params, 'filter', requestFilterFields.join(','));
   }
@@ -271,19 +370,14 @@ try {
     ? Object.keys(raw).sort()
     : [];
 
-  let selected = raw;
-  if (formatInput === 'raw' && fields.length > 0) {
-    selected = {};
-    for (let i = 0; i < fields.length; i++) {
-      const key = fields[i];
-      if (raw && Object.prototype.hasOwnProperty.call(raw, key)) {
-        selected[key] = raw[key];
-      }
+  let selected = {};
+  for (let i = 0; i < requestFilterFields.length; i++) {
+    const key = requestFilterFields[i];
+    if (raw && Object.prototype.hasOwnProperty.call(raw, key)) {
+      selected[key] = raw[key];
     }
   }
-  if (formatInput === 'raw' && periods) {
-    selected = applyPeriodLimit(selected, periods);
-  }
+  selected = applyPeriodLimit(selected, periods, '');
 
   const general = raw && raw.General ? raw.General : {};
   const highlights = raw && raw.Highlights ? raw.Highlights : {};
@@ -310,8 +404,10 @@ try {
     updatedAt: (general.UpdatedAt || '').toString() || null,
   };
 
+  const hasExplicitFieldSelection = !!(fieldsInput || fieldsPresetInput);
+
   return {
-    data: formatInput === 'summary' ? summary : selected,
+    data: hasExplicitFieldSelection ? selected : summary,
     summary,
     endpointDiagnostics: {
       endpoint: '/api/fundamentals/{symbol}',
@@ -323,17 +419,19 @@ try {
       allowedFields: ALLOWED_TOP_LEVEL_FIELDS,
       availableTopLevelKeys,
       responseType: Array.isArray(raw) ? 'array' : typeof raw,
+      aliasWarnings: deprecationWarnings(inputCompatibility),
+      inputCompatibility,
     },
     metadata: {
       source: 'EODHD atomic action: get_fundamentals',
       generatedAt: new Date().toISOString(),
       parameters: {
         symbol,
-        format: formatInput,
         fields,
-        fieldsPreset: fieldsPresetInput || null,
-        periods: periods || null,
+        fields_preset: fieldsPresetInput || null,
+        max_periods: periods || null,
       },
+      inputCompatibility,
     },
   };
 } catch (error) {

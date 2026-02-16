@@ -25,6 +25,12 @@
       "description": "Hypothesis-driven optimization loop for AI agents with persistent state and compounding"
     },
     {
+      "name": "agentic-optimization-commands",
+      "path": "codex-skills/agentic-optimization-commands",
+      "version": "0.1.0",
+      "description": "Codex wrapper commands for optimize-bootstrap, optimize, optimize-status, and cloud-optimize"
+    },
+    {
       "name": "evaluation-design",
       "path": "codex-skills/evaluation-design",
       "version": "0.1.0",
@@ -137,6 +143,18 @@
       "path": "codex-skills/langfuse-dataset-setup",
       "version": "0.1.0",
       "description": "Wizard for Langfuse dataset and judge setup"
+    },
+    {
+      "name": "langfuse-eval-infrastructure",
+      "path": "codex-skills/langfuse-eval-infrastructure",
+      "version": "0.1.0",
+      "description": "Bootstrap and validate Langfuse evaluation infrastructure contracts and snapshots"
+    },
+    {
+      "name": "langfuse-analyzer-commands",
+      "path": "codex-skills/langfuse-analyzer-commands",
+      "version": "0.1.0",
+      "description": "Codex wrapper commands for agent-eval workflows and Langfuse skill parity sync"
     },
     {
       "name": "compound-improvement-cycle-setup",

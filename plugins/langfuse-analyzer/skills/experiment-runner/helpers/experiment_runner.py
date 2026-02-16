@@ -609,6 +609,35 @@ def format_score_dual(value: float) -> str:
     """Format score with canonical and human-readable equivalents."""
     return f"{value:.3f} ({value * 10:.1f}/10)"
 
+CANONICAL_SCORE_SCALE = "0-1"
+
+
+def normalize_score(value: Any) -> float:
+    """
+    Normalize raw score values to canonical 0-1 scale.
+
+    Accepted inputs:
+    - 0-1 (already normalized)
+    - 0-10 (converted to 0-1)
+    """
+    try:
+        v = float(value)
+    except (TypeError, ValueError):
+        return 0.0
+
+    if v < 0:
+        return 0.0
+    if v <= 1.0:
+        return v
+    if v <= 10.0:
+        return v / 10.0
+    return 1.0
+
+
+def format_score_dual(value: float) -> str:
+    """Format score with canonical and human-readable equivalents."""
+    return f"{value:.3f} ({value * 10:.1f}/10)"
+
 
 def create_langfuse_judge_evaluator(prompt_name: str, client) -> Callable:
     """

@@ -37,3 +37,6 @@ Purpose: source of truth for single-endpoint EODHD Langdock actions and rollout 
   - `data`
   - `endpointDiagnostics`
   - `metadata`
+- Input contract cleanup in progress for core EODHD actions:
+  - Canonical snake_case names in docs and parser precedence.
+  - Backward-compatible legacy camelCase aliases retained temporarily via `metadata.inputCompatibility`.
