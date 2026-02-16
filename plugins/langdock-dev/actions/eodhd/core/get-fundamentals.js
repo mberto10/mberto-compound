@@ -6,7 +6,9 @@
 // fieldsPreset = Optional beginner preset: profile|valuation|financials|ownership|technical_snapshot|corporate_actions|full
 // fields = Optional comma-separated top-level keys to return. Allowed: General,Highlights,Valuation,SharesStats,SplitsDividends,Technicals,Holders,InsiderTransactions,ESGScores,outstandingShares,Earnings,Financials.
 // format = raw|summary (default: summary)
-// maxPeriods = Optional cap for yearly/quarterly history blocks in raw output (default: no cap, min: 1, max: 120)
+// periods = Optional cap for yearly/quarterly history blocks in raw output (default: no cap, min: 1, max: 120)
+// maxPeriods = Optional alias for periods
+// max_periods = Optional alias for periods
 
 function asBool(value, defaultValue) {
   if (value === undefined || value === null || value === '') return defaultValue;
@@ -93,9 +95,12 @@ if (!apiKey) return { error: true, message: 'Missing auth credential. Set one of
 const symbol = (data.input.symbol || '').toString().trim().toUpperCase();
 const fieldsInput = (data.input.fields || '').toString().trim();
 const formatInput = (data.input.format || 'summary').toString().trim().toLowerCase();
-const maxPeriodsRaw = data.input.maxPeriods !== undefined ? data.input.maxPeriods : data.input.max_periods;
-const hasMaxPeriodsInput = maxPeriodsRaw !== undefined && maxPeriodsRaw !== null && String(maxPeriodsRaw).trim() !== '';
-const maxPeriods = hasMaxPeriodsInput ? clampNumber(maxPeriodsRaw, 8, 1, 120) : null;
+const periodsRaw =
+  data.input.periods !== undefined
+    ? data.input.periods
+    : (data.input.maxPeriods !== undefined ? data.input.maxPeriods : data.input.max_periods);
+const hasPeriodsInput = periodsRaw !== undefined && periodsRaw !== null && String(periodsRaw).trim() !== '';
+const periods = hasPeriodsInput ? clampNumber(periodsRaw, 8, 1, 120) : null;
 
 if (!symbol) return { error: true, message: 'symbol is required.' };
 if (formatInput !== 'raw' && formatInput !== 'summary') {
@@ -273,8 +278,8 @@ try {
       }
     }
   }
-  if (formatInput === 'raw' && Number.isFinite(maxPeriods)) {
-    selected = applyMaxPeriodsToRaw(selected, maxPeriods);
+  if (formatInput === 'raw' && Number.isFinite(periods)) {
+    selected = applyMaxPeriodsToRaw(selected, periods);
   }
 
   const general = raw && raw.General ? raw.General : {};
@@ -314,13 +319,13 @@ try {
       allowedFields: ALLOWED_TOP_LEVEL_FIELDS,
       availableTopLevelKeys,
       responseType: Array.isArray(raw) ? 'array' : typeof raw,
-      maxPeriods,
-      periodsCapped: formatInput === 'raw' && Number.isFinite(maxPeriods),
+      periods,
+      periodsCapped: formatInput === 'raw' && Number.isFinite(periods),
     },
     metadata: {
       source: 'EODHD atomic action: get_fundamentals',
       generatedAt: new Date().toISOString(),
-      parameters: { symbol, format: formatInput, fields, fieldsPreset: fieldsPresetInput || null, maxPeriods },
+      parameters: { symbol, format: formatInput, fields, fieldsPreset: fieldsPresetInput || null, periods },
     },
   };
 } catch (error) {
