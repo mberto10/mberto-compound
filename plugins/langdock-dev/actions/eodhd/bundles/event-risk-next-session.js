@@ -4,15 +4,16 @@
 // symbols = Optional comma-separated symbols to prioritize (e.g. AAPL.US,MSFT.US)
 // from = Start date YYYY-MM-DD (default: today)
 // to = End date YYYY-MM-DD (default: +2 days)
-// daysAhead = Used when to not provided (default: 2, min: 1, max: 14)
-// includeIpos = Include IPO events (default: false)
-// includeTrends = Include trends events if available (default: false)
-// includeNews = Include recent headlines (default: true)
-// newsLookbackDays = News lookback in days (default: 3, min: 1, max: 30)
-// newsLimit = Maximum news items to fetch (default: 60, min: 1, max: 200)
-// maxSymbols = Maximum symbols to score (default: 40, min: 5, max: 100)
-// outputMode = compact|full (default: compact)
-// resultLimit = Maximum rows in summary risk tables (default: 10, min: 1, max: 50)
+// days_ahead = Used when to not provided (default: 2, min: 1, max: 14)
+// include_ipos = Include IPO events (default: false)
+// include_trends = Include trends events if available (default: false)
+// include_news = Include recent headlines (default: true)
+// news_lookback_days = News lookback in days (default: 3, min: 1, max: 30)
+// news_limit = Maximum news items to fetch (default: 60, min: 1, max: 200)
+// max_symbols = Maximum symbols to score (default: 40, min: 5, max: 100)
+// output_mode = compact|full (default: compact)
+// result_limit = Maximum rows in summary risk tables (default: 10, min: 1, max: 50)
+// canonical input naming uses snake_case. Legacy camelCase aliases are supported for compatibility.
 
 const auth = (data && data.auth) ? data.auth : {};
 const apiKey = (
@@ -25,6 +26,39 @@ const apiKey = (
   ''
 ).toString().trim();
 if (!apiKey) return { error: true, message: 'Missing auth credential. Set one of: auth.apiKey, auth.apiToken, auth.api_key, auth.api_token, auth.eodhdApiKey' };
+
+function trimInput(value) {
+  if (value === undefined || value === null) return '';
+  return String(value).trim();
+}
+
+function recordLegacyAliasUsage(usageList, key) {
+  if (usageList.indexOf(key) === -1) usageList.push(key);
+}
+
+function getCanonicalInput(input, canonicalKey, aliases, fallback, legacyUsage) {
+  const canonicalRaw = trimInput(input[canonicalKey]);
+  const aliasValues = {};
+  for (let i = 0; i < aliases.length; i++) {
+    const alias = aliases[i];
+    const aliasRaw = trimInput(input[alias]);
+    if (aliasRaw !== '') {
+      aliasValues[alias] = aliasRaw;
+      if (legacyUsage) recordLegacyAliasUsage(legacyUsage, alias);
+    }
+  }
+  if (canonicalRaw !== '') return canonicalRaw;
+  for (let i = 0; i < aliases.length; i++) {
+    const alias = aliases[i];
+    if (aliasValues[alias] !== undefined) return aliasValues[alias];
+  }
+  return fallback;
+}
+
+function deprecationWarnings(inputCompatibility) {
+  if (!inputCompatibility || inputCompatibility.length === 0) return [];
+  return ['Deprecated legacy input key(s) used: ' + inputCompatibility.join(', ') + '. Use snake_case canonical names when possible.'];
+}
 
 function asBool(value, defaultValue) {
   if (value === undefined || value === null || value === '') return defaultValue;
@@ -186,19 +220,33 @@ async function fetchJson(url, label) {
   return response.json;
 }
 
-const inputSymbols = (data.input.symbols || '').toString().trim();
-const fromInput = (data.input.from || '').toString().trim();
-const toInput = (data.input.to || '').toString().trim();
-const daysAhead = clampNumber(data.input.daysAhead, 2, 1, 14);
-const includeIpos = asBool(data.input.includeIpos, false);
-const includeTrends = asBool(data.input.includeTrends, false);
-const includeNews = asBool(data.input.includeNews, true);
-const newsLookbackDays = clampNumber(data.input.newsLookbackDays, 3, 1, 30);
-const newsLimit = clampNumber(data.input.newsLimit, 60, 1, 200);
-const maxSymbols = clampNumber(data.input.maxSymbols, 40, 5, 100);
-const outputMode = (data.input.outputMode || 'compact').toString().trim().toLowerCase();
-const resultLimit = clampNumber(data.input.resultLimit, 10, 1, 50);
-if (outputMode !== 'compact' && outputMode !== 'full') return { error: true, message: 'outputMode must be compact or full.' };
+const input = (data && data.input) ? data.input : {};
+const inputCompatibility = [];
+const INPUT_ALIASES = {
+  days_ahead: ['daysAhead'],
+  include_ipos: ['includeIpos'],
+  include_trends: ['includeTrends'],
+  include_news: ['includeNews'],
+  news_lookback_days: ['newsLookbackDays'],
+  news_limit: ['newsLimit'],
+  max_symbols: ['maxSymbols'],
+  output_mode: ['outputMode'],
+  result_limit: ['resultLimit'],
+};
+
+const inputSymbols = getCanonicalInput(input, 'symbols', [], '', inputCompatibility);
+const fromInput = getCanonicalInput(input, 'from', [], '', inputCompatibility);
+const toInput = getCanonicalInput(input, 'to', [], '', inputCompatibility);
+const daysAhead = clampNumber(getCanonicalInput(input, 'days_ahead', INPUT_ALIASES.days_ahead, 2, inputCompatibility), 2, 1, 14);
+const includeIpos = asBool(getCanonicalInput(input, 'include_ipos', INPUT_ALIASES.include_ipos, false, inputCompatibility), false);
+const includeTrends = asBool(getCanonicalInput(input, 'include_trends', INPUT_ALIASES.include_trends, false, inputCompatibility), false);
+const includeNews = asBool(getCanonicalInput(input, 'include_news', INPUT_ALIASES.include_news, true, inputCompatibility), true);
+const newsLookbackDays = clampNumber(getCanonicalInput(input, 'news_lookback_days', INPUT_ALIASES.news_lookback_days, 3, inputCompatibility), 3, 1, 30);
+const newsLimit = clampNumber(getCanonicalInput(input, 'news_limit', INPUT_ALIASES.news_limit, 60, inputCompatibility), 60, 1, 200);
+const maxSymbols = clampNumber(getCanonicalInput(input, 'max_symbols', INPUT_ALIASES.max_symbols, 40, inputCompatibility), 40, 5, 100);
+const outputMode = getCanonicalInput(input, 'output_mode', INPUT_ALIASES.output_mode, 'compact', inputCompatibility).toLowerCase();
+const resultLimit = clampNumber(getCanonicalInput(input, 'result_limit', INPUT_ALIASES.result_limit, 10, inputCompatibility), 10, 1, 50);
+if (outputMode !== 'compact' && outputMode !== 'full') return { error: true, message: 'output_mode must be compact or full.' };
 
 const from = fromInput || formatDate(new Date());
 const to = toInput || dateDaysAhead(daysAhead);
@@ -416,6 +464,8 @@ try {
     outputMode,
     truncated: truncationNotes.length > 0,
     truncationNotes,
+    aliasWarnings: deprecationWarnings(inputCompatibility),
+    inputCompatibility,
   });
 
   return {
@@ -470,6 +520,7 @@ try {
         resultLimit,
         outputMode,
       },
+      inputCompatibility,
     },
   };
 } catch (error) {

@@ -6,9 +6,9 @@
 // filters = Optional advanced JSON string for EODHD screener filters
 // signals = Optional comma-separated screener signals (common: top_gainers,top_losers,oversold,overbought)
 // sort = Optional sort field. Common: market_capitalization.desc,market_capitalization.asc,name.asc,name.desc,volume.desc,change_p.desc
-// outputMode = compact|full (default: compact)
-// limit = Max rows (default: 25, min: 1, max: 500)
-// offset = Pagination offset (default: 0, min: 0)
+// output_mode = compact|full (default: compact)
+// result_limit = Optional max returned rows after fetch (default: limit, min: 1, max: 500)
+// canonical input naming uses snake_case. Legacy camelCase aliases are supported for compatibility.
 
 function asBool(value, defaultValue) {
   if (value === undefined || value === null || value === '') return defaultValue;
@@ -19,12 +19,61 @@ function asBool(value, defaultValue) {
   return defaultValue;
 }
 
-const help = asBool(data.input.help, false);
-const presetInput = (data.input.preset || '').toString().trim().toLowerCase();
-const filtersInput = (data.input.filters || '').toString().trim();
-const signalsInputRaw = (data.input.signals || '').toString().trim();
-const sortInputRaw = (data.input.sort || '').toString().trim();
-const outputMode = (data.input.outputMode || 'compact').toString().trim().toLowerCase();
+function trimInput(value) {
+  if (value === undefined || value === null) return '';
+  return String(value).trim();
+}
+
+function recordLegacyAliasUsage(usageList, key) {
+  if (usageList.indexOf(key) === -1) usageList.push(key);
+}
+
+function getCanonicalInput(input, canonicalKey, aliases, fallback, legacyUsage) {
+  const canonicalRaw = trimInput(input[canonicalKey]);
+  const aliasValues = {};
+  for (let i = 0; i < aliases.length; i++) {
+    const alias = aliases[i];
+    const aliasRaw = trimInput(input[alias]);
+    if (aliasRaw !== '') {
+      aliasValues[alias] = aliasRaw;
+      if (legacyUsage) recordLegacyAliasUsage(legacyUsage, alias);
+    }
+  }
+  if (canonicalRaw !== '') return canonicalRaw;
+  for (let i = 0; i < aliases.length; i++) {
+    const alias = aliases[i];
+    if (aliasValues[alias] !== undefined) return aliasValues[alias];
+  }
+  return fallback;
+}
+
+function clampNumber(value, fallback, minValue, maxValue) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(Math.max(Math.floor(n), minValue), maxValue);
+}
+
+const INPUT_ALIASES = {
+  output_mode: ['outputMode'],
+  result_limit: ['resultLimit'],
+};
+
+function deprecationWarnings(inputCompatibility) {
+  if (!inputCompatibility || inputCompatibility.length === 0) return [];
+  return ['Deprecated legacy input key(s) used: ' + inputCompatibility.join(', ') + '. Use snake_case canonical names when possible.'];
+}
+
+const input = (data && data.input) ? data.input : {};
+const inputCompatibility = [];
+const help = asBool(getCanonicalInput(input, 'help', [], false, inputCompatibility), false);
+const presetInput = getCanonicalInput(input, 'preset', [], '', inputCompatibility).toString().trim().toLowerCase();
+const filtersInput = getCanonicalInput(input, 'filters', [], '', inputCompatibility);
+const signalsInputRaw = getCanonicalInput(input, 'signals', [], '', inputCompatibility);
+const sortInputRaw = getCanonicalInput(input, 'sort', [], '', inputCompatibility);
+const outputMode = getCanonicalInput(input, 'output_mode', INPUT_ALIASES.output_mode, 'compact', inputCompatibility).toString().trim().toLowerCase();
+const limitInput = getCanonicalInput(input, 'limit', [], null, inputCompatibility);
+const offsetInput = getCanonicalInput(input, 'offset', [], null, inputCompatibility);
+const resultLimitInput = getCanonicalInput(input, 'result_limit', INPUT_ALIASES.result_limit, null, inputCompatibility);
 
 const COMMON_SORT_OPTIONS = [
   'market_capitalization.desc',
@@ -97,14 +146,20 @@ if (help) {
       advancedNotes: {
         filters: 'filters is advanced raw JSON for EODHD screener. Prefer preset/signals first if unsure.',
       },
+      migrationNote: {
+        canonicalInputs: ['output_mode', 'result_limit'],
+        legacyAliases: ['outputMode', 'resultLimit'],
+      },
     },
     endpointDiagnostics: {
       endpoint: '/api/screener',
       helpOnly: true,
+      aliasWarnings: deprecationWarnings(inputCompatibility),
     },
     metadata: {
       source: 'EODHD atomic action: run_screener',
       generatedAt: new Date().toISOString(),
+      inputCompatibility,
     },
   };
 }
@@ -121,13 +176,7 @@ const apiKey = (
 ).toString().trim();
 if (!apiKey) return { error: true, message: 'Missing auth credential. Set one of: auth.apiKey, auth.apiToken, auth.api_key, auth.api_token, auth.eodhdApiKey' };
 if (outputMode !== 'compact' && outputMode !== 'full') {
-  return { error: true, message: 'outputMode must be compact or full.' };
-}
-
-function clampNumber(value, fallback, minValue, maxValue) {
-  const n = Number(value);
-  if (!Number.isFinite(n)) return fallback;
-  return Math.min(Math.max(Math.floor(n), minValue), maxValue);
+  return { error: true, message: 'output_mode must be compact or full.' };
 }
 
 if (presetInput && !Object.prototype.hasOwnProperty.call(PRESET_MAP, presetInput)) {
@@ -135,19 +184,20 @@ if (presetInput && !Object.prototype.hasOwnProperty.call(PRESET_MAP, presetInput
     error: true,
     message: 'Unknown preset value for run_screener.',
     details: {
-      presetInput,
+      preset: presetInput,
       allowedPresets: Object.keys(PRESET_MAP),
     },
   };
 }
 
 const preset = presetInput ? PRESET_MAP[presetInput] : null;
-const hasUserLimit = data.input.limit !== undefined && data.input.limit !== null && String(data.input.limit).trim() !== '';
-let limit = clampNumber(data.input.limit, 25, 1, 500);
+const hasUserLimit = limitInput !== null;
+let limit = clampNumber(limitInput, 25, 1, 500);
 if (!hasUserLimit && preset && Number.isFinite(preset.limit)) {
   limit = clampNumber(preset.limit, 50, 1, 500);
 }
-const offset = clampNumber(data.input.offset, 0, 0, 1000000);
+const offset = clampNumber(offsetInput, 0, 0, 1000000);
+const resultLimit = clampNumber(resultLimitInput, limit, 1, 500);
 
 const sortInput = sortInputRaw || (preset ? preset.sort : 'market_capitalization.desc');
 const signalsInput = signalsInputRaw || (preset ? preset.signals : '');
@@ -235,8 +285,6 @@ try {
   const rows = Array.isArray(payload)
     ? payload
     : (Array.isArray(payload.data) ? payload.data : (Array.isArray(payload.results) ? payload.results : []));
-
-  const symbols = dedupe(rows.map(extractSymbol).filter(Boolean));
   const compactRows = rows.map((row) => ({
     symbol: extractSymbol(row),
     code: firstText(row, ['code', 'Code', 'ticker']),
@@ -249,34 +297,52 @@ try {
     volume: safeNumber(row.volume),
     marketCap: safeNumber(row.market_capitalization || row.marketCap),
   }));
+  const truncated = compactRows.length > resultLimit;
+  const compactRowsLimited = compactRows.slice(0, resultLimit);
+  const rawRowsLimited = rows.slice(0, resultLimit);
+  const symbols = dedupe(compactRowsLimited.map((row) => row.symbol).filter(Boolean));
 
   const dataBlock = {
-    rows: outputMode === 'full' ? rows : compactRows,
+    rows: compactRowsLimited,
+    rowCount: compactRowsLimited.length,
     symbols,
-    count: rows.length,
+    truncated,
+    truncationReason: truncated ? `Returned ${compactRowsLimited.length} of ${rows.length} rows (resultLimit=${resultLimit}).` : null,
   };
-  if (outputMode === 'full') dataBlock.rawRows = rows;
+  if (outputMode === 'full') {
+    dataBlock.rawRows = rawRowsLimited;
+    dataBlock.debug = {
+      sort: sortInput,
+      signals: signalsInput || null,
+      filtersProvided: parsedFilters ? true : false,
+      preset: presetInput || null,
+      outputMode,
+      limit,
+      offset,
+    };
+  }
 
   return {
     data: dataBlock,
     endpointDiagnostics: {
       endpoint: '/api/screener',
+      preset: presetInput || null,
       parameters: {
+        preset: presetInput || null,
+        sort: sortInput,
+        signals: signalsInput || null,
         limit,
         offset,
-        sort: sortInput,
-        hasFilters: !!parsedFilters,
-        signals: signalsInput || null,
-        preset: presetInput || null,
+        resultLimit,
         outputMode,
       },
-      commonSortOptions: COMMON_SORT_OPTIONS,
-      commonSignals: COMMON_SIGNALS,
-      presets: PRESET_MAP,
+      aliasWarnings: deprecationWarnings(inputCompatibility),
+      inputCompatibility,
     },
     metadata: {
       source: 'EODHD atomic action: run_screener',
       generatedAt: new Date().toISOString(),
+      inputCompatibility,
     },
   };
 } catch (error) {

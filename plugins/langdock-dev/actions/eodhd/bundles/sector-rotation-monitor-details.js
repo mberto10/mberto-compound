@@ -1,16 +1,17 @@
 // name = Sector Rotation Monitor Details
 // description = Returns expanded sector metric tables for sector rotation analysis.
 //
-// screenerFilters = Optional screener filters JSON string
-// screenerSignals = Optional screener signals (comma-separated)
-// screenerLimit = Maximum screener rows to inspect (default: 250, min: 50, max: 1000)
-// symbolsPerSector = Number of symbols per sector for aggregation (default: 5, min: 2, max: 15)
-// lookbackDays = EOD lookback days (default: 180, min: 60, max: 1500)
-// topSectors = Number of top/bottom sectors shown (default: 5, min: 1, max: 11)
-// includeTechnicals = Include sector RSI proxy (default: true)
-// rsiPeriod = RSI period for proxy symbol (default: 14, min: 2, max: 50)
-// outputMode = compact|full (default: full)
-// tableLimit = Max rows for detail sector tables (default: compact=20, full=100, min: 1, max: 200)
+// screener_filters = Optional screener filters JSON string
+// screener_signals = Optional screener signals (comma-separated)
+// screener_limit = Maximum screener rows to inspect (default: 250, min: 50, max: 1000)
+// symbols_per_sector = Number of symbols per sector for aggregation (default: 5, min: 2, max: 15)
+// lookback_days = EOD lookback days (default: 180, min: 60, max: 1500)
+// top_sectors = Number of top/bottom sectors shown (default: 5, min: 1, max: 11)
+// include_technicals = Include sector RSI proxy (default: true)
+// rsi_period = RSI period for proxy symbol (default: 14, min: 2, max: 50)
+// output_mode = compact|full (default: full)
+// table_limit = Max rows for detail sector tables (default: compact=20, full=100, min: 1, max: 200)
+// canonical input naming uses snake_case. Legacy camelCase aliases are supported for compatibility.
 
 const auth = (data && data.auth) ? data.auth : {};
 const apiKey = (
@@ -23,6 +24,39 @@ const apiKey = (
   ''
 ).toString().trim();
 if (!apiKey) return { error: true, message: 'Missing auth credential. Set one of: auth.apiKey, auth.apiToken, auth.api_key, auth.api_token, auth.eodhdApiKey' };
+
+function trimInput(value) {
+  if (value === undefined || value === null) return '';
+  return String(value).trim();
+}
+
+function recordLegacyAliasUsage(usageList, key) {
+  if (usageList.indexOf(key) === -1) usageList.push(key);
+}
+
+function getCanonicalInput(input, canonicalKey, aliases, fallback, legacyUsage) {
+  const canonicalRaw = trimInput(input[canonicalKey]);
+  const aliasValues = {};
+  for (let i = 0; i < aliases.length; i++) {
+    const alias = aliases[i];
+    const aliasRaw = trimInput(input[alias]);
+    if (aliasRaw !== '') {
+      aliasValues[alias] = aliasRaw;
+      if (legacyUsage) recordLegacyAliasUsage(legacyUsage, alias);
+    }
+  }
+  if (canonicalRaw !== '') return canonicalRaw;
+  for (let i = 0; i < aliases.length; i++) {
+    const alias = aliases[i];
+    if (aliasValues[alias] !== undefined) return aliasValues[alias];
+  }
+  return fallback;
+}
+
+function deprecationWarnings(inputCompatibility) {
+  if (!inputCompatibility || inputCompatibility.length === 0) return [];
+  return ['Deprecated legacy input key(s) used: ' + inputCompatibility.join(', ') + '. Use snake_case canonical names when possible.'];
+}
 
 function asBool(value, defaultValue) {
   if (value === undefined || value === null || value === '') return defaultValue;
@@ -183,17 +217,32 @@ async function fetchJson(url, label) {
   return response.json;
 }
 
-const screenerFilters = (data.input.screenerFilters || '').toString().trim();
-const screenerSignals = (data.input.screenerSignals || '').toString().trim();
-const screenerLimit = clampNumber(data.input.screenerLimit, 250, 50, 1000);
-const symbolsPerSector = clampNumber(data.input.symbolsPerSector, 5, 2, 15);
-const lookbackDays = clampNumber(data.input.lookbackDays, 180, 60, 1500);
-const topSectors = clampNumber(data.input.topSectors, 5, 1, 11);
-const includeTechnicals = asBool(data.input.includeTechnicals, true);
-const rsiPeriod = clampNumber(data.input.rsiPeriod, 14, 2, 50);
-const outputMode = (data.input.outputMode || 'full').toString().trim().toLowerCase();
-if (outputMode !== 'compact' && outputMode !== 'full') return { error: true, message: 'outputMode must be compact or full.' };
-const tableLimit = clampNumber(data.input.tableLimit, outputMode === 'compact' ? 20 : 100, 1, 200);
+const input = (data && data.input) ? data.input : {};
+const inputCompatibility = [];
+const INPUT_ALIASES = {
+  screener_filters: ['screenerFilters'],
+  screener_signals: ['screenerSignals'],
+  screener_limit: ['screenerLimit'],
+  symbols_per_sector: ['symbolsPerSector'],
+  lookback_days: ['lookbackDays'],
+  top_sectors: ['topSectors'],
+  include_technicals: ['includeTechnicals'],
+  rsi_period: ['rsiPeriod'],
+  output_mode: ['outputMode'],
+  table_limit: ['tableLimit'],
+};
+
+const screenerFilters = getCanonicalInput(input, 'screener_filters', INPUT_ALIASES.screener_filters, '', inputCompatibility);
+const screenerSignals = getCanonicalInput(input, 'screener_signals', INPUT_ALIASES.screener_signals, '', inputCompatibility);
+const screenerLimit = clampNumber(getCanonicalInput(input, 'screener_limit', INPUT_ALIASES.screener_limit, 250, inputCompatibility), 250, 50, 1000);
+const symbolsPerSector = clampNumber(getCanonicalInput(input, 'symbols_per_sector', INPUT_ALIASES.symbols_per_sector, 5, inputCompatibility), 5, 2, 15);
+const lookbackDays = clampNumber(getCanonicalInput(input, 'lookback_days', INPUT_ALIASES.lookback_days, 180, inputCompatibility), 180, 60, 1500);
+const topSectors = clampNumber(getCanonicalInput(input, 'top_sectors', INPUT_ALIASES.top_sectors, 5, inputCompatibility), 5, 1, 11);
+const includeTechnicals = asBool(getCanonicalInput(input, 'include_technicals', INPUT_ALIASES.include_technicals, true, inputCompatibility), true);
+const rsiPeriod = clampNumber(getCanonicalInput(input, 'rsi_period', INPUT_ALIASES.rsi_period, 14, inputCompatibility), 14, 2, 50);
+const outputMode = getCanonicalInput(input, 'output_mode', INPUT_ALIASES.output_mode, 'full', inputCompatibility).toLowerCase();
+if (outputMode !== 'compact' && outputMode !== 'full') return { error: true, message: 'output_mode must be compact or full.' };
+const tableLimit = clampNumber(getCanonicalInput(input, 'table_limit', INPUT_ALIASES.table_limit, outputMode === 'compact' ? 20 : 100, inputCompatibility), outputMode === 'compact' ? 20 : 100, 1, 200);
 
 let parsedFilters = null;
 if (screenerFilters) {
@@ -438,6 +487,8 @@ try {
     outputMode,
     truncated: truncationNotes.length > 0,
     truncationNotes,
+    aliasWarnings: deprecationWarnings(inputCompatibility),
+    inputCompatibility,
   });
 
   return {
@@ -489,6 +540,7 @@ try {
         outputMode,
         tableLimit,
       },
+      inputCompatibility,
     },
   };
 } catch (error) {
