@@ -209,8 +209,8 @@ try {
       endpoint: '/api/calendar/{type}',
       endpointType,
       parameters: { from, to, symbols: symbols || null, limit, offset, windowPreset: windowPreset || null, outputMode },
-      calendarTypeOptions: CALENDAR_TYPE_OPTIONS,
-      windowPresetOptions: WINDOW_PRESETS,
+      calendarTypeOptions: outputMode === 'full' ? CALENDAR_TYPE_OPTIONS : undefined,
+      windowPresetOptions: outputMode === 'full' ? WINDOW_PRESETS : undefined,
     },
     metadata: {
       source: 'EODHD atomic action: get_calendar_events',

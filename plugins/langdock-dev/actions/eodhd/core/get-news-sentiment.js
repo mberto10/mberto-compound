@@ -218,10 +218,10 @@ try {
         offset,
         windowPreset: windowPreset || null,
         outputMode,
-        contentMaxChars: outputMode === 'compact' ? contentMaxChars : null,
+        contentMaxChars: outputMode === 'full' ? contentMaxChars : undefined,
       },
       queryMode,
-      windowPresetOptions: WINDOW_PRESETS,
+      windowPresetOptions: outputMode === 'full' ? WINDOW_PRESETS : undefined,
     },
     metadata: {
       source: 'EODHD atomic action: get_news_sentiment',

@@ -230,14 +230,14 @@ try {
       symbol,
       requestedFields: fields,
       fieldsPreset: fieldsPresetInput || null,
-      allowedFields: ALLOWED_TOP_LEVEL_FIELDS,
-      availableTopLevelKeys,
+      allowedFields: formatInput === 'raw' ? ALLOWED_TOP_LEVEL_FIELDS : undefined,
+      availableTopLevelKeys: formatInput === 'raw' ? availableTopLevelKeys : undefined,
       responseType: Array.isArray(raw) ? 'array' : typeof raw,
     },
     metadata: {
       source: 'EODHD atomic action: get_fundamentals',
       generatedAt: new Date().toISOString(),
-      parameters: { symbol, format: formatInput, fields, fieldsPreset: fieldsPresetInput || null },
+      parameters: formatInput === 'raw' ? { symbol, format: formatInput, fields, fieldsPreset: fieldsPresetInput || null } : undefined,
     },
   };
 } catch (error) {

@@ -61,6 +61,27 @@ python3 ${CLAUDE_PLUGIN_ROOT}/skills/experiment-runner/helpers/experiment_runner
 1. If `--judges` specified, use those exact prompt names
 2. If dataset has `judge_prompts` in metadata, use those
 3. Otherwise, auto-discover all prompts starting with `judge-`
+3. Otherwise, auto-discover all prompts starting with `judge-`
+
+#### Live Mode Experiments (No Dataset)
+
+Run experiments on recent production traces (live data) without creating a permanent dataset first.
+This fetches the last N traces, creates an ephemeral dataset (e.g., `live-run-name`), and runs the experiment.
+
+```bash
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/experiment-runner/helpers/experiment_runner.py \
+  run \
+  --run-name "live-test-v1" \
+  --task-script /path/to/my_task.py \
+  --source-type live \
+  --sample-size 10 \
+  --use-langfuse-judges
+```
+
+**Arguments:**
+- `--source-type live`: Switch to live trace mode (default is `dataset`)
+- `--sample-size N`: Number of recent traces to fetch (default: 10)
+- `--dataset`: Ignored in live mode (an ephemeral dataset is created automatically)
 
 #### Using Local Evaluator Scripts
 

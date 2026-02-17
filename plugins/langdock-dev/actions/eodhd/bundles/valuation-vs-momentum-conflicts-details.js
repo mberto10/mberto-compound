@@ -186,19 +186,25 @@ function setupType(valuationClass, momentumClass) {
 }
 
 async function fetchJson(url, label) {
-  const response = await ld.request({
-    url,
-    method: 'GET',
-    headers: { 'Accept': 'application/json' },
-    body: null,
-  });
-  if (response.status < 200 || response.status >= 300) {
-    const err = new Error(label + ' request failed');
-    err.status = response.status;
-    err.details = response.json || null;
-    throw err;
+  try {
+    const response = await ld.request({
+      url,
+      method: 'GET',
+      headers: { 'Accept': 'application/json' },
+      body: null,
+    });
+    if (response.status === 404 || response.status === 422) return null;
+    if (response.status < 200 || response.status >= 300) {
+      const err = new Error(label + ' request failed');
+      err.status = response.status;
+      err.details = response.json || null;
+      throw err;
+    }
+    return response.json;
+  } catch (e) {
+    if (e.status === 404 || e.status === 422) return null;
+    throw e;
   }
-  return response.json;
 }
 
 const inputSymbols = (data.input.symbols || '').toString().trim();

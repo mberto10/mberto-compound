@@ -412,7 +412,16 @@ try {
   }
 
   const validRows = reactionTable.filter((r) => r.status === 'ok' && Number.isFinite(r.dailyMovePct));
-  if (validRows.length === 0) riskFlags.push('No symbols had complete EOD reaction calculations.');
+  if (validRows.length === 0) {
+    riskFlags.push('No symbols had complete EOD reaction calculations.');
+    // Add specific reasons for failures to help diagnose "why"
+    const failures = reactionTable.slice(0, 5); // Show first 5 failures
+    for (let i = 0; i < failures.length; i++) {
+      const f = failures[i];
+      const reason = f.warnings.length > 0 ? f.warnings.join('; ') : 'Unknown error (check diagnostics)';
+      riskFlags.push(`${f.symbol}: ${reason}`);
+    }
+  }
   if (diagnostics.errors.length > 0) {
     riskFlags.push(`${diagnostics.errors.length} endpoint call(s) failed. See endpointDiagnostics.errors.`);
   }
@@ -475,21 +484,21 @@ try {
     key_takeaways: keyTakeaways,
     risk_flags: riskFlags,
     endpointDiagnostics,
-    calculation_notes: {
+    calculation_notes: outputMode === 'full' ? {
       dailyMovePct: '(latest_close - previous_close) / previous_close * 100',
       move5dPct: '(latest_close - close_5_days_ago) / close_5_days_ago * 100',
       intradayMovePct: '(last_intraday_close - first_intraday_open) / first_intraday_open * 100',
       intradayRangePct: '(intraday_max_high - intraday_min_low) / first_intraday_open * 100',
       epsSurprisePct: '(eps_actual - eps_estimate) / eps_estimate * 100',
       reactionClass: `Strong reaction threshold = minAbsMovePct (${minAbsMovePct}%)`,
-    },
+    } : undefined,
     metadata: {
       source: 'EODHD bundle action: earnings_reaction_brief',
       actionType: 'summary',
       pairedAction: 'earnings_reaction_brief_details',
       generatedAt: new Date().toISOString(),
-      universe,
-      parameters: {
+      universe: outputMode === 'full' ? universe : undefined,
+      parameters: outputMode === 'full' ? {
         topN,
         includeIntraday,
         intradayInterval,
@@ -497,7 +506,7 @@ try {
         newsLimit,
         minAbsMovePct,
         outputMode,
-      },
+      } : undefined,
     },
   };
 } catch (error) {
