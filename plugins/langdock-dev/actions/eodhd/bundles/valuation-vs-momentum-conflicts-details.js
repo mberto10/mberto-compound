@@ -2,20 +2,21 @@
 // description = Returns full ranked valuation-vs-momentum setup tables and bucketed detail rows.
 //
 // symbols = Optional comma-separated symbols to analyze (e.g. AAPL.US,MSFT.US)
-// screenerFilters = Optional screener filters JSON string (required if symbols not provided)
-// screenerSignals = Optional screener signals (required if symbols not provided)
-// screenerSort = Screener sort expression (default: market_capitalization.desc)
-// candidateLimit = Maximum symbols to analyze (default: 30, min: 5, max: 120)
-// lookbackDays = EOD lookback days (default: 180, min: 60, max: 1500)
-// includeTechnicals = Include RSI confirmation (default: true)
-// rsiPeriod = RSI period (default: 14, min: 2, max: 50)
-// resultLimit = Rows per output bucket (default: 10, min: 3, max: 30)
-// peCheapThreshold = Cheap PE threshold (default: 15)
-// peExpensiveThreshold = Expensive PE threshold (default: 30)
-// pbCheapThreshold = Cheap P/B threshold (default: 2)
-// pbExpensiveThreshold = Expensive P/B threshold (default: 5)
-// outputMode = compact|full (default: full)
-// tableLimit = Max rows for fullRanked table (default: compact=50, full=200, min: 1, max: 500)
+// screener_filters = Optional screener filters JSON string (required if symbols not provided)
+// screener_signals = Optional screener signals (required if symbols not provided)
+// screener_sort = Screener sort expression (default: market_capitalization.desc)
+// candidate_limit = Maximum symbols to analyze (default: 30, min: 5, max: 120)
+// lookback_days = EOD lookback days (default: 180, min: 60, max: 1500)
+// include_technicals = Include RSI confirmation (default: true)
+// rsi_period = RSI period (default: 14, min: 2, max: 50)
+// result_limit = Rows per output bucket (default: 10, min: 3, max: 30)
+// pe_cheap_threshold = Cheap PE threshold (default: 15)
+// pe_expensive_threshold = Expensive PE threshold (default: 30)
+// pb_cheap_threshold = Cheap P/B threshold (default: 2)
+// pb_expensive_threshold = Expensive P/B threshold (default: 5)
+// output_mode = compact|full (default: full)
+// table_limit = Max rows for fullRanked table (default: compact=50, full=200, min: 1, max: 500)
+// canonical input naming uses snake_case. Legacy camelCase aliases are supported for compatibility.
 
 const auth = (data && data.auth) ? data.auth : {};
 const apiKey = (
@@ -28,6 +29,39 @@ const apiKey = (
   ''
 ).toString().trim();
 if (!apiKey) return { error: true, message: 'Missing auth credential. Set one of: auth.apiKey, auth.apiToken, auth.api_key, auth.api_token, auth.eodhdApiKey' };
+
+function trimInput(value) {
+  if (value === undefined || value === null) return '';
+  return String(value).trim();
+}
+
+function recordLegacyAliasUsage(usageList, key) {
+  if (usageList.indexOf(key) === -1) usageList.push(key);
+}
+
+function getCanonicalInput(input, canonicalKey, aliases, fallback, legacyUsage) {
+  const canonicalRaw = trimInput(input[canonicalKey]);
+  const aliasValues = {};
+  for (let i = 0; i < aliases.length; i++) {
+    const alias = aliases[i];
+    const aliasRaw = trimInput(input[alias]);
+    if (aliasRaw !== '') {
+      aliasValues[alias] = aliasRaw;
+      if (legacyUsage) recordLegacyAliasUsage(legacyUsage, alias);
+    }
+  }
+  if (canonicalRaw !== '') return canonicalRaw;
+  for (let i = 0; i < aliases.length; i++) {
+    const alias = aliases[i];
+    if (aliasValues[alias] !== undefined) return aliasValues[alias];
+  }
+  return fallback;
+}
+
+function deprecationWarnings(inputCompatibility) {
+  if (!inputCompatibility || inputCompatibility.length === 0) return [];
+  return ['Deprecated legacy input key(s) used: ' + inputCompatibility.join(', ') + '. Use snake_case canonical names when possible.'];
+}
 
 function asBool(value, defaultValue) {
   if (value === undefined || value === null || value === '') return defaultValue;
@@ -207,22 +241,41 @@ async function fetchJson(url, label) {
   }
 }
 
-const inputSymbols = (data.input.symbols || '').toString().trim();
-const screenerFilters = (data.input.screenerFilters || '').toString().trim();
-const screenerSignals = (data.input.screenerSignals || '').toString().trim();
-const screenerSort = (data.input.screenerSort || 'market_capitalization.desc').toString().trim();
-const candidateLimit = clampNumber(data.input.candidateLimit, 30, 5, 120);
-const lookbackDays = clampNumber(data.input.lookbackDays, 180, 60, 1500);
-const includeTechnicals = asBool(data.input.includeTechnicals, true);
-const rsiPeriod = clampNumber(data.input.rsiPeriod, 14, 2, 50);
-const resultLimit = clampNumber(data.input.resultLimit, 10, 3, 30);
-const peCheapThreshold = clampNumber(data.input.peCheapThreshold, 15, 1, 100);
-const peExpensiveThreshold = clampNumber(data.input.peExpensiveThreshold, 30, 2, 200);
-const pbCheapThreshold = clampNumber(data.input.pbCheapThreshold, 2, 0.1, 30);
-const pbExpensiveThreshold = clampNumber(data.input.pbExpensiveThreshold, 5, 0.2, 50);
-const outputMode = (data.input.outputMode || 'full').toString().trim().toLowerCase();
-if (outputMode !== 'compact' && outputMode !== 'full') return { error: true, message: 'outputMode must be compact or full.' };
-const tableLimit = clampNumber(data.input.tableLimit, outputMode === 'compact' ? 50 : 200, 1, 500);
+const input = (data && data.input) ? data.input : {};
+const inputCompatibility = [];
+const INPUT_ALIASES = {
+  screener_filters: ['screenerFilters'],
+  screener_signals: ['screenerSignals'],
+  screener_sort: ['screenerSort'],
+  candidate_limit: ['candidateLimit'],
+  lookback_days: ['lookbackDays'],
+  include_technicals: ['includeTechnicals'],
+  rsi_period: ['rsiPeriod'],
+  result_limit: ['resultLimit'],
+  pe_cheap_threshold: ['peCheapThreshold'],
+  pe_expensive_threshold: ['peExpensiveThreshold'],
+  pb_cheap_threshold: ['pbCheapThreshold'],
+  pb_expensive_threshold: ['pbExpensiveThreshold'],
+  output_mode: ['outputMode'],
+  table_limit: ['tableLimit'],
+};
+
+const inputSymbols = getCanonicalInput(input, 'symbols', [], '', inputCompatibility);
+const screenerFilters = getCanonicalInput(input, 'screener_filters', INPUT_ALIASES.screener_filters, '', inputCompatibility);
+const screenerSignals = getCanonicalInput(input, 'screener_signals', INPUT_ALIASES.screener_signals, '', inputCompatibility);
+const screenerSort = getCanonicalInput(input, 'screener_sort', INPUT_ALIASES.screener_sort, 'market_capitalization.desc', inputCompatibility);
+const candidateLimit = clampNumber(getCanonicalInput(input, 'candidate_limit', INPUT_ALIASES.candidate_limit, 30, inputCompatibility), 30, 5, 120);
+const lookbackDays = clampNumber(getCanonicalInput(input, 'lookback_days', INPUT_ALIASES.lookback_days, 180, inputCompatibility), 180, 60, 1500);
+const includeTechnicals = asBool(getCanonicalInput(input, 'include_technicals', INPUT_ALIASES.include_technicals, true, inputCompatibility), true);
+const rsiPeriod = clampNumber(getCanonicalInput(input, 'rsi_period', INPUT_ALIASES.rsi_period, 14, inputCompatibility), 14, 2, 50);
+const resultLimit = clampNumber(getCanonicalInput(input, 'result_limit', INPUT_ALIASES.result_limit, 10, inputCompatibility), 10, 3, 30);
+const peCheapThreshold = clampNumber(getCanonicalInput(input, 'pe_cheap_threshold', INPUT_ALIASES.pe_cheap_threshold, 15, inputCompatibility), 15, 1, 100);
+const peExpensiveThreshold = clampNumber(getCanonicalInput(input, 'pe_expensive_threshold', INPUT_ALIASES.pe_expensive_threshold, 30, inputCompatibility), 30, 2, 200);
+const pbCheapThreshold = clampNumber(getCanonicalInput(input, 'pb_cheap_threshold', INPUT_ALIASES.pb_cheap_threshold, 2, inputCompatibility), 2, 0.1, 30);
+const pbExpensiveThreshold = clampNumber(getCanonicalInput(input, 'pb_expensive_threshold', INPUT_ALIASES.pb_expensive_threshold, 5, inputCompatibility), 5, 0.2, 50);
+const outputMode = getCanonicalInput(input, 'output_mode', INPUT_ALIASES.output_mode, 'full', inputCompatibility).toLowerCase();
+if (outputMode !== 'compact' && outputMode !== 'full') return { error: true, message: 'output_mode must be compact or full.' };
+const tableLimit = clampNumber(getCanonicalInput(input, 'table_limit', INPUT_ALIASES.table_limit, outputMode === 'compact' ? 50 : 200, inputCompatibility), outputMode === 'compact' ? 50 : 200, 1, 500);
 
 let parsedFilters = null;
 if (screenerFilters) {
@@ -416,6 +469,8 @@ try {
     outputMode,
     truncated: truncationNotes.length > 0,
     truncationNotes,
+    aliasWarnings: deprecationWarnings(inputCompatibility),
+    inputCompatibility,
   });
 
   return {
@@ -476,6 +531,7 @@ try {
         outputMode,
         tableLimit,
       },
+      inputCompatibility,
     },
   };
 } catch (error) {

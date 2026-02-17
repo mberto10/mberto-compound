@@ -4,6 +4,7 @@
 // help = true|false (optional, default false). If true, returns a decision guide and exits.
 // symbol = EODHD symbol (required, e.g. AAPL.US)
 // outputMode = compact|full (default: compact)
+// output_mode = snake_case alias for outputMode
 
 function asBool(value, defaultValue) {
   if (value === undefined || value === null || value === '') return defaultValue;
@@ -15,7 +16,7 @@ function asBool(value, defaultValue) {
 }
 
 const help = asBool(data.input.help, false);
-const outputMode = (data.input.outputMode || 'compact').toString().trim().toLowerCase();
+const outputMode = (data.input.outputMode || data.input.output_mode || 'compact').toString().trim().toLowerCase();
 if (help) {
   return {
     data: {

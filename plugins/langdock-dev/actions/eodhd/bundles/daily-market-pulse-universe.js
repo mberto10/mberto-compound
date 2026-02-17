@@ -2,10 +2,11 @@
 // description = Produces a daily market pulse for a fixed input universe of symbols.
 //
 // symbols = Comma-separated symbols (required, e.g. AAPL.US,MSFT.US,NVDA.US)
-// asOfDate = Analysis date in YYYY-MM-DD (required)
-// topN = Number of top gainers/losers/movers to return (default: 5, min: 1, max: 30)
-// lookbackDays = EOD lookback window for volatility and context (default: 90, min: 20, max: 365)
-// outputMode = compact|full (default: compact)
+// as_of_date = Analysis date in YYYY-MM-DD (required)
+// top_n = Number of top gainers/losers/movers to return (default: 5, min: 1, max: 30)
+// lookback_days = EOD lookback window for volatility and context (default: 90, min: 20, max: 365)
+// output_mode = compact|full (default: compact)
+// canonical input naming uses snake_case. Legacy camelCase aliases are supported for compatibility.
 
 const auth = (data && data.auth) ? data.auth : {};
 const apiKey = (
@@ -18,6 +19,39 @@ const apiKey = (
   ''
 ).toString().trim();
 if (!apiKey) return { error: true, message: 'Missing auth credential. Set one of: auth.apiKey, auth.apiToken, auth.api_key, auth.api_token, auth.eodhdApiKey' };
+
+function trimInput(value) {
+  if (value === undefined || value === null) return '';
+  return String(value).trim();
+}
+
+function recordLegacyAliasUsage(usageList, key) {
+  if (usageList.indexOf(key) === -1) usageList.push(key);
+}
+
+function getCanonicalInput(input, canonicalKey, aliases, fallback, legacyUsage) {
+  const canonicalRaw = trimInput(input[canonicalKey]);
+  const aliasValues = {};
+  for (let i = 0; i < aliases.length; i++) {
+    const alias = aliases[i];
+    const aliasRaw = trimInput(input[alias]);
+    if (aliasRaw !== '') {
+      aliasValues[alias] = aliasRaw;
+      if (legacyUsage) recordLegacyAliasUsage(legacyUsage, alias);
+    }
+  }
+  if (canonicalRaw !== '') return canonicalRaw;
+  for (let i = 0; i < aliases.length; i++) {
+    const alias = aliases[i];
+    if (aliasValues[alias] !== undefined) return aliasValues[alias];
+  }
+  return fallback;
+}
+
+function deprecationWarnings(inputCompatibility) {
+  if (!inputCompatibility || inputCompatibility.length === 0) return [];
+  return ['Deprecated legacy input key(s) used: ' + inputCompatibility.join(', ') + '. Use snake_case canonical names when possible.'];
+}
 
 function clampNumber(value, fallback, minValue, maxValue) {
   const n = Number(value);
@@ -148,16 +182,25 @@ async function fetchJson(url, label) {
   return response.json;
 }
 
-const symbolsInput = (data.input.symbols || '').toString().trim();
-const asOfDate = (data.input.asOfDate || '').toString().trim();
-const topN = clampNumber(data.input.topN, 5, 1, 30);
-const lookbackDays = clampNumber(data.input.lookbackDays, 90, 20, 365);
-const outputMode = (data.input.outputMode || 'compact').toString().trim().toLowerCase();
+const input = (data && data.input) ? data.input : {};
+const inputCompatibility = [];
+const INPUT_ALIASES = {
+  as_of_date: ['asOfDate'],
+  top_n: ['topN'],
+  lookback_days: ['lookbackDays'],
+  output_mode: ['outputMode'],
+};
+
+const symbolsInput = getCanonicalInput(input, 'symbols', [], '', inputCompatibility);
+const asOfDate = getCanonicalInput(input, 'as_of_date', INPUT_ALIASES.as_of_date, '', inputCompatibility);
+const topN = clampNumber(getCanonicalInput(input, 'top_n', INPUT_ALIASES.top_n, 5, inputCompatibility), 5, 1, 30);
+const lookbackDays = clampNumber(getCanonicalInput(input, 'lookback_days', INPUT_ALIASES.lookback_days, 90, inputCompatibility), 90, 20, 365);
+const outputMode = getCanonicalInput(input, 'output_mode', INPUT_ALIASES.output_mode, 'compact', inputCompatibility).toLowerCase();
 
 if (!symbolsInput) return { error: true, message: 'symbols is required. Provide comma-separated symbols.' };
-if (!asOfDate) return { error: true, message: 'asOfDate is required (YYYY-MM-DD).' };
-if (!isValidDateString(asOfDate)) return { error: true, message: 'Invalid asOfDate format. Use YYYY-MM-DD.' };
-if (outputMode !== 'compact' && outputMode !== 'full') return { error: true, message: 'outputMode must be compact or full.' };
+if (!asOfDate) return { error: true, message: 'as_of_date is required (YYYY-MM-DD).' };
+if (!isValidDateString(asOfDate)) return { error: true, message: 'Invalid as_of_date format. Use YYYY-MM-DD.' };
+if (outputMode !== 'compact' && outputMode !== 'full') return { error: true, message: 'output_mode must be compact or full.' };
 
 const symbolInputCap = 300;
 const parsedSymbols = dedupeSymbols(symbolsInput.split(',').map((s) => s.trim()).filter(Boolean));
@@ -257,6 +300,8 @@ try {
     outputMode,
     truncated: truncationNotes.length > 0,
     truncationNotes,
+    aliasWarnings: deprecationWarnings(inputCompatibility),
+    inputCompatibility,
   });
 
   return {
@@ -296,6 +341,7 @@ try {
       pairedAction: 'daily_market_pulse_universe_details',
       generatedAt: new Date().toISOString(),
       parameters: { asOfDate, topN, lookbackDays, outputMode, symbols },
+      inputCompatibility,
     },
   };
 } catch (error) {
