@@ -1,7 +1,7 @@
 ---
 name: agent-eval-setup
 description: Set up Langfuse-first evaluation infrastructure for an AI agent through codebase discovery and contract bootstrap
-allowed_tools:
+allowed-tools:
   - Read
   - Glob
   - Grep

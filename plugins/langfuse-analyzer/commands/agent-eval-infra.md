@@ -1,7 +1,7 @@
 ---
 name: agent-eval-infra
 description: Inspect, bootstrap, and export Langfuse-first evaluation infrastructure for agent optimization workflows
-allowed_tools:
+allowed-tools:
   - Read
   - Write
   - Bash

@@ -8,6 +8,8 @@ Personal collection of Claude Code plugins, commands, agents, skills, and config
 
 In Claude Code, run:
 
+/plugin marketplace add /home/runner/workspace/plugins 
+
 
 /plugin marketplace add mberto10/mberto-compound
 ```

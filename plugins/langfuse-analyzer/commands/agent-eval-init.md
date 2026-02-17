@@ -1,7 +1,7 @@
 ---
 name: agent-eval-init
 description: Interview-driven initialization of an agent evaluation infrastructure document using tracing implementation context and custom instructions
-allowed_tools:
+allowed-tools:
   - Read
   - Write
   - Grep

@@ -11,7 +11,8 @@
   "license": "MIT",
   "keywords": ["langdock", "integrations", "actions", "api", "development", "cli", "agents", "knowledge-folders"],
   "commands": [
-    "./commands/create-action.md"
+    "./commands/create-action.md",
+    "./commands/create-assistant.md"
   ],
   "agents": [
     "./agents/action-builder.md"

@@ -1,7 +1,7 @@
 ---
 name: agent-eval
 description: Run agent evaluation cycle - experiment, analyze failures, document findings in Linear or markdown
-allowed_tools:
+allowed-tools:
   - Read
   - Glob
   - Grep
