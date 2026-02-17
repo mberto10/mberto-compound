@@ -255,8 +255,8 @@ try {
         maxPoints,
         outputMode,
       },
-      commonFunctions: COMMON_FUNCTIONS,
-      analysisTypes: ANALYSIS_TYPE_MAP,
+      commonFunctions: outputMode === 'full' ? COMMON_FUNCTIONS : undefined,
+      analysisTypes: outputMode === 'full' ? ANALYSIS_TYPE_MAP : undefined,
       rowCount: rows.length,
     },
     metadata: {

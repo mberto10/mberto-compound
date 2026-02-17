@@ -15,13 +15,6 @@
 
 set -euo pipefail
 
-# Portable in-place sed (works on both BSD and GNU)
-sed_inplace() {
-  local file="$1"; shift
-  local tmp="${file}.tmp.$$"
-  sed "$@" "$file" > "$tmp" && mv "$tmp" "$file"
-}
-
 # Read hook input from stdin
 HOOK_INPUT=$(cat)
 
@@ -50,13 +43,13 @@ CONSECUTIVE_FAILURES=$(echo "$FRONTMATTER" | grep '^consecutive_failures:' | sed
 # Validate numeric fields
 if [[ ! "$ITERATION" =~ ^[0-9]+$ ]]; then
   echo "Warning: Harness state corrupted (iteration='$ITERATION'). Stopping." >&2
-  sed_inplace "$STATE_FILE" 's/^active: true/active: false/'
+  sed -i 's/^active: true/active: false/' "$STATE_FILE"
   exit 0
 fi
 
 if [[ ! "$MAX_ITERATIONS" =~ ^[0-9]+$ ]]; then
   echo "Warning: Harness state corrupted (max_iterations='$MAX_ITERATIONS'). Stopping." >&2
-  sed_inplace "$STATE_FILE" 's/^active: true/active: false/'
+  sed -i 's/^active: true/active: false/' "$STATE_FILE"
   exit 0
 fi
 
@@ -69,14 +62,14 @@ TRANSCRIPT_PATH=$(python3 -c "import json,sys; print(json.loads(sys.argv[1]).get
 
 if [[ -z "$TRANSCRIPT_PATH" ]] || [[ ! -f "$TRANSCRIPT_PATH" ]]; then
   echo "Warning: Harness transcript not found. Stopping." >&2
-  sed_inplace "$STATE_FILE" 's/^active: true/active: false/'
+  sed -i 's/^active: true/active: false/' "$STATE_FILE"
   exit 0
 fi
 
 # Check for assistant messages (handle both compact and pretty JSON)
 if ! grep -qE '"role" *: *"assistant"' "$TRANSCRIPT_PATH"; then
   echo "Warning: No assistant messages in transcript. Stopping." >&2
-  sed_inplace "$STATE_FILE" 's/^active: true/active: false/'
+  sed -i 's/^active: true/active: false/' "$STATE_FILE"
   exit 0
 fi
 
@@ -95,7 +88,7 @@ print('\n'.join(parts))
 
 if [[ -z "$LAST_OUTPUT" ]]; then
   echo "Warning: Could not parse assistant message. Stopping." >&2
-  sed_inplace "$STATE_FILE" 's/^active: true/active: false/'
+  sed -i 's/^active: true/active: false/' "$STATE_FILE"
   exit 0
 fi
 
@@ -104,28 +97,28 @@ fi
 # Check for HARNESS_DONE — queue empty, allow exit
 if echo "$LAST_OUTPUT" | grep -q '\[HARNESS_DONE\]'; then
   echo "Harness: Queue empty. Stopping after $ITERATION iterations." >&2
-  sed_inplace "$STATE_FILE" 's/^active: true/active: false/'
+  sed -i 's/^active: true/active: false/' "$STATE_FILE"
   exit 0
 fi
 
 # Check for HARNESS_PAUSE — context limit, allow exit
-if echo "$LAST_OUTPUT" | grep -qE '\[HARNESS_PAUSE: .+\]'; then
-  PAUSE_ID=$(echo "$LAST_OUTPUT" | grep -oE '\[HARNESS_PAUSE: [^]]+' | sed 's/\[HARNESS_PAUSE: //')
+if echo "$LAST_OUTPUT" | grep -qP '\[HARNESS_PAUSE: .+\]'; then
+  PAUSE_ID=$(echo "$LAST_OUTPUT" | grep -oP '\[HARNESS_PAUSE: \K[^\]]+')
   echo "Harness: Pausing on issue $PAUSE_ID. Resume with /harness start." >&2
-  sed_inplace "$STATE_FILE" 's/^active: true/active: false/'
+  sed -i 's/^active: true/active: false/' "$STATE_FILE"
   exit 0
 fi
 
 # Check for HARNESS_STOP — user-requested stop
 if echo "$LAST_OUTPUT" | grep -q '\[HARNESS_STOP\]'; then
   echo "Harness: User-requested stop after $ITERATION iterations." >&2
-  sed_inplace "$STATE_FILE" 's/^active: true/active: false/'
+  sed -i 's/^active: true/active: false/' "$STATE_FILE"
   exit 0
 fi
 
 # Check for ISSUE_COMPLETE — success, continue loop
-if echo "$LAST_OUTPUT" | grep -qE '\[ISSUE_COMPLETE: .+\]'; then
-  COMPLETED_ID=$(echo "$LAST_OUTPUT" | grep -oE '\[ISSUE_COMPLETE: [^]]+' | sed 's/\[ISSUE_COMPLETE: //')
+if echo "$LAST_OUTPUT" | grep -qP '\[ISSUE_COMPLETE: .+\]'; then
+  COMPLETED_ID=$(echo "$LAST_OUTPUT" | grep -oP '\[ISSUE_COMPLETE: \K[^\]]+')
 
   # Update completed_issues in state file using python3 for reliable YAML list editing
   python3 -c "
@@ -152,8 +145,8 @@ with open(state_file, 'w') as f:
 fi
 
 # Check for ISSUE_FAILED — failure, maybe continue
-if echo "$LAST_OUTPUT" | grep -qE '\[ISSUE_FAILED: .+\]'; then
-  FAILED_ID=$(echo "$LAST_OUTPUT" | grep -oE '\[ISSUE_FAILED: [^]]+' | sed 's/\[ISSUE_FAILED: //')
+if echo "$LAST_OUTPUT" | grep -qP '\[ISSUE_FAILED: .+\]'; then
+  FAILED_ID=$(echo "$LAST_OUTPUT" | grep -oP '\[ISSUE_FAILED: \K[^\]]+')
 
   # Increment consecutive failures
   NEW_FAILURES=$((CONSECUTIVE_FAILURES + 1))
@@ -182,7 +175,7 @@ with open(state_file, 'w') as f:
   # Check if 3+ consecutive failures — stop the loop
   if [[ $NEW_FAILURES -ge 3 ]]; then
     echo "Harness: 3 consecutive failures. Stopping for human review." >&2
-    sed_inplace "$STATE_FILE" 's/^active: true/active: false/'
+    sed -i 's/^active: true/active: false/' "$STATE_FILE"
     exit 0
   fi
 
@@ -197,19 +190,21 @@ NEXT_ITERATION=$((ITERATION + 1))
 # Check max iterations
 if [[ $MAX_ITERATIONS -gt 0 ]] && [[ $NEXT_ITERATION -gt $MAX_ITERATIONS ]]; then
   echo "Harness: Max iterations ($MAX_ITERATIONS) reached. Stopping." >&2
-  sed_inplace "$STATE_FILE" 's/^active: true/active: false/'
+  sed -i 's/^active: true/active: false/' "$STATE_FILE"
   exit 0
 fi
 
 # Update iteration in state file
-sed_inplace "$STATE_FILE" "s/^iteration: .*/iteration: $NEXT_ITERATION/"
+TEMP_FILE="${STATE_FILE}.tmp.$$"
+sed "s/^iteration: .*/iteration: $NEXT_ITERATION/" "$STATE_FILE" > "$TEMP_FILE"
+mv "$TEMP_FILE" "$STATE_FILE"
 
 # Extract the prompt text (everything after the closing ---)
 PROMPT_TEXT=$(awk '/^---$/{i++; next} i>=2' "$STATE_FILE")
 
 if [[ -z "$PROMPT_TEXT" ]]; then
   echo "Warning: No prompt found in state file. Stopping." >&2
-  sed_inplace "$STATE_FILE" 's/^active: true/active: false/'
+  sed -i 's/^active: true/active: false/' "$STATE_FILE"
   exit 0
 fi
 

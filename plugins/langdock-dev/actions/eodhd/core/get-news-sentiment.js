@@ -235,7 +235,7 @@ try {
         resultLimit,
         windowPreset: windowPreset || null,
         outputMode,
-        contentMaxChars: outputMode === 'compact' ? contentMaxChars : null,
+        contentMaxChars: outputMode === 'full' ? contentMaxChars : undefined,
       },
       queryMode,
       windowPresetOptions: WINDOW_PRESETS,

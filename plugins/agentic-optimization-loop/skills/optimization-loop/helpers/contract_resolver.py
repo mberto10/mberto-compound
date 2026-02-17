@@ -132,10 +132,13 @@ def normalize_contract(raw: Dict[str, Any], agent: str, source_path: str) -> Dic
                 "name": raw.get("dataset_name") or raw.get("dataset") or None,
                 "id": raw.get("dataset_id") or None,
             },
+            "source": raw.get("source") or {},
+            "judges_external": raw.get("judges_external", False),
             "score_scale": raw.get("score_scale"),
             "dimensions": raw.get("dimensions") or [],
             "baseline": raw.get("baseline") or {},
             "judge_prompts": raw.get("judge_prompts") or [],
+            "status": raw.get("status") or {},
         }
         return normalized
 
@@ -146,7 +149,11 @@ def validate_contract_shape(contract: Dict[str, Any]) -> List[str]:
     errors: List[str] = []
 
     dataset = _as_dict(contract.get("dataset"))
-    if not dataset.get("name"):
+    source = _as_dict(contract.get("source"))
+    is_live = source.get("type") == "live"
+    is_dataset_required = not is_live
+
+    if is_dataset_required and not dataset.get("name"):
         errors.append("dataset.name is required")
 
     score_scale = contract.get("score_scale")
@@ -172,10 +179,14 @@ def validate_contract_shape(contract: Dict[str, Any]) -> List[str]:
                     errors.append(f"dimensions[{idx}].threshold must normalize to [0,1]")
 
     baseline = _as_dict(contract.get("baseline"))
-    if not baseline.get("run_name"):
-        errors.append("baseline.run_name is required")
-    if not isinstance(baseline.get("metrics"), dict):
-        errors.append("baseline.metrics must be an object")
+    status = _as_dict(contract.get("status"))
+    
+    # In live mode, baseline might not be ready yet
+    if not is_live:
+        if not baseline.get("run_name"):
+            errors.append("baseline.run_name is required")
+        if not isinstance(baseline.get("metrics"), dict):
+            errors.append("baseline.metrics must be an object")
 
     return errors
 
@@ -192,39 +203,48 @@ def validate_live(contract: Dict[str, Any]) -> List[str]:
     errors: List[str] = []
     client = _resolve_langfuse_client()
 
-    dataset_name = _as_dict(contract.get("dataset")).get("name")
-    expected_dataset_id = _as_dict(contract.get("dataset")).get("id")
+    client = _resolve_langfuse_client()
 
-    try:
-        dataset = client.get_dataset(dataset_name)
-    except Exception as exc:
-        return [f"could not fetch dataset '{dataset_name}': {exc}"]
+    source = _as_dict(contract.get("source"))
+    if source.get("type") == "live":
+        # Skip dataset validation in live mode
+        pass
+    else:
+        dataset_name = _as_dict(contract.get("dataset")).get("name")
+        expected_dataset_id = _as_dict(contract.get("dataset")).get("id")
 
-    if not dataset:
-        return [f"dataset '{dataset_name}' not found"]
+        try:
+            dataset = client.get_dataset(dataset_name)
+        except Exception as exc:
+            return [f"could not fetch dataset '{dataset_name}': {exc}"]
 
-    dataset_dict = _as_dict(dataset)
-    actual_dataset_id = getattr(dataset, "id", None) or dataset_dict.get("id")
-    if expected_dataset_id and actual_dataset_id and expected_dataset_id != actual_dataset_id:
-        errors.append(
-            f"dataset id mismatch: expected {expected_dataset_id}, got {actual_dataset_id}"
-        )
+        if not dataset:
+            return [f"dataset '{dataset_name}' not found"]
+
+        dataset_dict = _as_dict(dataset)
+        actual_dataset_id = getattr(dataset, "id", None) or dataset_dict.get("id")
+        if expected_dataset_id and actual_dataset_id and expected_dataset_id != actual_dataset_id:
+            errors.append(
+                f"dataset id mismatch: expected {expected_dataset_id}, got {actual_dataset_id}"
+            )
+        
+        # Verify baseline exists in dataset only if not live
+        baseline_name = _as_dict(contract.get("baseline")).get("run_name")
+        runs = getattr(dataset, "runs", []) or []
+        run_names = {getattr(r, "name", None) for r in runs}
+        if baseline_name and baseline_name not in run_names:
+            errors.append(f"baseline run not found in dataset runs: {baseline_name}")
 
     # judge prompt checks
-    prompts = contract.get("judge_prompts") or []
-    for name in prompts:
-        try:
-            prompt = client.get_prompt(name, label="production")
-            if not prompt:
-                errors.append(f"judge prompt not found: {name}")
-        except Exception as exc:
-            errors.append(f"judge prompt check failed for {name}: {exc}")
-
-    baseline_name = _as_dict(contract.get("baseline")).get("run_name")
-    runs = getattr(dataset, "runs", []) or []
-    run_names = {getattr(r, "name", None) for r in runs}
-    if baseline_name and baseline_name not in run_names:
-        errors.append(f"baseline run not found in dataset runs: {baseline_name}")
+    if not contract.get("judges_external"):
+        prompts = contract.get("judge_prompts") or []
+        for name in prompts:
+            try:
+                prompt = client.get_prompt(name, label="production")
+                if not prompt:
+                    errors.append(f"judge prompt not found: {name}")
+            except Exception as exc:
+                errors.append(f"judge prompt check failed for {name}: {exc}")
 
     return errors
 

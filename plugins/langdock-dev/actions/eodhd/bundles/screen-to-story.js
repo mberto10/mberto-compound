@@ -203,19 +203,25 @@ function getFirstNumber(obj, keys) {
 }
 
 async function fetchJson(url, label) {
-  const response = await ld.request({
-    url,
-    method: 'GET',
-    headers: { 'Accept': 'application/json' },
-    body: null,
-  });
-  if (response.status < 200 || response.status >= 300) {
-    const err = new Error(label + ' request failed');
-    err.status = response.status;
-    err.details = response.json || null;
-    throw err;
+  try {
+    const response = await ld.request({
+      url,
+      method: 'GET',
+      headers: { 'Accept': 'application/json' },
+      body: null,
+    });
+    if (response.status === 404 || response.status === 422) return null;
+    if (response.status < 200 || response.status >= 300) {
+      const err = new Error(label + ' request failed');
+      err.status = response.status;
+      err.details = response.json || null;
+      throw err;
+    }
+    return response.json;
+  } catch (e) {
+    if (e.status === 404 || e.status === 422) return null;
+    throw e;
   }
-  return response.json;
 }
 
 const input = (data && data.input) ? data.input : {};
@@ -546,7 +552,7 @@ try {
     key_takeaways: keyTakeaways,
     risk_flags: riskFlags,
     endpointDiagnostics,
-    scoring_model: {
+    scoring_model: outputMode === 'full' ? {
       weights: {
         quality: 0.35,
         momentum: 0.35,
@@ -554,21 +560,21 @@ try {
         narrative: 0.1,
       },
       scoreRanges: 'Each subscore normalized to [0,100]. Composite is weighted sum.',
-    },
-    calculation_notes: {
+    } : undefined,
+    calculation_notes: outputMode === 'full' ? {
       return1mPct: '(latest_close - close_20_sessions_ago) / close_20_sessions_ago * 100',
       annualizedVol20dPct: 'stdev(log daily returns over last 20 sessions) * sqrt(252) * 100',
       valueScore: 'heuristic from PE and P/B relative to anchor levels',
       qualityScore: 'heuristic from ROE, profit margin, and revenue growth',
       momentumScore: 'heuristic from 1M return and RSI regime',
       narrativeScore: 'heuristic from recent headline intensity',
-    },
+    } : undefined,
     metadata: {
       source: 'EODHD bundle action: screen_to_story',
       actionType: 'summary',
       pairedAction: 'screen_to_story_details',
       generatedAt: new Date().toISOString(),
-      parameters: {
+      parameters: outputMode === 'full' ? {
         candidateLimit,
         shortlistSize,
         lookbackDays,
