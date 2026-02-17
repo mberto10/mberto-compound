@@ -221,8 +221,8 @@ Follow the /review methodology inline:
 **FAIL:**
 - Assess if the failure is fixable within this iteration.
 - If fixable: fix and re-review (one retry).
-- If not fixable: revert all commits for this issue using `git reset --soft` to the pre-issue state. Mark the issue as failed.
-- Note: Be careful with git reset — only reset commits made during THIS issue's work phase.
+- If not fixable: revert all commits for this issue using `git reset --hard` to the pre-issue commit (the HEAD before Step 6 began). This discards both the commits and any staged/unstaged changes from the failed work. Mark the issue as failed.
+- Note: Be careful with git reset — only reset to the commit that was HEAD before THIS issue's work phase started. Record that commit hash at the start of Step 6.
 
 ### Step 8: Update Linear
 
@@ -264,12 +264,11 @@ Follow the /review methodology inline:
 
 2. Do NOT change the issue status — leave it for human triage.
 
-### Step 9: Update State and Log Friction
+### Step 9: Log Friction (state bookkeeping is handled by the Stop hook)
 
-1. Update state file:
-   - On success: add issue ID to `completed_issues`, reset `consecutive_failures` to 0
-   - On failure: add issue ID to `failed_issues`, increment `consecutive_failures`
-   - Clear `current_issue`
+Note: Do NOT update `completed_issues`, `failed_issues`, or `consecutive_failures` here — the Stop hook is the single owner of those counters (it reads the completion marker and updates state atomically). Doing it in both places would double-count.
+
+1. Clear `current_issue` in the state file.
 
 2. Append friction points to `friction_log` in state file:
    ```yaml
@@ -304,8 +303,9 @@ Based on the outcome, output ONE of these markers **on its own line**:
 [HARNESS_DONE]
 ```
 
-The Stop hook will detect the marker, update state, and either:
-- Feed the harness prompt back to start the next iteration
+The Stop hook will detect the marker and:
+- Update `completed_issues`/`failed_issues` and `consecutive_failures` (single owner of state counters)
+- Feed the harness prompt back to start the next iteration, OR
 - Allow exit if max_iterations reached or 3+ consecutive failures
 
 ### Context Limit Handling
