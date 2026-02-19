@@ -61,6 +61,31 @@ claude-marketplace/
         └── skills/           # Autonomous skills
 ```
 
+## Universal Hub (Antigravity & Codex)
+
+This repository serves as a **Universal Hub** for [Antigravity](https://gemini.google.com) and **Codex** skills and workflows. It uses the standardized `.agents` format compatible with both environments.
+
+### How to use these skills in your project
+
+You can reference the skills and workflows in this repo from any other project by creating a symbolic link.
+
+**One-liner setup (run in your project root):**
+
+```bash
+# Replace /path/to/mberto-compound with the actual path to this repo
+HUB_PATH="/Users/maximilianbruhn/mberto-compound-6"
+
+mkdir -p .agents
+ln -s "$HUB_PATH/.agents/skills" .agents/skills
+ln -s "$HUB_PATH/.agents/workflows" .agents/workflows
+
+echo "Linked Antigravity skills and workflows from $HUB_PATH"
+```
+
+Once linked, Antigravity will automatically discover:
+- `/compound-plan`, `/compound-work`, `/compound-review` etc.
+- Skills like `compound-strategic-planner` and `compound-improvement-cycle`
+
 ## Creating New Plugins
 
 1. Create a new directory under `plugins/`:

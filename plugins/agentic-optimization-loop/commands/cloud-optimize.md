@@ -36,7 +36,7 @@ Validation:
 Resolve local snapshot and live-validate identifiers:
 
 ```bash
-python3 ${CLAUDE_PLUGIN_ROOT}/skills/optimization-loop/helpers/contract_resolver.py \
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/optimization-controller/helpers/contract_resolver.py \
   resolve \
   --agent "<agent>" \
   --validate-live
@@ -49,9 +49,8 @@ If contract fails preflight:
 ## Step 3: Load Target + Loop Guidance
 
 Read:
-- `${CLAUDE_PLUGIN_ROOT}/skills/optimization-target/SKILL.md`
-- `${CLAUDE_PLUGIN_ROOT}/skills/optimization-loop/SKILL.md`
-- `${CLAUDE_PLUGIN_ROOT}/skills/optimization-loop/references/loop-prompt-template.md`
+- `${CLAUDE_PLUGIN_ROOT}/skills/optimization-controller/SKILL.md`
+- `${CLAUDE_PLUGIN_ROOT}/skills/optimization-controller/references/loop-prompt-template.md`
 
 ## Step 4: Build Prompt Variables
 

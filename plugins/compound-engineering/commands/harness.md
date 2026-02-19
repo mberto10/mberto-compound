@@ -21,9 +21,8 @@ Extract the subcommand from $ARGUMENTS:
 
 Also extract optional flags:
 - `--project PROJECT_ID` — Linear project to pull issues from
-- `--label LABEL` — filter issues by label (default: "ready")
 - `--team TEAM_ID` — Linear team ID (default: "MB90")
-- `--max N` — max iterations before auto-stop (default: 20)
+- `--max N` — max iterations before auto-stop (default: 10)
 
 ---
 

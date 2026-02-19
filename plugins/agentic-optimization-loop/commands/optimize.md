@@ -45,7 +45,7 @@ Before phase routing, resolve and validate external eval contract:
 2. Live validation (Langfuse identifiers):
 
 ```bash
-python3 ${CLAUDE_PLUGIN_ROOT}/skills/optimization-loop/helpers/contract_resolver.py \
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/optimization-controller/helpers/contract_resolver.py \
   resolve \
   --agent "<agent>" \
   --validate-live
@@ -125,7 +125,7 @@ If `phase` argument is provided, allow override with warning.
 Use:
 
 ```text
-${CLAUDE_PLUGIN_ROOT}/skills/optimization-craft/SKILL.md
+${CLAUDE_PLUGIN_ROOT}/skills/optimization-controller/SKILL.md
 ```
 
 ### Lever-specific hypothesis rule
@@ -147,8 +147,8 @@ Decision policy stays identical in both modes:
 For deeper diagnosis inside analyze/compound, use local read-only retrieval helpers:
 
 ```bash
-python3 ${CLAUDE_PLUGIN_ROOT}/skills/optimization-loop/helpers/trace_retriever.py --trace-id <trace_id> --mode io
-python3 ${CLAUDE_PLUGIN_ROOT}/skills/optimization-loop/helpers/trace_retriever.py --last 10 --filter-field candidate_id --filter-value <candidate> --mode flow
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/optimization-controller/helpers/trace_retriever.py --trace-id <trace_id> --mode io
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/optimization-controller/helpers/trace_retriever.py --last 10 --filter-field candidate_id --filter-value <candidate> --mode flow
 ```
 
 ## Step 6: Persist State

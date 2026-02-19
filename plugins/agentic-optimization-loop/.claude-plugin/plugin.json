@@ -8,10 +8,7 @@
     "./commands/cloud-optimize.md"
   ],
   "skills": [
-    "./skills/evaluation-infrastructure",
-    "./skills/optimization-target",
-    "./skills/optimization-loop",
-    "./skills/optimization-craft"
+    "./skills/optimization-controller"
   ],
   "agents": [
     "./agents/optimization-analyst.md"
