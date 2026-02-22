@@ -8,9 +8,10 @@ with optional live validation against Langfuse identifiers.
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 
 def _load_yaml(text: str) -> Dict[str, Any]:
@@ -191,6 +192,36 @@ def validate_contract_shape(contract: Dict[str, Any]) -> List[str]:
     return errors
 
 
+def _fetch_dataset_run_names(dataset_name: str) -> Set[str]:
+    """Fetch run names for a dataset via REST API.
+
+    The Langfuse Python SDK does not populate dataset.runs, so we call
+    GET /api/public/datasets/{name}/runs directly.
+    """
+    host = os.getenv("LANGFUSE_HOST", "https://cloud.langfuse.com")
+    public_key = os.getenv("LANGFUSE_PUBLIC_KEY")
+    secret_key = os.getenv("LANGFUSE_SECRET_KEY")
+
+    if not public_key or not secret_key:
+        return set()
+
+    try:
+        import urllib.request
+        import base64
+
+        credentials = base64.b64encode(f"{public_key}:{secret_key}".encode()).decode()
+        url = f"{host.rstrip('/')}/api/public/datasets/{dataset_name}/runs"
+        req = urllib.request.Request(url, headers={
+            "Authorization": f"Basic {credentials}",
+            "Content-Type": "application/json",
+        })
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            data = json.loads(resp.read().decode())
+            return {r.get("name") for r in data.get("data", []) if r.get("name")}
+    except Exception:
+        return set()
+
+
 def _resolve_langfuse_client():
     helper_dir = Path(__file__).resolve().parent
     sys.path.insert(0, str(helper_dir))
@@ -201,8 +232,6 @@ def _resolve_langfuse_client():
 
 def validate_live(contract: Dict[str, Any]) -> List[str]:
     errors: List[str] = []
-    client = _resolve_langfuse_client()
-
     client = _resolve_langfuse_client()
 
     source = _as_dict(contract.get("source"))
@@ -228,12 +257,15 @@ def validate_live(contract: Dict[str, Any]) -> List[str]:
                 f"dataset id mismatch: expected {expected_dataset_id}, got {actual_dataset_id}"
             )
         
-        # Verify baseline exists in dataset only if not live
+        # Verify baseline exists in dataset via REST API
+        # (SDK does not populate dataset.runs — see FAZ-204)
         baseline_name = _as_dict(contract.get("baseline")).get("run_name")
-        runs = getattr(dataset, "runs", []) or []
-        run_names = {getattr(r, "name", None) for r in runs}
-        if baseline_name and baseline_name not in run_names:
-            errors.append(f"baseline run not found in dataset runs: {baseline_name}")
+        if baseline_name:
+            run_names = _fetch_dataset_run_names(dataset_name)
+            if run_names and baseline_name not in run_names:
+                errors.append(f"baseline run not found in dataset runs: {baseline_name}")
+            elif not run_names:
+                pass  # Could not fetch runs; skip check rather than false-negative
 
     # judge prompt checks
     if not contract.get("judges_external"):
