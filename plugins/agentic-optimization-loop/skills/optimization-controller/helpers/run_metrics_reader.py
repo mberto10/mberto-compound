@@ -10,26 +10,20 @@ from typing import Any, Dict, List, Optional
 
 from contract_resolver import _as_dict, normalize_score, normalize_contract, load_snapshot, _resolve_snapshot_path
 from contract_resolver import validate_contract_shape
+from trace_retriever import retrieve_dataset_run_scores
 
 
-def _find_run(dataset: Any, run_name: str) -> Optional[Any]:
-    runs = getattr(dataset, "runs", []) or []
-    for run in runs:
-        if getattr(run, "name", None) == run_name:
-            return run
-    return None
+def _collect_scores_rest(dataset_name: str, run_name: str) -> Dict[str, List[float]]:
+    """Aggregate per-item scores from a dataset run via REST API.
 
-
-def _collect_scores(run: Any) -> Dict[str, List[float]]:
+    Returns a dict mapping score name -> list of normalized float values.
+    """
+    result = retrieve_dataset_run_scores(dataset_name, run_name)
     by_name: Dict[str, List[float]] = {}
-    items = getattr(run, "items", []) or []
-    for item in items:
-        scores = getattr(item, "scores", []) or []
-        for score in scores:
-            name = getattr(score, "name", None) or _as_dict(score).get("name")
-            value = getattr(score, "value", None)
-            if value is None:
-                value = _as_dict(score).get("value")
+    for item in result.get("items", []):
+        for score in item.get("scores", []):
+            name = score.get("name")
+            value = score.get("value")
             if not name:
                 continue
             if isinstance(value, (int, float)):
@@ -43,12 +37,6 @@ def _mean(values: List[float]) -> Optional[float]:
     return sum(values) / len(values)
 
 
-def _get_client():
-    from contract_resolver import _resolve_langfuse_client
-
-    return _resolve_langfuse_client()
-
-
 def cmd_compare(args: argparse.Namespace) -> int:
     path = _resolve_snapshot_path(args.agent, args.path)
     raw = load_snapshot(path)
@@ -60,20 +48,16 @@ def cmd_compare(args: argparse.Namespace) -> int:
         return 2
 
     dataset_name = _as_dict(contract.get("dataset")).get("name")
-    client = _get_client()
-    dataset = client.get_dataset(dataset_name)
-    if not dataset:
-        print(json.dumps({"status": "error", "error": f"dataset not found: {dataset_name}"}, indent=2))
-        return 3
 
-    baseline = _find_run(dataset, args.baseline_run)
-    candidate = _find_run(dataset, args.candidate_run)
-    if not baseline or not candidate:
+    baseline_scores = _collect_scores_rest(dataset_name, args.baseline_run)
+    candidate_scores = _collect_scores_rest(dataset_name, args.candidate_run)
+
+    if not baseline_scores and not candidate_scores:
         print(
             json.dumps(
                 {
                     "status": "error",
-                    "error": "baseline or candidate run not found",
+                    "error": "no scores found for baseline or candidate run",
                     "baseline_run": args.baseline_run,
                     "candidate_run": args.candidate_run,
                 },
@@ -81,9 +65,6 @@ def cmd_compare(args: argparse.Namespace) -> int:
             )
         )
         return 4
-
-    baseline_scores = _collect_scores(baseline)
-    candidate_scores = _collect_scores(candidate)
 
     dimensions = contract.get("dimensions") or []
     rows = []

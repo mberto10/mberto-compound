@@ -1,6 +1,6 @@
 ---
 name: agent-eval-setup
-description: Set up Langfuse-first evaluation infrastructure for an AI agent through codebase discovery and contract bootstrap
+description: Interactively discover, bootstrap, and export Langfuse-first evaluation infrastructure for agent optimization.
 allowed-tools:
   - Read
   - Glob
@@ -10,51 +10,65 @@ allowed-tools:
   - Task
   - Bash
 arguments:
+  - name: action
+    description: One of `interactive` (default), `status`, `baseline`, or `export`
+    required: false
   - name: agent
-    description: Agent name or path to explore
+    description: Agent name or path to explore (used for contract snapshot lookup)
     required: false
   - name: dataset
-    description: Optional dataset name (defaults to <agent>-eval)
+    description: Optional dataset name (defaults to <agent>-eval when needed)
     required: false
 ---
 
 # Agent Evaluation Setup
 
-Set up evaluation infrastructure with **Langfuse as source of truth** and local snapshots for compatibility.
+Set up or manage evaluation infrastructure with **Langfuse as canonical source of truth** and local snapshots for compatibility.
+
+This unified command handles discovery, bootstrapping, baseline testing, and export handoffs.
 
 ## Canonical Outputs
 
 - Langfuse dataset metadata (`eval_infra_v1`) is canonical.
 - Judge prompts are stored in Langfuse (`judge-*`).
-- Local files are generated views:
+- Local files are generated snapshots/views:
   - `.claude/eval-infra/<agent>.json`
   - `.claude/eval-infra/<agent>.yaml`
   - `.claude/agent-eval/<agent>.yaml` (compatibility projection)
 
-## Phase 1: Deep Codebase Discovery
+---
 
-Keep existing discovery behavior:
+## Action: `interactive` (Default)
+
+This action guides the user through End-to-End setup.
+
+### Phase 1: Deep Codebase Discovery & Context
 
 1. Discover the agent entry point and invocation.
-2. Map flow (LLM calls, tools, routing).
-3. Analyze prompts and expected quality behavior.
-4. Infer quality dimensions from actual implementation.
-5. Locate any existing evaluation assets.
+2. Scan codebase for tracing implementation, metrics, and metadata keys:
+```bash
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/eval-infrastructure/helpers/tracing_context_collector.py \
+  scan \
+  --agent "<agent>" \
+  --root "." \
+  --out ".claude/eval-infra/<agent>-tracing-context.json"
+```
+3. Ask the user (if missing/unclear):
+   - What exact output/feature is being optimized?
+   - What does success look like (primary objective and target threshold)?
+   - What constraints are non-negotiable?
+   - What failure modes matter most right now?
 
-Present findings before setup changes.
+### Phase 2: Confirm Setup Inputs
 
-## Phase 2: Confirm Setup Inputs
-
-Ask only non-derivable inputs:
-
+Based on discovery/interview, confirm final parameters:
 - Dataset name (default: `<agent>-eval`)
-- Dimension thresholds, weights, critical flags
-- Optional known failure categories to prioritize
+- Dimensions (Name, Threshold `0-1`, Weight, Critical Flag)
 - Optional entry-point override for metadata
 
-## Phase 3: Bootstrap Contract + Judges
+### Phase 3: Bootstrap Contract & Judges
 
-Run:
+Create/update the Langfuse metadata and prompts:
 
 ```bash
 python3 ${CLAUDE_PLUGIN_ROOT}/skills/eval-infrastructure/helpers/eval_infra_manager.py \
@@ -66,7 +80,6 @@ python3 ${CLAUDE_PLUGIN_ROOT}/skills/eval-infrastructure/helpers/eval_infra_mana
 ```
 
 Example dimensions JSON:
-
 ```json
 [
   {"name": "accuracy", "threshold": 0.8, "weight": 1.0, "critical": true},
@@ -74,21 +87,22 @@ Example dimensions JSON:
 ]
 ```
 
-## Phase 4: Optional Baseline Smoke Run
+### Phase 4: Curate Initial Dataset
 
-If user provides a task script:
-
+Help the user find and add traces if the dataset is empty:
 ```bash
-python3 ${CLAUDE_PLUGIN_ROOT}/skills/eval-infrastructure/helpers/eval_infra_manager.py \
-  baseline \
-  --agent "<agent>" \
-  --dataset "<dataset>" \
-  --task-script ./task.py
+# Find candidate traces
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/data-retrieval/helpers/trace_retriever.py \
+  --last 20 --mode minimal
+
+# Add one trace
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/dataset-management/helpers/dataset_manager.py \
+  add-trace --dataset "<dataset-name>" --trace-id <trace-id>
 ```
 
-If no task script is available, verify baseline readiness only.
+### Phase 5: Export Local Snapshot 
 
-## Phase 5: Export Snapshot + Compatibility File
+Finally, export files to handoff to `/optimize`:
 
 ```bash
 python3 ${CLAUDE_PLUGIN_ROOT}/skills/eval-infrastructure/helpers/eval_infra_manager.py \
@@ -97,21 +111,44 @@ python3 ${CLAUDE_PLUGIN_ROOT}/skills/eval-infrastructure/helpers/eval_infra_mana
   --dataset "<dataset>"
 ```
 
-## Score Scale Policy
+---
 
-- Canonical thresholds and gating are `0-1`.
-- Judges may still reason in `0-10`; runtime normalizes before scoring decisions.
+## Alternative Actions (CLI Wrappers)
 
-## Output
+### `status`
+Check completeness and contract health without changing anything:
+```bash
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/eval-infrastructure/helpers/eval_infra_manager.py \
+  assess \
+  --agent "<agent>" \
+  --dataset "<dataset>"
+```
 
-Return:
+### `baseline`
+Verify whether baseline metadata and run references are complete (optionally with task script):
+```bash
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/eval-infrastructure/helpers/eval_infra_manager.py \
+  baseline \
+  --agent "<agent>" \
+  --dataset "<dataset>" \
+  [--task-script ./task.py]
+```
 
-- Canonical dataset identifier
-- Dimension table (threshold/weight/critical)
-- Judge prompt list
+### `export`
+Regenerate local snapshot and compatibility projections explicitly:
+```bash
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/eval-infrastructure/helpers/eval_infra_manager.py \
+  export \
+  --agent "<agent>" \
+  --dataset "<dataset>"
+```
+
+---
+
+## Output / Summary
+
+When finished, summarize:
+- Canonical dataset identifier and dimensions
 - Baseline status
-- Snapshot and compatibility file paths
-
-## Compatibility Note
-
-`/agent-eval` users can continue using `.claude/agent-eval/<agent>.yaml`; this file is now generated from canonical Langfuse state.
+- Snapshot paths
+- Remind user they can now run `/optimize <agent>`

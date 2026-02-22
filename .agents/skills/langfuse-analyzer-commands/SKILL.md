@@ -29,7 +29,7 @@ See full mapping in `references/command-map.md`.
 
 ```bash
 python3 ~/.codex/skills/langfuse-analyzer-commands/scripts/langfuse_bridge.py agent-eval-infra --action status --agent my-agent --dataset my-agent-eval
-python3 ~/.codex/skills/langfuse-analyzer-commands/scripts/langfuse_bridge.py agent-eval-setup --agent my-agent --dataset my-agent-eval --dimensions-json '[{"name":"accuracy","threshold":0.8,"weight":1.0,"critical":true}]'
+python3 ~/.codex/skills/langfuse-analyzer-commands/scripts/langfuse_bridge.py agent-eval-setup --agent my-agent --dataset my-agent-eval
 python3 ~/.codex/skills/langfuse-analyzer-commands/scripts/langfuse_bridge.py skills-status
 python3 ~/.codex/skills/langfuse-analyzer-commands/scripts/langfuse_bridge.py skills-sync --all
 ```

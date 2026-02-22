@@ -6,8 +6,8 @@
 |---|---|
 | `/agent-eval-init --agent <a> [--dataset <d>]` | `python3 ~/.codex/skills/langfuse-analyzer-commands/scripts/langfuse_bridge.py agent-eval-init --agent <a> --dataset <d>` |
 | `/agent-eval-infra <action> --agent <a> --dataset <d>` | `python3 ~/.codex/skills/langfuse-analyzer-commands/scripts/langfuse_bridge.py agent-eval-infra --action <action> --agent <a> --dataset <d>` |
-| `/agent-eval-setup --agent <a> --dataset <d>` | `python3 ~/.codex/skills/langfuse-analyzer-commands/scripts/langfuse_bridge.py agent-eval-setup --agent <a> --dataset <d> --dimensions-json '<json>'` |
-| `/setup-dataset` | `python3 ~/.codex/skills/langfuse-analyzer-commands/scripts/langfuse_bridge.py setup-dataset --agent <a> --dataset <d> --dimensions-json '<json>'` |
+| `/agent-eval-setup --agent <a> --dataset <d>` | `python3 ~/.codex/skills/langfuse-analyzer-commands/scripts/langfuse_bridge.py agent-eval-setup --agent <a> --dataset <d>` |
+| `/setup-dataset` | `python3 ~/.codex/skills/langfuse-analyzer-commands/scripts/langfuse_bridge.py setup-dataset --agent <a> --dataset <d>` |
 | `/agent-eval --agent <a>` | `python3 ~/.codex/skills/langfuse-analyzer-commands/scripts/langfuse_bridge.py agent-eval --agent <a> --dataset <d> --task-script <path>` |
 | `/optimize-bootstrap --agent <a>` | `python3 ~/.codex/skills/langfuse-analyzer-commands/scripts/langfuse_bridge.py optimize-bootstrap --agent <a> --dataset <d>` |
 

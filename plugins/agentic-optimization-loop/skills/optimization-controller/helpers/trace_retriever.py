@@ -17,6 +17,8 @@ RETRIEVAL:
     --last N          Last N traces (default: 1)
     --case ID         Filter by case_id metadata
     --tags TAG...     Filter by tags
+    --dataset-run NAME    All scores for a dataset run (requires --dataset)
+    --dataset NAME        Dataset name, used with --dataset-run
 
 ENVIRONMENT:
     LANGFUSE_SDK_TIMEOUT  SDK timeout in seconds before HTTP fallback (default: 30)
@@ -27,6 +29,7 @@ EXAMPLES:
     python trace_retriever.py --last 2
     python trace_retriever.py --trace-id abc123 --mode prompts
     python trace_retriever.py --last 5 --case 0001 --mode flow
+    python trace_retriever.py --dataset-run baseline-v1 --dataset my_eval
 """
 
 import argparse
@@ -220,6 +223,82 @@ def get_trace_score(trace_id: str, score_name: str) -> Optional[float]:
     except Exception as e:
         print(f"Warning: Could not fetch scores for {trace_id}: {e}", file=sys.stderr)
         return None
+
+
+def retrieve_dataset_run_scores(dataset_name: str, run_name: str) -> Dict:
+    """Retrieve all items and their scores for a specific dataset run.
+
+    Uses REST API directly because the SDK does not populate scores
+    on dataset run items. Returns JSON with per-item trace_id + scores.
+    """
+    client = _get_httpx_client()
+    if not client:
+        print("Error: httpx required for dataset run score retrieval", file=sys.stderr)
+        return {}
+
+    try:
+        # Step 1: resolve dataset ID
+        resp = client.get(f"/api/public/datasets/{dataset_name}")
+        resp.raise_for_status()
+        dataset_id = resp.json().get("id")
+        if not dataset_id:
+            print(f"Error: dataset '{dataset_name}' not found", file=sys.stderr)
+            return {}
+
+        # Step 2: paginate dataset-run-items
+        all_items = []
+        page = 1
+        while True:
+            resp = client.get("/api/public/dataset-run-items", params={
+                "datasetId": dataset_id,
+                "runName": run_name,
+                "limit": 50,
+                "page": page,
+            })
+            resp.raise_for_status()
+            data = resp.json()
+            items = data.get("data", [])
+            if not items:
+                break
+            all_items.extend(items)
+            total_pages = data.get("meta", {}).get("totalPages", 1)
+            if page >= total_pages:
+                break
+            page += 1
+
+        # Step 3: for each item, get scores from trace (scores may not be on run-item)
+        result_items = []
+        for item in all_items:
+            trace_id = item.get("traceId") or item.get("trace_id")
+            scores = item.get("scores") or []
+
+            # If no embedded scores, fetch from trace directly
+            if not scores and trace_id:
+                try:
+                    trace_resp = client.get(f"/api/public/traces/{trace_id}")
+                    trace_resp.raise_for_status()
+                    scores = trace_resp.json().get("scores", [])
+                except Exception:
+                    pass
+
+            result_items.append({
+                "dataset_item_id": item.get("datasetItemId") or item.get("id"),
+                "trace_id": trace_id,
+                "scores": [{"name": s.get("name"), "value": s.get("value")}
+                           for s in scores if s.get("name") is not None],
+            })
+
+        return {
+            "dataset": dataset_name,
+            "run_name": run_name,
+            "item_count": len(result_items),
+            "items": result_items,
+        }
+    except Exception as e:
+        print(f"Error fetching dataset run scores: {e}", file=sys.stderr)
+        return {}
+    finally:
+        client.close()
 
 
 def retrieve_last_traces(
@@ -665,6 +744,18 @@ Examples:
         default=1,
         help="Retrieve last N traces (default: 1)"
     )
+    retrieval.add_argument(
+        "--dataset-run",
+        metavar="RUN_NAME",
+        help="Retrieve all scores for a dataset run (requires --dataset)"
+    )
+
+    # Dataset name (used with --dataset-run)
+    parser.add_argument(
+        "--dataset",
+        metavar="DATASET_NAME",
+        help="Dataset name (required with --dataset-run)"
+    )
 
     # Filters
     parser.add_argument(
@@ -713,6 +804,19 @@ Examples:
     )
 
     args = parser.parse_args()
+
+    # Dataset run score retrieval (separate path)
+    if args.dataset_run:
+        if not args.dataset:
+            print("Error: --dataset required with --dataset-run", file=sys.stderr)
+            sys.exit(1)
+        result = retrieve_dataset_run_scores(args.dataset, args.dataset_run)
+        if not result or not result.get("items"):
+            print(f"No items found for run '{args.dataset_run}' in dataset '{args.dataset}'", file=sys.stderr)
+            sys.exit(1)
+        import json as _json
+        print(_json.dumps(result, indent=2))
+        sys.exit(0)
 
     # Retrieve traces
     if args.trace_id:

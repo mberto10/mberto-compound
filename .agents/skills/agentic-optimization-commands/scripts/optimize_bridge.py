@@ -37,8 +37,8 @@ def find_repo_root(explicit_root: Optional[str]) -> Path:
 
     def has_required_dirs(path: Path) -> bool:
         return (
-            (path / "plugins" / "langfuse-analyzer").exists()
-            and (path / "plugins" / "agentic-optimization-loop").exists()
+            (path / ".agents" / "skills" / "langfuse-analyzer-commands").exists()
+            and (path / ".agents" / "skills" / "agentic-optimization-commands").exists()
         )
 
     candidates: List[Path] = []
@@ -81,14 +81,14 @@ def get_helper_paths(repo_root: Path) -> Dict[str, Path]:
         / "plugins"
         / "agentic-optimization-loop"
         / "skills"
-        / "optimization-loop"
+        / "optimization-controller"
         / "helpers"
         / "contract_resolver.py",
         "loop_template": repo_root
         / "plugins"
         / "agentic-optimization-loop"
         / "skills"
-        / "optimization-loop"
+        / "optimization-controller"
         / "references"
         / "loop-prompt-template.md",
     }
@@ -456,7 +456,6 @@ def handle_optimize_bootstrap(args: argparse.Namespace) -> int:
         if assess.returncode != 0:
             return assess.returncode
 
-    if dimensions:
         print("\n# Step: bootstrap")
         bootstrap_args = [
             "bootstrap",
@@ -464,9 +463,11 @@ def handle_optimize_bootstrap(args: argparse.Namespace) -> int:
             args.agent,
             "--dataset",
             dataset,
-            "--dimensions",
-            dimensions,
         ]
+        
+        if dimensions:
+            bootstrap_args.extend(["--dimensions", dimensions])
+
         if args.entry_point:
             bootstrap_args.extend(["--entry-point", args.entry_point])
         if args.description:
@@ -475,9 +476,6 @@ def handle_optimize_bootstrap(args: argparse.Namespace) -> int:
         bootstrap = run_python_script(helper_paths["eval_infra"], bootstrap_args, cwd=repo_root)
         if bootstrap.returncode != 0:
             return bootstrap.returncode
-    else:
-        print("\n# Step: bootstrap")
-        print("Skipped bootstrap (no dimensions provided).")
 
     should_run_baseline = args.run_baseline or bool(args.task_script)
     if should_run_baseline:

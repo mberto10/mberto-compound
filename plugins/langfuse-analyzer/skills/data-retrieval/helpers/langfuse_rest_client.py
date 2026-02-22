@@ -134,6 +134,33 @@ def get_dataset_by_name(dataset_name: str) -> Optional[Dict[str, Any]]:
         client.close()
 
 
+def update_dataset(dataset_name: str, **kwargs) -> Optional[Dict[str, Any]]:
+    """
+    Update dataset fields.
+    PATCH /api/public/datasets/{name}
+    """
+    client = _get_httpx_client()
+    if not client:
+        return None
+    
+    try:
+        payload = {}
+        if "description" in kwargs:
+            payload["description"] = kwargs["description"]
+        if "metadata" in kwargs:
+            payload["metadata"] = kwargs["metadata"]
+
+        response = client.patch(f"/api/public/datasets/{dataset_name}", json=payload)
+        response.raise_for_status()
+        return response.json()
+    except Exception as e:
+        print(f"Error patching dataset '{dataset_name}': {e}", file=sys.stderr)
+        return None
+    finally:
+        client.close()
+
+
+
 def get_trace(trace_id: str) -> Optional[Dict[str, Any]]:
     """
     Get a single trace by ID, including scores.

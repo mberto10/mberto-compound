@@ -10,32 +10,7 @@ from typing import Any, Dict, List, Optional
 
 from contract_resolver import _as_dict, normalize_score, normalize_contract, load_snapshot, _resolve_snapshot_path
 from contract_resolver import validate_contract_shape
-
-
-def _get_client():
-    from contract_resolver import _resolve_langfuse_client
-
-    return _resolve_langfuse_client()
-
-
-def _find_run(dataset: Any, run_name: str) -> Optional[Any]:
-    for run in (getattr(dataset, "runs", []) or []):
-        if getattr(run, "name", None) == run_name:
-            return run
-    return None
-
-
-def _score_for_dimension(item: Any, dimension_name: str) -> Optional[float]:
-    for score in (getattr(item, "scores", []) or []):
-        name = getattr(score, "name", None) or _as_dict(score).get("name")
-        if name != dimension_name:
-            continue
-        value = getattr(score, "value", None)
-        if value is None:
-            value = _as_dict(score).get("value")
-        if isinstance(value, (int, float)):
-            return normalize_score(value)
-    return None
+from trace_retriever import retrieve_dataset_run_scores
 
 
 def cmd_failures(args: argparse.Namespace) -> int:
@@ -62,39 +37,34 @@ def cmd_failures(args: argparse.Namespace) -> int:
     threshold = normalize_score(args.threshold) if args.threshold is not None else normalize_score(dim_obj.get("threshold", 0.8))
 
     dataset_name = _as_dict(contract.get("dataset")).get("name")
-    client = _get_client()
-    dataset = client.get_dataset(dataset_name)
-    if not dataset:
-        print(json.dumps({"status": "error", "error": f"dataset not found: {dataset_name}"}, indent=2))
-        return 5
 
-    run = _find_run(dataset, args.run_name)
-    if not run:
-        print(json.dumps({"status": "error", "error": f"run not found: {args.run_name}"}, indent=2))
-        return 6
+    result = retrieve_dataset_run_scores(dataset_name, args.run_name)
+    if not result or not result.get("items"):
+        print(json.dumps({"status": "error", "error": f"no items found for run '{args.run_name}' in dataset '{dataset_name}'"}, indent=2))
+        return 5
 
     failures: List[Dict[str, Any]] = []
 
-    for item in (getattr(run, "items", []) or []):
-        score = _score_for_dimension(item, dimension)
-        if score is None or score >= threshold:
+    for item in result.get("items", []):
+        # Find score for the target dimension
+        score_value: Optional[float] = None
+        for s in item.get("scores", []):
+            if s.get("name") == dimension:
+                v = s.get("value")
+                if isinstance(v, (int, float)):
+                    score_value = normalize_score(v)
+                break
+
+        if score_value is None or score_value >= threshold:
             continue
-
-        item_dict = _as_dict(item)
-        metadata = item_dict.get("metadata") or {}
-
-        if args.slice_key and args.slice_value is not None:
-            if str(metadata.get(args.slice_key)) != str(args.slice_value):
-                continue
 
         failures.append(
             {
-                "item_id": getattr(item, "id", None) or item_dict.get("id"),
-                "trace_id": getattr(item, "trace_id", None) or item_dict.get("trace_id") or metadata.get("trace_id"),
+                "item_id": item.get("dataset_item_id"),
+                "trace_id": item.get("trace_id"),
                 "dimension": dimension,
-                "score": score,
+                "score": score_value,
                 "threshold": threshold,
-                "metadata": metadata,
             }
         )
 

@@ -65,7 +65,7 @@ def find_repo_root(explicit_root: Optional[str]) -> Path:
     def has_required(path: Path) -> bool:
         return (
             (path / "plugins" / "langfuse-analyzer").exists()
-            and (path / "codex-skills").exists()
+            and (path / ".agents" / "skills").exists()
         )
 
     candidates: List[Path] = []
@@ -123,7 +123,7 @@ def get_paths(repo_root: Path) -> Dict[str, Path]:
         / "dataset-management"
         / "helpers"
         / "dataset_manager.py",
-        "codex_skills_root": repo_root / "codex-skills",
+        "codex_skills_root": repo_root / ".agents" / "skills",
     }
 
     missing = [name for name, p in paths.items() if name != "codex_skills_root" and not p.exists()]
@@ -316,10 +316,13 @@ def run_eval_infra_action(
 ) -> int:
     cmd = [action, "--agent", agent, "--dataset", dataset]
 
-    if action in {"bootstrap", "ensure-judges"}:
+    if action == "ensure-judges":
         if not dimensions:
-            eprint("ERROR: dimensions are required for bootstrap/ensure-judges")
+            eprint("ERROR: dimensions are required for ensure-judges")
             return 2
+        cmd.extend(["--dimensions", dimensions])
+        
+    elif action == "bootstrap" and dimensions:
         cmd.extend(["--dimensions", dimensions])
 
     if action == "bootstrap":
@@ -431,9 +434,6 @@ def handle_agent_eval_setup(args: argparse.Namespace) -> int:
 
     dataset = normalize_dataset(args.agent, args.dataset)
     dimensions = parse_dimensions_json(args.dimensions_json, args.dimensions_file)
-    if not dimensions:
-        eprint("ERROR: agent-eval-setup requires dimensions via --dimensions-json or --dimensions-file")
-        return 2
 
     if not args.skip_scan:
         context_out = repo_root / ".claude" / "eval-infra" / f"{args.agent}-tracing-context.json"
@@ -532,9 +532,6 @@ def handle_setup_dataset(args: argparse.Namespace) -> int:
 
     dataset = normalize_dataset(args.agent, args.dataset)
     dimensions = parse_dimensions_json(args.dimensions_json, args.dimensions_file)
-    if not dimensions:
-        eprint("ERROR: setup-dataset requires dimensions via --dimensions-json or --dimensions-file")
-        return 2
 
     rc = run_eval_infra_action(
         repo_root,
@@ -754,25 +751,24 @@ def handle_optimize_bootstrap(args: argparse.Namespace) -> int:
     if rc != 0:
         return rc
 
-    if dimensions:
-        print("\n# Step: bootstrap")
-        rc = run_eval_infra_action(
-            repo_root,
-            paths["eval_infra"],
-            "bootstrap",
-            args.agent,
-            dataset,
-            dimensions,
-            args.entry_point,
-            args.description,
-            None,
-            None,
-            None,
-            None,
-            None,
-        )
-        if rc != 0:
-            return rc
+    print("\n# Step: bootstrap")
+    rc = run_eval_infra_action(
+        repo_root,
+        paths["eval_infra"],
+        "bootstrap",
+        args.agent,
+        dataset,
+        dimensions,
+        args.entry_point,
+        args.description,
+        None,
+        None,
+        None,
+        None,
+        None,
+    )
+    if rc != 0:
+        return rc
 
     if args.task_script:
         print("\n# Step: baseline")

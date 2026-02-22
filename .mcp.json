@@ -4,6 +4,21 @@
       "type": "http",
       "url": "https://mcp.supabase.com/mcp?project_ref=ezwdpxbbqmsqqmafqxpw"
     },
+    "linear": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@linear/mcp-server"
+      ],
+      "env": {
+        "LINEAR_API_KEY": "${LINEAR_API_KEY}"
+      }
+    },
+    "supermemory": {
+      "type": "http",
+      "url": "https://mcp.supermemory.ai/${SUPERMEMORY_API_KEY}/sse"
+    },
     "obsidian": {
       "type": "stdio",
       "command": "node",

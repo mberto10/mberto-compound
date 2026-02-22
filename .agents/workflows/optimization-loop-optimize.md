@@ -1,0 +1,1 @@
+../../plugins/agentic-optimization-loop/commands/optimize.md

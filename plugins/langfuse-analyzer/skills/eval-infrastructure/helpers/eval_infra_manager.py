@@ -17,17 +17,18 @@ import json
 import os
 import re
 import sys
-from datetime import datetime, timezone
+import yaml
 from pathlib import Path
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 # Shared Langfuse client
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "data-retrieval" / "helpers"))
+sys.path.insert(0, str(Path(__file__).parent.parent.parent / "langfuse-data-retrieval" / "helpers"))
 from langfuse_client import get_langfuse_client
 import langfuse_rest_client
 
 # Experiment runner for baseline execution
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "experiment-runner" / "helpers"))
+sys.path.insert(0, str(Path(__file__).parent.parent.parent / "langfuse-experiment-runner" / "helpers"))
 from experiment_runner import run_experiment
 
 
@@ -188,10 +189,18 @@ def update_dataset_metadata(dataset_name: str, metadata_patch: Dict[str, Any]) -
     if hasattr(dataset, "update"):
         attempts.append(lambda: dataset.update(metadata=merged))
 
+    # Add REST API fallback for updating existing datasets
+    if hasattr(langfuse_rest_client, "update_dataset"):
+        attempts.append(lambda: langfuse_rest_client.update_dataset(dataset_name, metadata=merged))
+
     errors: List[str] = []
     for attempt in attempts:
         try:
-            attempt()
+            res = attempt()
+            # If REST API returns None, it means it failed but didn't throw (e.g. no client)
+            if res is None and hasattr(langfuse_rest_client, "update_dataset") and attempt.__name__ == '<lambda>' and 'update_dataset' in attempt.__code__.co_names:
+                errors.append("REST API update returned None")
+                continue
             return {"status": "updated", "metadata": merged}
         except Exception as exc:
             errors.append(str(exc))
@@ -258,6 +267,19 @@ def ensure_judge_prompts(dimensions: List[Dict[str, Any]]) -> Dict[str, Any]:
     }
 
 
+def load_agent_config(agent_name: str, config_dir: str = ".claude/agent-eval") -> Optional[Dict[str, Any]]:
+    """Load agent strategy configuration from disk, which defines dimensions and levers."""
+    base = Path(config_dir)
+    yaml_path = base / f"{agent_name}.yaml"
+    if not yaml_path.exists():
+        return None
+    try:
+        with open(yaml_path, "r", encoding="utf-8") as f:
+            return yaml.safe_load(f)
+    except Exception as exc:
+        print(f"Warning: Failed to load config {yaml_path}: {exc}", file=sys.stderr)
+        return None
+
 def build_metadata(
     agent_name: str,
     entry_point: str,
@@ -265,6 +287,7 @@ def build_metadata(
     baseline: Optional[Dict[str, Any]] = None,
     previous: Optional[Dict[str, Any]] = None,
     judges_ready: Optional[bool] = None,
+    levers: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     prev = previous or {}
     prev_baseline = prev.get("baseline") if isinstance(prev, dict) else None
@@ -277,7 +300,7 @@ def build_metadata(
     judges = [d["judge_prompt"] for d in dimensions]
     baseline_ready = bool(baseline_block.get("run_name")) and bool(baseline_block.get("metrics"))
 
-    return {
+    metadata = {
         "schema_version": SCHEMA_VERSION,
         "agent": {
             "name": agent_name,
@@ -293,6 +316,11 @@ def build_metadata(
             "baseline_ready": baseline_ready,
         },
     }
+    
+    if levers:
+        metadata["meta"] = {"levers": levers}
+        
+    return metadata
 
 
 def summarize_status(dataset_name: str, agent_name: str) -> Dict[str, Any]:
@@ -413,6 +441,10 @@ def export_snapshots(agent_name: str, dataset_name: str, snapshot_dir: str) -> D
             "legacy_config_path": f".claude/agent-eval/{agent_name}.yaml",
         },
     }
+    
+    # Inject meta.levers if present in schema
+    if "meta" in metadata and isinstance(metadata["meta"], dict) and "levers" in metadata["meta"]:
+         snapshot["meta"] = {"levers": metadata["meta"]["levers"]}
 
     base = Path(snapshot_dir)
     json_path = base / f"{agent_name}.json"
@@ -519,13 +551,28 @@ def cmd_assess(args: argparse.Namespace) -> int:
 
 
 def cmd_bootstrap(args: argparse.Namespace) -> int:
-    try:
-        raw_dimensions = json.loads(args.dimensions)
-        if not isinstance(raw_dimensions, list):
-            raise ValueError("dimensions must be a JSON list")
-    except Exception as exc:
-        print(f"Error: invalid --dimensions JSON: {exc}", file=sys.stderr)
+    agent_config = load_agent_config(args.agent)
+    raw_dimensions = None
+    levers = None
+    
+    if args.dimensions:
+        try:
+            raw_dimensions = json.loads(args.dimensions)
+            if not isinstance(raw_dimensions, list):
+                raise ValueError("dimensions must be a JSON list")
+        except Exception as exc:
+            print(f"Error: invalid --dimensions JSON: {exc}", file=sys.stderr)
+            return 1
+    elif agent_config and "evaluation" in agent_config and "dimensions" in agent_config["evaluation"]:
+        raw_dimensions = agent_config["evaluation"]["dimensions"]
+        print(f"Loaded {len(raw_dimensions)} dimensions from configuration for '{args.agent}'")
+    else:
+        print("Error: --dimensions is required when no config exists for the agent", file=sys.stderr)
         return 1
+        
+    if agent_config and "meta" in agent_config and "levers" in agent_config["meta"]:
+        levers = agent_config["meta"]["levers"]
+        print(f"Loaded meta.levers from configuration for '{args.agent}'")
 
     dimensions = normalize_dimensions(raw_dimensions)
     if not dimensions:
@@ -539,6 +586,7 @@ def cmd_bootstrap(args: argparse.Namespace) -> int:
         baseline=None,
         previous=None,
         judges_ready=False,
+        levers=levers,
     )
 
     create_result = create_dataset_if_missing(args.dataset, args.description, base_metadata)
@@ -556,6 +604,7 @@ def cmd_bootstrap(args: argparse.Namespace) -> int:
         baseline=existing_metadata.get("baseline"),
         previous=existing_metadata,
         judges_ready=judges_result.get("ready"),
+        levers=levers,
     )
     merged_metadata["status"]["dataset_ready"] = True
 
@@ -586,13 +635,28 @@ def cmd_bootstrap(args: argparse.Namespace) -> int:
 
 
 def cmd_bootstrap_live(args: argparse.Namespace) -> int:
-    try:
-        raw_dimensions = json.loads(args.dimensions)
-        if not isinstance(raw_dimensions, list):
-            raise ValueError("dimensions must be a JSON list")
-    except Exception as exc:
-        print(f"Error: invalid --dimensions JSON: {exc}", file=sys.stderr)
+    agent_config = load_agent_config(args.agent)
+    raw_dimensions = None
+    levers = None
+    
+    if args.dimensions:
+        try:
+            raw_dimensions = json.loads(args.dimensions)
+            if not isinstance(raw_dimensions, list):
+                raise ValueError("dimensions must be a JSON list")
+        except Exception as exc:
+            print(f"Error: invalid --dimensions JSON: {exc}", file=sys.stderr)
+            return 1
+    elif agent_config and "evaluation" in agent_config and "dimensions" in agent_config["evaluation"]:
+        raw_dimensions = agent_config["evaluation"]["dimensions"]
+        print(f"Loaded {len(raw_dimensions)} dimensions from configuration for '{args.agent}'")
+    else:
+        print("Error: --dimensions is required when no config exists for the agent", file=sys.stderr)
         return 1
+        
+    if agent_config and "meta" in agent_config and "levers" in agent_config["meta"]:
+        levers = agent_config["meta"]["levers"]
+        print(f"Loaded meta.levers from configuration for '{args.agent}'")
 
     dimensions = normalize_dimensions(raw_dimensions)
     if not dimensions:
@@ -639,6 +703,9 @@ def cmd_bootstrap_live(args: argparse.Namespace) -> int:
             "live_mode": True,
         },
     }
+    
+    if levers:
+        contract["meta"] = {"levers": levers}
 
     # 3. Write locally
     paths = write_contract_file(args.agent, contract)
@@ -782,13 +849,13 @@ def build_parser() -> argparse.ArgumentParser:
     bootstrap = sub.add_parser("bootstrap", help="Bootstrap dataset + judges + metadata")
     bootstrap.add_argument("--agent", required=True, help="Agent name")
     bootstrap.add_argument("--dataset", required=True, help="Dataset name")
-    bootstrap.add_argument("--dimensions", required=True, help="JSON list of dimension objects")
+    bootstrap.add_argument("--dimensions", help="JSON list of dimension objects (optional if agent config exists)")
     bootstrap.add_argument("--entry-point", default="", help="Agent invocation/entry point")
     bootstrap.add_argument("--description", default="", help="Dataset description when creating")
 
     bootstrap_live = sub.add_parser("bootstrap-live", help="Bootstrap local live-mode contract (no dataset)")
     bootstrap_live.add_argument("--agent", required=True, help="Agent name")
-    bootstrap_live.add_argument("--dimensions", required=True, help="JSON list of dimension objects")
+    bootstrap_live.add_argument("--dimensions", help="JSON list of dimension objects (optional if agent config exists)")
     bootstrap_live.add_argument("--entry-point", default="", help="Agent invocation/entry point")
     bootstrap_live.add_argument("--sample-size", type=int, default=10, help="Number of recent traces to fetch")
     bootstrap_live.add_argument("--skip-judges", action="store_true", help="Do not create judge prompts (external)")
