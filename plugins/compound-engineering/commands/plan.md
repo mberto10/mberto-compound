@@ -6,6 +6,8 @@ allowed-tools: Read, Glob, Grep, Task, AskUserQuestion
 
 # Plan Command
 
+**IMPORTANT: Do NOT use the EnterPlanMode tool. Execute the steps below directly in the current conversation. This command produces a structured plan — it is not a trigger for Claude Code's built-in plan mode.**
+
 Produce a dependency-aware change plan by consulting subsystem knowledge BEFORE reading any source code.
 
 ---
@@ -179,3 +181,4 @@ Review the plan for:
 - If the subsystems_knowledge folder is empty or missing for this project, tell the user to run `/explore-subsystem` first to build the knowledge base.
 - If you find that subsystem specs are stale or missing information, note this in the "Spec Gaps Discovered" section so they can be updated after the change lands.
 - When the change is small and only touches one subsystem with no consumers, the plan can be shorter — skip the cascade analysis and just output the change group + tests.
+- **Do not enter Claude Code plan mode.** This command has its own structured planning workflow. Using the built-in EnterPlanMode tool will bypass `/work` and break the plan → work → review pipeline.

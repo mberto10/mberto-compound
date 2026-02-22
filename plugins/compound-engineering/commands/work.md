@@ -18,6 +18,21 @@ Work is subsystem-aware. Before touching code, load the relevant subsystem specs
 
 ---
 
+## Step 0: Activate Post-Work Chain
+
+Create or overwrite `.claude/work-chain-state.local.md` so the Stop hook will auto-chain review → discover after work completes:
+
+```yaml
+---
+active: true
+stage: idle
+---
+```
+
+This is automatic — no separate command needed. Use `/chain stop` mid-session to abort the chain if needed.
+
+---
+
 ## Step 1: Load the Plan
 
 Find the plan to execute:
