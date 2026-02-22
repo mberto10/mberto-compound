@@ -1,5 +1,4 @@
 ---
-name: explore-subsystem
 description: Systematically explore and document a subsystem for the compound engineering knowledge base
 argument-hint: <system/subsystem e.g. backend/api or frontend/auth>
 allowed-tools: Read, Glob, Grep, Write, Task, AskUserQuestion

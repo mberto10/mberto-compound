@@ -1,5 +1,4 @@
 ---
-name: harness
 description: Start autonomous engineering loop — pulls issues from Linear, executes plan→work→review→commit cycle
 argument-hint: <start|stop|status> [--project PROJECT_ID] [--label ready] [--max 20] [--team MB90]
 allowed-tools: Read, Write, Edit, Glob, Grep, Bash, Task, AskUserQuestion, mcp__linear-server__*

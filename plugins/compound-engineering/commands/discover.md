@@ -1,5 +1,4 @@
 ---
-name: discover
 description: Analyze work session to discover reusable patterns and specify appropriate components for the local project plugin
 argument-hint: [optional focus - what pattern you noticed or want to explore]
 allowed-tools: Read, Glob, Grep, Write, Task, AskUserQuestion

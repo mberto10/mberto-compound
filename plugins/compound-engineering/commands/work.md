@@ -1,5 +1,4 @@
 ---
-name: work
 description: Execute planned work while leveraging subsystem knowledge and applying the improvement mindset
 argument-hint: [optional plan reference or description of work to execute]
 allowed-tools: Read, Write, Edit, Glob, Grep, Bash, Task, AskUserQuestion

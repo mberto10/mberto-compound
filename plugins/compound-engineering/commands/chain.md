@@ -1,5 +1,4 @@
 ---
-name: chain
 description: Check or stop the post-work chain (work → review → discover)
 argument-hint: stop | status
 allowed-tools: Read, Write, Glob
