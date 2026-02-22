@@ -1,4 +1,5 @@
 ---
+name: consolidate
 description: Implement discovered patterns into the local project plugin and update subsystem knowledge
 argument-hint: [optional filter - e.g., "only backend skills", "from latest discover"]
 allowed-tools: Read, Write, Edit, Glob, Grep, Bash, Task, AskUserQuestion

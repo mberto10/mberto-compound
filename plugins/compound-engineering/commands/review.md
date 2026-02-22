@@ -1,4 +1,5 @@
 ---
+name: review
 description: Verify work against subsystem contracts, invariants, and tests
 argument-hint: [optional scope - e.g., "backend only" or specific subsystem]
 allowed-tools: Read, Glob, Grep, Bash, Task, AskUserQuestion

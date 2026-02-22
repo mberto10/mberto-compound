@@ -1,4 +1,5 @@
 ---
+name: plan
 description: Produce a dependency-aware change plan by consulting subsystem knowledge before reading source code
 argument-hint: <change description - what you want to plan>
 allowed-tools: Read, Glob, Grep, Task, AskUserQuestion
