@@ -14,7 +14,9 @@
     "./commands/discover.md",
     "./commands/consolidate.md",
     "./commands/strategic-plan.md",
-    "./commands/harness.md"
+    "./commands/harness.md",
+    "./commands/reason.md",
+    "./commands/chain.md"
   ],
   "skills": [
     "./skills/improvement-cycle",
@@ -22,7 +24,8 @@
     "./skills/consolidation-craft",
     "./skills/reflection-craft",
     "./skills/strategic-planner",
-    "./skills/harness-protocol"
+    "./skills/harness-protocol",
+    "./skills/reasoning-craft"
   ],
   "hooks": "./hooks/hooks.json"
 }
