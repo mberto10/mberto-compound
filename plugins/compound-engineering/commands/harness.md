@@ -53,7 +53,7 @@ Also extract optional flags:
 
 ## Subcommand: `start` — The Loop Body
 
-This is the core autonomous loop. Each execution handles ONE issue. The Stop hook feeds this command back to handle the next issue.
+This is the core autonomous loop. It processes all queued issues in sequence until the queue is empty, max_iterations is reached, or 3 consecutive failures occur.
 
 ### Step 1: Load or Create State
 
@@ -263,13 +263,23 @@ Follow the /review methodology inline:
 
 2. Do NOT change the issue status — leave it for human triage.
 
-### Step 9: Log Friction (state bookkeeping is handled by the Stop hook)
+### Step 9: Update State and Log Friction
 
-Note: Do NOT update `completed_issues`, `failed_issues`, or `consecutive_failures` here — the Stop hook is the single owner of those counters (it reads the completion marker and updates state atomically). Doing it in both places would double-count.
+1. Based on outcome, update state file:
 
-1. Clear `current_issue` in the state file.
+   **On success:**
+   - Append `{issue_id}` to `completed_issues`
+   - Set `consecutive_failures: 0`
 
-2. Append friction points to `friction_log` in state file:
+   **On failure:**
+   - Append `{issue_id}` to `failed_issues`
+   - Increment `consecutive_failures`
+
+2. Clear `current_issue` in the state file.
+
+3. Increment `iteration` by 1.
+
+4. Append friction points to `friction_log` in state file:
    ```yaml
    friction_log:
      - issue: "{issue_id}"
@@ -278,34 +288,34 @@ Note: Do NOT update `completed_issues`, `failed_issues`, or `consecutive_failure
          - "{friction description}"
    ```
 
-3. Check discovery trigger: if `completed_issues` count is a multiple of `discover_interval`:
+5. Check discovery trigger: if `completed_issues` count is a multiple of `discover_interval`:
    - Log: "Discovery trigger: {discover_interval} issues completed since last discovery"
    - Run a brief inline discovery pass on accumulated friction
    - If patterns found, note them in state but continue the loop
 
-### Step 10: Output Completion Marker
+### Step 10: Check Termination and Continue
 
-Based on the outcome, output ONE of these markers **on its own line**:
+Output the appropriate marker for logging/observability:
+- Success: `[ISSUE_COMPLETE: {issue_id}]`
+- Failure: `[ISSUE_FAILED: {issue_id}]`
 
-**Success:**
-```
-[ISSUE_COMPLETE: {issue_id}]
-```
+Then check termination conditions:
 
-**Failure:**
-```
-[ISSUE_FAILED: {issue_id}]
-```
+1. **Max iterations reached** (`iteration >= max_iterations`):
+   - Output `[HARNESS_STOP]`
+   - Set `active: false` in state file
+   - **Stop. Do not continue.**
 
-**Queue empty (should have been caught in Step 3, but as safety net):**
-```
-[HARNESS_DONE]
-```
+2. **3+ consecutive failures:**
+   - Output `[HARNESS_STOP]`
+   - Set `active: false` in state file
+   - **Stop. Do not continue.**
 
-The Stop hook will detect the marker and:
-- Update `completed_issues`/`failed_issues` and `consecutive_failures` (single owner of state counters)
-- Feed the harness prompt back to start the next iteration, OR
-- Allow exit if max_iterations reached or 3+ consecutive failures
+3. **`active: false`** (user ran `/harness stop` during execution):
+   - Output `[HARNESS_STOP]`
+   - **Stop. Do not continue.**
+
+4. **Otherwise: Go back to Step 3** (fetch next issue).
 
 ### Context Limit Handling
 
@@ -318,7 +328,7 @@ If you sense context is filling up (many tool calls, large outputs):
    ```
    [HARNESS_PAUSE: {issue_id}]
    ```
-5. The Stop hook will allow exit. Next session can resume with `/harness start`.
+5. **Stop. Do not continue to the next issue.** Next session can resume with `/harness start`.
 
 ---
 
@@ -329,7 +339,7 @@ If you sense context is filling up (many tool calls, large outputs):
 3. **Never modify files outside the blast radius** identified in the plan phase.
 4. **Always verify before committing.** Invariant check + tier0 tests must pass.
 5. **Revert on review failure.** Don't leave broken commits in the history.
-6. **Respect max_iterations.** The stop hook enforces this, but the command should also check.
+6. **Respect max_iterations.** Check before starting each new issue.
 7. **Log everything to Linear.** The issue comment is the audit trail.
 8. **One issue at a time.** Never work on multiple issues simultaneously.
 9. **Ask if truly blocked.** If something needs human input, use AskUserQuestion rather than guessing and potentially breaking things.
@@ -339,7 +349,8 @@ If you sense context is filling up (many tool calls, large outputs):
 ## Notes
 
 - This command orchestrates the full cycle INLINE — it does NOT invoke /plan, /work, /review as sub-commands. It follows their methodology directly.
-- The Stop hook (`hooks/scripts/harness-stop-hook.sh`) creates the loop. This command handles ONE issue per invocation.
+- The loop is self-contained: after completing an issue, the command checks termination conditions and loops back to Step 3.
+- The Stop hook (`hooks/scripts/harness-stop-hook.sh`) serves as a fallback safety net — if the session exits unexpectedly, it can update state. But normal loop continuation is driven by the command itself.
 - State is persisted in `.claude/harness-state.local.md` (git-ignored, machine-local).
 - The harness-protocol skill provides the "how to think" guidance for autonomous decisions.
 - Friction logging feeds into periodic `/discover` passes for self-improvement.

@@ -128,19 +128,21 @@ if echo "$LAST_OUTPUT" | grep -qE '\[ISSUE_COMPLETE: .+\]'; then
   COMPLETED_ID=$(echo "$LAST_OUTPUT" | grep -oE '\[ISSUE_COMPLETE: [^]]+' | sed 's/\[ISSUE_COMPLETE: //')
 
   # Update completed_issues in state file using python3 for reliable YAML list editing
+  # Skips update if issue already present (command may have self-updated)
   python3 -c "
 import sys, re
 state_file = sys.argv[1]
 issue_id = sys.argv[2]
 with open(state_file, 'r') as f:
     content = f.read()
-# Update completed_issues list
-content = re.sub(
-    r'^(completed_issues: \[)(.*?)(\])$',
-    lambda m: m.group(1) + ('\"' + issue_id + '\", ' + m.group(2) if m.group(2).strip() else '\"' + issue_id + '\"') + m.group(3),
-    content,
-    flags=re.MULTILINE
-)
+# Only add if not already present (command may have self-updated in Step 9)
+if issue_id not in content.split('completed_issues:')[1].split('\n')[0] if 'completed_issues:' in content else True:
+    content = re.sub(
+        r'^(completed_issues: \[)(.*?)(\])$',
+        lambda m: m.group(1) + ('\"' + issue_id + '\", ' + m.group(2) if m.group(2).strip() else '\"' + issue_id + '\"') + m.group(3),
+        content,
+        flags=re.MULTILINE
+    )
 # Reset consecutive failures
 content = re.sub(r'^consecutive_failures: .*$', 'consecutive_failures: 0', content, flags=re.MULTILINE)
 with open(state_file, 'w') as f:
@@ -159,6 +161,7 @@ if echo "$LAST_OUTPUT" | grep -qE '\[ISSUE_FAILED: .+\]'; then
   NEW_FAILURES=$((CONSECUTIVE_FAILURES + 1))
 
   # Update failed_issues and consecutive_failures in state file
+  # Skips update if issue already present (command may have self-updated)
   python3 -c "
 import sys, re
 state_file = sys.argv[1]
@@ -166,13 +169,14 @@ issue_id = sys.argv[2]
 new_failures = sys.argv[3]
 with open(state_file, 'r') as f:
     content = f.read()
-# Update failed_issues list
-content = re.sub(
-    r'^(failed_issues: \[)(.*?)(\])$',
-    lambda m: m.group(1) + ('\"' + issue_id + '\", ' + m.group(2) if m.group(2).strip() else '\"' + issue_id + '\"') + m.group(3),
-    content,
-    flags=re.MULTILINE
-)
+# Only add if not already present (command may have self-updated in Step 9)
+if issue_id not in content.split('failed_issues:')[1].split('\n')[0] if 'failed_issues:' in content else True:
+    content = re.sub(
+        r'^(failed_issues: \[)(.*?)(\])$',
+        lambda m: m.group(1) + ('\"' + issue_id + '\", ' + m.group(2) if m.group(2).strip() else '\"' + issue_id + '\"') + m.group(3),
+        content,
+        flags=re.MULTILINE
+    )
 # Update consecutive failures
 content = re.sub(r'^consecutive_failures: .*$', 'consecutive_failures: ' + new_failures, content, flags=re.MULTILINE)
 with open(state_file, 'w') as f:
