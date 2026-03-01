@@ -1,0 +1,190 @@
+{
+  "skills": [
+    {
+      "name": "skill-template",
+      "path": "codex-skills/skill-template",
+      "version": "0.1.0",
+      "description": "Starter template for new Codex skills"
+    },
+    {
+      "name": "alpha-production-readiness-trace",
+      "path": "codex-skills/alpha-production-readiness-trace",
+      "version": "0.1.0",
+      "description": "Production readiness evaluation for alpha via UI-to-backend tracing and gap reporting"
+    },
+    {
+      "name": "ux-evaluator",
+      "path": "codex-skills/ux-evaluator",
+      "version": "0.1.0",
+      "description": "Codex port of the ux-evaluator plugin with ux-eval, dogfood, and mcp-eval modes"
+    },
+    {
+      "name": "agentic-optimization-craft",
+      "path": "codex-skills/agentic-optimization-craft",
+      "version": "0.1.0",
+      "description": "Hypothesis-driven optimization loop for AI agents with persistent state and compounding"
+    },
+    {
+      "name": "agentic-optimization-commands",
+      "path": "codex-skills/agentic-optimization-commands",
+      "version": "0.1.0",
+      "description": "Codex wrapper commands for optimize-bootstrap, optimize, optimize-status, and cloud-optimize"
+    },
+    {
+      "name": "evaluation-design",
+      "path": "codex-skills/evaluation-design",
+      "version": "0.1.0",
+      "description": "Design metrics, datasets, and grading strategies for agent evaluation"
+    },
+    {
+      "name": "work-toolkit-linear",
+      "path": "codex-skills/work-toolkit-linear",
+      "version": "0.1.0",
+      "description": "Linear daily planning and task management workflows"
+    },
+    {
+      "name": "work-toolkit-youtrack",
+      "path": "codex-skills/work-toolkit-youtrack",
+      "version": "0.1.0",
+      "description": "YouTrack KW updates, epic health, and Linear to YouTrack sync workflows"
+    },
+    {
+      "name": "work-toolkit-communication",
+      "path": "codex-skills/work-toolkit-communication",
+      "version": "0.1.0",
+      "description": "German business communication templates and drafting"
+    },
+    {
+      "name": "work-toolkit-meetings",
+      "path": "codex-skills/work-toolkit-meetings",
+      "version": "0.1.0",
+      "description": "Meeting preparation for JF, stakeholder updates, and Lenkungsausschuss"
+    },
+    {
+      "name": "work-toolkit-structuring",
+      "path": "codex-skills/work-toolkit-structuring",
+      "version": "0.1.0",
+      "description": "Structuring presentations, docs, outlines, and milestones"
+    },
+    {
+      "name": "langfuse-data-retrieval",
+      "path": "codex-skills/langfuse-data-retrieval",
+      "version": "0.1.0",
+      "description": "Fetch Langfuse traces with focused output modes"
+    },
+    {
+      "name": "langfuse-trace-analysis",
+      "path": "codex-skills/langfuse-trace-analysis",
+      "version": "0.1.0",
+      "description": "Root-cause analysis for Langfuse traces"
+    },
+    {
+      "name": "langfuse-dataset-management",
+      "path": "codex-skills/langfuse-dataset-management",
+      "version": "0.1.0",
+      "description": "Create and manage Langfuse datasets"
+    },
+    {
+      "name": "langfuse-prompt-management",
+      "path": "codex-skills/langfuse-prompt-management",
+      "version": "0.1.0",
+      "description": "Manage Langfuse prompts, versions, and labels"
+    },
+    {
+      "name": "langfuse-score-analytics",
+      "path": "codex-skills/langfuse-score-analytics",
+      "version": "0.1.0",
+      "description": "Analyze Langfuse score trends and regressions"
+    },
+    {
+      "name": "langfuse-session-analysis",
+      "path": "codex-skills/langfuse-session-analysis",
+      "version": "0.1.0",
+      "description": "Session-level analysis for Langfuse traces"
+    },
+    {
+      "name": "langfuse-annotation-manager",
+      "path": "codex-skills/langfuse-annotation-manager",
+      "version": "0.1.0",
+      "description": "Human annotation workflows for Langfuse traces"
+    },
+    {
+      "name": "langfuse-experiment-runner",
+      "path": "codex-skills/langfuse-experiment-runner",
+      "version": "0.1.0",
+      "description": "Run and analyze Langfuse experiments"
+    },
+    {
+      "name": "langfuse-instrumentation-setup",
+      "path": "codex-skills/langfuse-instrumentation-setup",
+      "version": "0.1.0",
+      "description": "Instrument Python pipelines with Langfuse tracing"
+    },
+    {
+      "name": "langfuse-agent-advisor",
+      "path": "codex-skills/langfuse-agent-advisor",
+      "version": "0.1.0",
+      "description": "Strategic guidance for agent evals with Langfuse"
+    },
+    {
+      "name": "langfuse-agent-eval-setup",
+      "path": "codex-skills/langfuse-agent-eval-setup",
+      "version": "0.1.0",
+      "description": "Set up agent evaluation configs and assets"
+    },
+    {
+      "name": "langfuse-agent-eval",
+      "path": "codex-skills/langfuse-agent-eval",
+      "version": "0.1.0",
+      "description": "Run agent evaluation cycles and document findings"
+    },
+    {
+      "name": "langfuse-dataset-setup",
+      "path": "codex-skills/langfuse-dataset-setup",
+      "version": "0.1.0",
+      "description": "Wizard for Langfuse dataset and judge setup"
+    },
+    {
+      "name": "langfuse-eval-infrastructure",
+      "path": "codex-skills/langfuse-eval-infrastructure",
+      "version": "0.1.0",
+      "description": "Bootstrap and validate Langfuse evaluation infrastructure contracts and snapshots"
+    },
+    {
+      "name": "langfuse-analyzer-commands",
+      "path": "codex-skills/langfuse-analyzer-commands",
+      "version": "0.1.0",
+      "description": "Codex wrapper commands for agent-eval workflows and Langfuse skill parity sync"
+    },
+    {
+      "name": "compound-improvement-cycle-setup",
+      "path": "codex-skills/compound-improvement-cycle-setup",
+      "version": "0.1.0",
+      "description": "Improvement mindset for compounding learnings during work"
+    },
+    {
+      "name": "compound-reflection-craft",
+      "path": "codex-skills/compound-reflection-craft",
+      "version": "0.1.0",
+      "description": "Trace-aware reflection workflow to capture structured learnings"
+    },
+    {
+      "name": "compound-discovery-craft",
+      "path": "codex-skills/compound-discovery-craft",
+      "version": "0.1.0",
+      "description": "Pattern extraction and component specification for new capabilities"
+    },
+    {
+      "name": "compound-consolidation-craft",
+      "path": "codex-skills/compound-consolidation-craft",
+      "version": "0.1.0",
+      "description": "Review and implement compound learnings into skills and plugins"
+    },
+    {
+      "name": "markdown-program-autopilot",
+      "path": "codex-skills/markdown-program-autopilot",
+      "version": "0.1.0",
+      "description": "Self-sustaining markdown-based long-running program execution loop"
+    }
+  ]
+}

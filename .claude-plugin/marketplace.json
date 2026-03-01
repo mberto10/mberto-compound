@@ -1,0 +1,251 @@
+{
+  "name": "mberto-compound",
+  "owner": {
+    "name": "Maximilian Bruhn",
+    "email": "puzzle.ai.studio@gmail.com"
+  },
+  "metadata": {
+    "description": "Personal collection of Claude Code plugins, commands, and configurations",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "langfuse-analyzer",
+      "source": "./plugins/langfuse-analyzer",
+      "description": "Surgical Langfuse trace retrieval with multiple output modes for LLM-friendly debugging and optimization workflows",
+      "version": "0.1.0",
+      "author": {
+        "name": "Writing Ecosystem Team"
+      },
+      "homepage": "https://github.com/mberto10/mberto-compound",
+      "repository": "https://github.com/mberto10/mberto-compound",
+      "license": "MIT",
+      "keywords": [
+        "langfuse",
+        "tracing",
+        "debugging",
+        "observability",
+        "optimization"
+      ],
+      "category": "observability"
+    },
+    {
+      "name": "langdock-dev",
+      "source": "./plugins/langdock-dev",
+      "description": "Build Langdock integration actions and use Langdock APIs with live documentation fetching",
+      "version": "0.1.0",
+      "author": {
+        "name": "Maximilian Bruhn",
+        "email": "puzzle.ai.studio@gmail.com"
+      },
+      "homepage": "https://github.com/mberto10/mberto-compound",
+      "repository": "https://github.com/mberto10/mberto-compound",
+      "license": "MIT",
+      "keywords": [
+        "langdock",
+        "integrations",
+        "actions",
+        "api",
+        "development"
+      ],
+      "category": "development"
+    },
+    {
+      "name": "writing-studio",
+      "source": "./plugins/writing-studio",
+      "description": "Comprehensive writing assistant with quality loop workflow: deep discovery, voice profiles, iterative self-critique, and publication-ready output",
+      "version": "2.0.0",
+      "author": {
+        "name": "Maximilian Bruhn",
+        "email": "puzzle.ai.studio@gmail.com"
+      },
+      "homepage": "https://github.com/mberto10/mberto-compound",
+      "repository": "https://github.com/mberto10/mberto-compound",
+      "license": "MIT",
+      "keywords": [
+        "writing",
+        "style",
+        "drafting",
+        "editing",
+        "brainstorming",
+        "content",
+        "workflow",
+        "critique",
+        "voice",
+        "quality-loop"
+      ],
+      "category": "writing"
+    },
+    {
+      "name": "work-toolkit",
+      "source": "./plugins/work-toolkit",
+      "description": "Personal management plugin for daily planning with Linear, German business communication, and YouTrack documentation",
+      "version": "0.1.0",
+      "author": {
+        "name": "Maximilian Bruhn",
+        "email": "puzzle.ai.studio@gmail.com"
+      },
+      "homepage": "https://github.com/mberto10/mberto-compound",
+      "repository": "https://github.com/mberto10/mberto-compound",
+      "license": "MIT",
+      "keywords": [
+        "productivity",
+        "planning",
+        "linear",
+        "youtrack",
+        "communication",
+        "german",
+        "documentation"
+      ],
+      "category": "productivity"
+    },
+    {
+      "name": "openai-apps-sdk",
+      "source": "./plugins/openai-apps-sdk",
+      "description": "Comprehensive toolkit for building MCP servers with the OpenAI Apps SDK. Provides skills, commands, and agents for creating ChatGPT apps with Python and TypeScript.",
+      "version": "0.1.0",
+      "author": {
+        "name": "Maximilian Bruhn",
+        "email": "puzzle.ai.studio@gmail.com"
+      },
+      "homepage": "https://github.com/mberto10/mberto-compound",
+      "repository": "https://github.com/mberto10/mberto-compound",
+      "license": "MIT",
+      "keywords": [
+        "openai",
+        "apps-sdk",
+        "mcp",
+        "model-context-protocol",
+        "chatgpt",
+        "mcp-server",
+        "widgets"
+      ],
+      "category": "development"
+    },
+    {
+      "name": "compound-loop",
+      "source": "./plugins/compound-loop",
+      "description": "Structured feedback loop for capturing learnings from plugin usage anywhere and consolidating them into improvements",
+      "version": "0.1.0",
+      "author": {
+        "name": "Maximilian Bruhn",
+        "email": "puzzle.ai.studio@gmail.com"
+      },
+      "homepage": "https://github.com/mberto10/mberto-compound",
+      "repository": "https://github.com/mberto10/mberto-compound",
+      "license": "MIT",
+      "keywords": [
+        "compounding",
+        "feedback-loop",
+        "learning",
+        "meta",
+        "self-improvement"
+      ],
+      "category": "meta"
+    },
+    {
+      "name": "continuous-compound",
+      "source": "./plugins/continuous-compound",
+      "description": "Long-running agent continuity via Linear + compound loop learning extraction",
+      "version": "1.0.0",
+      "author": {
+        "name": "Maximilian Bruhn",
+        "email": "puzzle.ai.studio@gmail.com"
+      },
+      "homepage": "https://github.com/mberto10/mberto-compound",
+      "repository": "https://github.com/mberto10/mberto-compound",
+      "license": "MIT",
+      "keywords": [
+        "linear",
+        "continuity",
+        "compound-loop",
+        "long-running-tasks"
+      ],
+      "category": "productivity"
+    },
+    {
+      "name": "daily-metrics",
+      "source": "./plugins/daily-metrics",
+      "description": "Personal tracking and goal management system with Supabase integration",
+      "version": "0.1.0",
+      "author": {
+        "name": "Maximilian Bruhn",
+        "email": "puzzle.ai.studio@gmail.com"
+      },
+      "homepage": "https://github.com/mberto10/mberto-compound",
+      "repository": "https://github.com/mberto10/mberto-compound",
+      "license": "MIT",
+      "keywords": [
+        "habits",
+        "tracking",
+        "goals",
+        "metrics",
+        "personal-development"
+      ],
+      "category": "personal"
+    },
+    {
+      "name": "ux-evaluator",
+      "source": "./plugins/ux-evaluator",
+      "description": "Frontend UX evaluation using User Lifecycle Framework and Playwright browser automation",
+      "version": "0.1.0",
+      "author": {
+        "name": "Dispatch Team"
+      },
+      "homepage": "https://github.com/mberto10/mberto-compound",
+      "repository": "https://github.com/mberto10/mberto-compound",
+      "license": "MIT",
+      "keywords": [
+        "ux",
+        "frontend",
+        "evaluation",
+        "playwright",
+        "user-lifecycle",
+        "testing"
+      ],
+      "category": "testing"
+    },
+    {
+      "name": "agentic-optimization-loop",
+      "source": "./plugins/agentic-optimization-loop",
+      "description": "Iterative optimization loops for AI agents with hypothesis-driven improvement cycles. Guides you through Build -> Evaluate -> Analyze -> Improve -> Compound cycles with persistent state.",
+      "version": "0.1.0",
+      "author": {
+        "name": "Maximilian Bruhn",
+        "email": "puzzle.ai.studio@gmail.com"
+      },
+      "homepage": "https://github.com/mberto10/mberto-compound",
+      "repository": "https://github.com/mberto10/mberto-compound",
+      "license": "MIT",
+      "keywords": [
+        "optimization",
+        "agentic",
+        "hypothesis-driven",
+        "improvement-cycles",
+        "evaluation"
+      ],
+      "category": "development"
+    },
+    {
+      "name": "compound-engineering",
+      "source": "./plugins/compound-engineering",
+      "description": "Portable compound engineering workflow: Plan, Work, Review, Compound. Powered by subsystem knowledge files for dependency-aware planning and contract verification. Each unit of work makes subsequent work easier.",
+      "version": "0.1.0",
+      "author": {
+        "name": "Maximilian Bruhn",
+        "email": "puzzle.ai.studio@gmail.com"
+      },
+      "homepage": "https://github.com/mberto10/mberto-compound",
+      "repository": "https://github.com/mberto10/mberto-compound",
+      "license": "MIT",
+      "keywords": [
+        "compound-engineering",
+        "planning",
+        "subsystem-knowledge",
+        "contract-verification",
+        "workflow"
+      ],
+      "category": "development"
+    }
+  ]
+}
