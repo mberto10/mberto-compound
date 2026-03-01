@@ -14,7 +14,7 @@ Thumbs.db
 .env.local
 .env.*.local
 
-# Node modules (if any plugins use npm)
+# Node modules
 node_modules/
 
 # Logs
@@ -30,5 +30,5 @@ __pycache__/
 *.pyo
 
 # Claude Code local settings
-.claude/
+.claude/settings.local.json
 plugins/.claude-plugin/
