@@ -1,9 +1,7 @@
 ---
 name: add-kw-update
 description: Add an entry to the current week's KW update on a YouTrack epic
-allowed-tools:
-  - Bash
-  - Read
+allowed-tools: Bash, Read
 argument-hint: "<project_name> <section> <content>"
 ---
 
