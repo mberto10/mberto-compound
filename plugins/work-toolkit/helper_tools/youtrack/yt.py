@@ -37,9 +37,39 @@ BASE_URL = "https://fazit.youtrack.cloud"
 DEFAULT_PROJECT_ID = "0-331"
 
 
+def load_dotenv():
+    """Load .env file from common locations into os.environ."""
+    candidates = [
+        os.path.join(os.getcwd(), ".env"),
+        os.path.join(os.path.dirname(__file__), "..", "..", ".env"),
+    ]
+    project_dir = os.environ.get("CLAUDE_PROJECT_DIR")
+    if project_dir:
+        candidates.insert(0, os.path.join(project_dir, ".env"))
+    for path in candidates:
+        path = os.path.realpath(path)
+        if os.path.isfile(path):
+            with open(path) as f:
+                for line in f:
+                    line = line.strip()
+                    if not line or line.startswith("#"):
+                        continue
+                    if "=" not in line:
+                        continue
+                    key, _, value = line.partition("=")
+                    key = key.strip()
+                    value = value.strip().strip('"').strip("'")
+                    if key not in os.environ:
+                        os.environ[key] = value
+            break
+
+
 def get_token():
     """Get YouTrack API token from environment."""
     token = os.environ.get("YOUTRACK_API_TOKEN")
+    if not token:
+        load_dotenv()
+        token = os.environ.get("YOUTRACK_API_TOKEN")
     if not token:
         print(json.dumps({"error": "YOUTRACK_API_TOKEN not set"}))
         sys.exit(1)
@@ -180,7 +210,7 @@ def get_comments(issue_id: str, full: bool = False):
 
     output = [{
         "id": c.get("id"),
-        "text": c.get("text", "") if full else c.get("text", "")[:300],
+        "text": (c.get("text") or "") if full else (c.get("text") or "")[:300],
         "author": c.get("author", {}).get("name") if c.get("author") else None,
         "created": c.get("created")
     } for c in comments]

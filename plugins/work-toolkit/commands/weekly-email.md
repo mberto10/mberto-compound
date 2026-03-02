@@ -59,27 +59,19 @@ Compile weekly update email for Lenkungsausschuss from YouTrack project KW comme
 
    Im folgenden findet Ihr eine Zusammenfassung der wichtigsten Updates aus dem GenAI Team für KW[XX]:
 
-   ---
-
    ## [Project 1 Name]
 
    **Updates:**
    - [Progress items from KW comment]
 
-   **Blocker:** [Issues or "Keine"]
-
    **Next Steps:**
    - [Planned items]
-
-   ---
 
    ## [Project 2 Name]
 
    [...]
 
-   ---
-
-   Bei Fragen wendet euch jederzeit gerne an Sina oder mich.
+   Bei Fragen meldet euch jederzeit gerne an Sina oder mich.
    ```
 
 5. **Present draft** for final review
@@ -90,6 +82,8 @@ Compile weekly update email for Lenkungsausschuss from YouTrack project KW comme
 - Target 5-6 projects per email. A Lenkungsausschuss update should be scannable, not exhaustive. [src:2026-01-12]
 - Always show user the project selection before generating the final email. [src:2026-01-12]
 - Use exact template phrasing - greeting: "Hallo Lieber Lenkungsausschuss,", intro: "Im folgenden findet Ihr eine Zusammenfassung der wichtigsten Updates aus dem GenAI Team für KW[XX]:", closing: "Bei Fragen meldet euch jederzeit gerne an Sina oder mich." [src:2026-01-12]
+- Do NOT include Blocker sections in the email — only Updates and Next Steps per project. [src:2026-03-02]
+- Do NOT use horizontal rules (---) between projects — use heading spacing only. [src:2026-03-02]
 
 ## Options
 
