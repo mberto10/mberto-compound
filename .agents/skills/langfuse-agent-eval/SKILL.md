@@ -1,6 +1,6 @@
 ---
 name: langfuse-agent-eval
-description: Use when the user wants to run an evaluation cycle: execute a Langfuse experiment, analyze failures, compare cycles, and document findings.
+description: "Use when the user wants to run an evaluation cycle: execute a Langfuse experiment, analyze failures, compare cycles, and document findings."
 ---
 
 # Langfuse Agent Eval

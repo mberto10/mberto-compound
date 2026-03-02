@@ -1,6 +1,6 @@
 ---
 name: langfuse-agent-eval-setup
-description: Use when the user wants to set up an evaluation pipeline for an agent: discover the agent flow, define quality dimensions, create a dataset, create judge prompts, and generate a local eval config.
+description: "Use when the user wants to set up an evaluation pipeline for an agent: discover the agent flow, define quality dimensions, create a dataset, create judge prompts, and generate a local eval config."
 ---
 
 # Langfuse Agent Eval Setup
