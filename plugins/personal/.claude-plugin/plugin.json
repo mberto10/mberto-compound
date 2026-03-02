@@ -1,0 +1,12 @@
+{
+  "name": "personal",
+  "version": "0.1.0",
+  "description": "Personal life management tools — calendar, scheduling, availability.",
+  "keywords": ["calendar", "scheduling", "meetings", "availability", "personal"],
+  "commands": [
+    "./commands/calendar.md"
+  ],
+  "skills": [
+    "./skills/calendar-management"
+  ]
+}
