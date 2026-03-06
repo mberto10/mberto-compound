@@ -6,7 +6,7 @@ description: Autonomous engineering loop (plan -> work -> review -> commit)
 
 Execute an autonomous engineering loop: Plan → Work → Review → Commit.
 
-**IMPORTANT:** Antigravity does not support the blocking `harness-stop-hook` used in Claude Code. This workflow runs the loop *sequentially* as a single long-running task or a set of manual steps. The user must manually re-trigger or approve steps if the agent pauses.
+**IMPORTANT:** This Codex variant is hookless. Use `compound_engineering_runner.py` state commands for loop stop/resume and run the loop sequentially as a single long-running task or manual steps.
 
 ---
 
@@ -27,6 +27,13 @@ Execute an autonomous engineering loop: Plan → Work → Review → Commit.
 
 ---
 
+Use state commands when needed:
+
+```bash
+python3 .agents/skills/compound-engineering-commands/scripts/compound_engineering_runner.py harness-status
+python3 .agents/skills/compound-engineering-commands/scripts/compound_engineering_runner.py harness-stop
+```
+
 ## Step 1: Fetch Work
 
 **If argument is provided:**
@@ -36,7 +43,7 @@ Treat it as a request description or Linear issue ID.
 Fetch "In Progress" issues assigned to the user from Linear (if configured).
 
 ```
-mcp request: linear-server/list_issues (assignee: me, state: In Progress)
+mcp request: mcp__linear__list_issues (assignee: me, state: In Progress)
 ```
 
 Select the top priority item.

@@ -20,18 +20,14 @@ Work is subsystem-aware. Before touching code, load the relevant subsystem specs
 
 ## Step 0: Activate Post-Work Chain
 
-Create or overwrite `.claude/work-chain-state.local.md` so the Stop hook will auto-chain review → discover after work completes:
+Initialize Codex-native chain state (hookless):
 
-```yaml
----
-active: true
-stage: idle
----
+```bash
+python3 .agents/skills/compound-engineering-commands/scripts/compound_engineering_runner.py chain-init
 ```
 
-This is automatic — no separate command needed. Use `/chain stop` mid-session to abort the chain if needed.
-
----
+This creates/updates `compound-state/compound-engineering/work-chain-state.local.json`.
+Use `/chain stop` mid-session to abort the chain if needed.
 
 ## Step 1: Load the Plan
 
@@ -181,11 +177,24 @@ Spec Gaps Discovered:
 - {gap 2}
 
 Suggested Next Steps:
-- Run /review for full verification
-- Run /discover if friction points suggest reusable patterns
+- Run `/review` for full verification
+- Run `/discover` if friction points suggest reusable patterns
 - Update subsystem specs with discovered gaps
 ═══════════════════════════════════════════════════════════════
 ```
+
+---
+
+## Step 7: Advance Chain State (If Active)
+
+After outputting `WORK COMPLETE`, advance chain state so Codex can continue without hooks:
+
+```bash
+python3 .agents/skills/compound-engineering-commands/scripts/compound_engineering_runner.py \
+  chain-advance --event work_complete --json
+```
+
+If `next_action` is `/review`, continue immediately with `/review`.
 
 ---
 

@@ -1,7 +1,7 @@
 ---
 description: Assemble codebase context for frontier reasoning models and transform their responses into actionable work
 argument-hint: <gather|transform> [--question "..."] [--template architecture|roadmap|debt|migration] [--subsystems backend/api,...] [--all-subsystems] [--commits 20] [--input FILE]
-allowed-tools: Read, Write, Edit, Glob, Grep, Bash, Task, AskUserQuestion, mcp__claude_ai_Linear__list_issues, mcp__claude_ai_Linear__list_projects, mcp__claude_ai_Linear__list_milestones, mcp__claude_ai_Linear__list_initiatives, mcp__claude_ai_Linear__get_issue, mcp__claude_ai_Linear__get_project, mcp__claude_ai_Linear__get_initiative, mcp__claude_ai_Linear__get_milestone, mcp__claude_ai_Linear__create_issue, mcp__claude_ai_Linear__create_milestone, mcp__claude_ai_Linear__list_teams, mcp__claude_ai_Linear__list_issue_labels, mcp__claude_ai_Linear__list_issue_statuses
+allowed-tools: Read, Write, Edit, Glob, Grep, Bash, Task, AskUserQuestion, mcp__linear__list_issues, mcp__linear__list_projects, mcp__linear__list_milestones, mcp__linear__list_initiatives, mcp__linear__get_issue, mcp__linear__get_project, mcp__linear__get_initiative, mcp__linear__get_milestone, mcp__linear__create_issue, mcp__linear__create_milestone, mcp__linear__list_teams, mcp__linear__list_issue_labels, mcp__linear__list_issue_statuses
 ---
 
 # Reason Command

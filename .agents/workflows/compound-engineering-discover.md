@@ -275,6 +275,15 @@ Next Steps:
 ═══════════════════════════════════════════════════════════════
 ```
 
+### 10. Advance Chain State (If Active)
+
+After outputting `DISCOVERY COMPLETE`, if a work chain is active, close it:
+
+```bash
+python3 .agents/skills/compound-engineering-commands/scripts/compound_engineering_runner.py \
+  chain-advance --event discovery_complete --json
+```
+
 ---
 
 ## Prompting for Depth

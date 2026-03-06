@@ -1,7 +1,7 @@
 ---
 description: Start autonomous engineering loop — pulls issues from Linear, executes plan→work→review→commit cycle
 argument-hint: <start|stop|status> [--project PROJECT_ID] [--label ready] [--max 20] [--team MB90]
-allowed-tools: Read, Write, Edit, Glob, Grep, Bash, Task, AskUserQuestion, mcp__linear-server__*
+allowed-tools: Read, Write, Edit, Glob, Grep, Bash, Task, AskUserQuestion, mcp__linear__*
 ---
 
 # Harness Command
@@ -28,19 +28,28 @@ Also extract optional flags:
 
 ## Subcommand: `stop`
 
-1. Read `.claude/harness-state.local.md`
-2. If it doesn't exist, report "No active harness session"
-3. If it exists, set `active: false` in the YAML frontmatter
-4. Report "Harness will stop after current issue completes"
-5. **Done. Do not continue to the loop body.**
+1. Run:
+
+```bash
+python3 .agents/skills/compound-engineering-commands/scripts/compound_engineering_runner.py harness-stop --json
+```
+
+2. If state doesn't exist, report "No active harness session"
+3. Otherwise report "Harness stopped" with current state summary
+4. **Done. Do not continue to the loop body.**
 
 ---
 
 ## Subcommand: `status`
 
-1. Read `.claude/harness-state.local.md`
-2. If it doesn't exist, report "No harness state file found"
-3. If it exists, display:
+1. Run:
+
+```bash
+python3 .agents/skills/compound-engineering-commands/scripts/compound_engineering_runner.py harness-status --json
+```
+
+2. If no state exists, report "No harness state file found"
+3. If state exists, display:
    - Active/inactive status
    - Current iteration / max iterations
    - Completed issues count and IDs
@@ -57,42 +66,21 @@ This is the core autonomous loop. It processes all queued issues in sequence unt
 
 ### Step 1: Load or Create State
 
-Read `.claude/harness-state.local.md`. If it doesn't exist, this is a fresh start:
+Harness state is managed by the hookless Codex runner at:
+`compound-state/compound-engineering/harness-state.local.json`
 
-1. Extract configuration from flags (--project, --label, --team, --max)
-2. If --project was not provided, use AskUserQuestion to ask:
-   - "Which Linear project should the harness pull issues from?" (provide project ID)
-   - "Which label marks issues as ready for autonomous work?" (default: "ready")
-   - "Maximum iterations before auto-stop?" (default: 20)
-3. Create the state file:
+Initialize or resume state:
 
-```yaml
----
-active: true
-iteration: 1
-max_iterations: {from flag or user input}
-consecutive_failures: 0
-discover_interval: 5
-
-linear_project: "{project_id}"
-linear_team: "{team_id}"
-linear_filter_labels: ["{label}"]
-linear_done_status: "Done"
-linear_in_progress_status: "In Progress"
-
-completed_issues: []
-failed_issues: []
-skipped_issues: []
-
-friction_log: []
----
-
-You are running the autonomous engineering harness. Execute /harness start to pick up the next issue from Linear and run the plan-work-review-commit cycle. Consult the harness-protocol skill for gate rules and failure handling. Output [ISSUE_COMPLETE: <id>] when done with an issue, [ISSUE_FAILED: <id>] on failure, [HARNESS_DONE] when queue is empty, or [HARNESS_STOP] to end the session.
+```bash
+python3 .agents/skills/compound-engineering-commands/scripts/compound_engineering_runner.py \
+  harness-init --project {project} --team {team} --label {label} --max-iterations {max} --json
 ```
 
-If the state file exists and `active: true`, this is a continuation — read current state and proceed.
-
-If the state file exists and `active: false`, ask the user if they want to restart (reset iteration counter) or resume (keep state, set active: true).
+Guidance:
+1. Extract configuration from flags (`--project`, `--team`, `--max`, optional label).
+2. If project is missing, ask once for project, label, and max iterations.
+3. Use `--resume` when state exists and user wants continuation.
+4. Use `--force` only when user explicitly wants a fresh restart.
 
 ### Step 2: Load the Harness Protocol
 
@@ -105,7 +93,7 @@ Internalize the **harness-protocol** skill. This provides:
 
 ### Step 3: Fetch Next Issue from Linear
 
-Call `mcp__linear-server__list_issues` with:
+Call `mcp__linear__list_issues` with:
 - Project filter: `linear_project` from state
 - Team filter: `linear_team` from state
 - Label filter: `linear_filter_labels` from state
@@ -122,16 +110,25 @@ Select the highest-priority unblocked issue. If no issues remain:
 [HARNESS_DONE]
 ```
 
-**Output this marker on its own line and stop.** The Stop hook will detect it and allow the session to exit.
+Record terminal state via runner and stop the loop:
+
+```bash
+python3 .agents/skills/compound-engineering-commands/scripts/compound_engineering_runner.py \
+  harness-record --event harness_done --json
+```
 
 ### Step 4: Claim the Issue
 
-1. Call `mcp__linear-server__update_issue` to set status to the `linear_in_progress_status` value
-2. Call `mcp__linear-server__create_comment` on the issue:
+1. Call `mcp__linear__update_issue` to set status to the `linear_in_progress_status` value
+2. Call `mcp__linear__create_comment` on the issue:
    ```
    Harness iteration {iteration} starting. Autonomous plan→work→review→commit cycle.
    ```
-3. Update state file: set `current_issue: {issue_id}`
+3. Record claim in state:
+   ```bash
+   python3 .agents/skills/compound-engineering-commands/scripts/compound_engineering_runner.py \
+     harness-claim --issue-id {issue_id} --json
+   ```
 
 ### Step 5: Plan Phase
 
@@ -265,57 +262,39 @@ Follow the /review methodology inline:
 
 ### Step 9: Update State and Log Friction
 
-1. Based on outcome, update state file:
+Persist iteration outcome with the runner:
 
-   **On success:**
-   - Append `{issue_id}` to `completed_issues`
-   - Set `consecutive_failures: 0`
+- Success:
 
-   **On failure:**
-   - Append `{issue_id}` to `failed_issues`
-   - Increment `consecutive_failures`
+```bash
+python3 .agents/skills/compound-engineering-commands/scripts/compound_engineering_runner.py \
+  harness-record --event issue_complete --issue-id {issue_id} --json
+```
 
-2. Clear `current_issue` in the state file.
+- Failure:
 
-3. Increment `iteration` by 1.
+```bash
+python3 .agents/skills/compound-engineering-commands/scripts/compound_engineering_runner.py \
+  harness-record --event issue_failed --issue-id {issue_id} --json
+```
 
-4. Append friction points to `friction_log` in state file:
-   ```yaml
-   friction_log:
-     - issue: "{issue_id}"
-       iteration: {N}
-       points:
-         - "{friction description}"
-   ```
-
-5. Check discovery trigger: if `completed_issues` count is a multiple of `discover_interval`:
-   - Log: "Discovery trigger: {discover_interval} issues completed since last discovery"
-   - Run a brief inline discovery pass on accumulated friction
-   - If patterns found, note them in state but continue the loop
+- Include friction points as needed with repeated `--friction "..."` flags.
 
 ### Step 10: Check Termination and Continue
 
-Output the appropriate marker for logging/observability:
+Emit marker for observability:
 - Success: `[ISSUE_COMPLETE: {issue_id}]`
 - Failure: `[ISSUE_FAILED: {issue_id}]`
 
-Then check termination conditions:
+Then evaluate the `harness-record` output:
+- If `should_continue: true` -> go back to Step 3.
+- If `should_continue: false` -> output `[HARNESS_STOP]` and stop.
 
-1. **Max iterations reached** (`iteration >= max_iterations`):
-   - Output `[HARNESS_STOP]`
-   - Set `active: false` in state file
-   - **Stop. Do not continue.**
+Also respect manual stop requests by running:
 
-2. **3+ consecutive failures:**
-   - Output `[HARNESS_STOP]`
-   - Set `active: false` in state file
-   - **Stop. Do not continue.**
-
-3. **`active: false`** (user ran `/harness stop` during execution):
-   - Output `[HARNESS_STOP]`
-   - **Stop. Do not continue.**
-
-4. **Otherwise: Go back to Step 3** (fetch next issue).
+```bash
+python3 .agents/skills/compound-engineering-commands/scripts/compound_engineering_runner.py harness-stop --json
+```
 
 ### Context Limit Handling
 
@@ -323,7 +302,11 @@ If you sense context is filling up (many tool calls, large outputs):
 
 1. Commit any completed change groups
 2. Comment current progress on the Linear issue
-3. Update state file with all current progress
+3. Persist pause state:
+   ```bash
+   python3 .agents/skills/compound-engineering-commands/scripts/compound_engineering_runner.py \
+     harness-record --event harness_pause --issue-id {issue_id} --json
+   ```
 4. Output:
    ```
    [HARNESS_PAUSE: {issue_id}]
@@ -335,7 +318,7 @@ If you sense context is filling up (many tool calls, large outputs):
 ## Safety Rules
 
 1. **Never force-push.** All commits are normal commits.
-2. **Never skip hooks.** Always use standard `git commit` without `--no-verify`.
+2. **Use standard commits.** Avoid bypassing verification unless explicitly requested by the user.
 3. **Never modify files outside the blast radius** identified in the plan phase.
 4. **Always verify before committing.** Invariant check + tier0 tests must pass.
 5. **Revert on review failure.** Don't leave broken commits in the history.
@@ -350,7 +333,7 @@ If you sense context is filling up (many tool calls, large outputs):
 
 - This command orchestrates the full cycle INLINE — it does NOT invoke /plan, /work, /review as sub-commands. It follows their methodology directly.
 - The loop is self-contained: after completing an issue, the command checks termination conditions and loops back to Step 3.
-- The Stop hook (`hooks/scripts/harness-stop-hook.sh`) serves as a fallback safety net — if the session exits unexpectedly, it can update state. But normal loop continuation is driven by the command itself.
-- State is persisted in `.claude/harness-state.local.md` (git-ignored, machine-local).
+- This Codex variant is hookless: loop continuation and stop conditions are handled explicitly via `compound_engineering_runner.py`.
+- State is persisted in `compound-state/compound-engineering/harness-state.local.json` (machine-local).
 - The harness-protocol skill provides the "how to think" guidance for autonomous decisions.
 - Friction logging feeds into periodic `/discover` passes for self-improvement.

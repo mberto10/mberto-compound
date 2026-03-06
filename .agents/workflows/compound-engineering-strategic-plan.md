@@ -1,7 +1,7 @@
 ---
 description: Decompose a product vision into a Linear hierarchy (initiative, project, milestones, issues) grounded in subsystem knowledge
 argument-hint: <vision - what you want to build, migrate, or implement>
-allowed-tools: Read, Glob, Grep, Task, AskUserQuestion, mcp__linear-server__list_initiatives, mcp__linear-server__get_initiative, mcp__linear-server__list_projects, mcp__linear-server__get_project, mcp__linear-server__list_issues, mcp__linear-server__get_issue, mcp__linear-server__list_milestones, mcp__linear-server__get_milestone, mcp__linear-server__list_teams, mcp__linear-server__get_team, mcp__linear-server__create_initiative, mcp__linear-server__create_project, mcp__linear-server__create_milestone, mcp__linear-server__create_issue, mcp__linear-server__update_issue
+allowed-tools: Read, Glob, Grep, Task, AskUserQuestion, mcp__linear__list_initiatives, mcp__linear__get_initiative, mcp__linear__list_projects, mcp__linear__get_project, mcp__linear__list_issues, mcp__linear__get_issue, mcp__linear__list_milestones, mcp__linear__get_milestone, mcp__linear__list_teams, mcp__linear__get_team, mcp__linear__create_initiative, mcp__linear__create_project, mcp__linear__create_milestone, mcp__linear__create_issue, mcp__linear__update_issue
 ---
 
 # Strategic Plan Command

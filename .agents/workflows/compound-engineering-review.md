@@ -198,6 +198,30 @@ RECOMMENDED ACTIONS:
 
 ---
 
+## Step 7: Advance Chain State (If Active)
+
+If a work chain is active, advance it based on review verdict:
+
+- `VERDICT: PASS` or `VERDICT: PASS WITH WARNINGS`
+
+```bash
+python3 .agents/skills/compound-engineering-commands/scripts/compound_engineering_runner.py \
+  chain-advance --event review_pass --json
+```
+
+If `next_action` is `/discover`, continue immediately with `/discover`.
+
+- `VERDICT: FAIL`
+
+```bash
+python3 .agents/skills/compound-engineering-commands/scripts/compound_engineering_runner.py \
+  chain-advance --event review_fail --json
+```
+
+This marks the chain as done/inactive.
+
+---
+
 ## Notes
 
 - This command does NOT make code changes. It only reads, runs tests, and reports.

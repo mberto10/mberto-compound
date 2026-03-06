@@ -32,3 +32,6 @@ __pycache__/
 # Claude Code local settings
 .claude/
 plugins/.claude-plugin/
+
+# Codex compound-engineering local state
+compound-state/compound-engineering/*.local.json

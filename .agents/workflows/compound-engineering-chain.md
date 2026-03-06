@@ -1,14 +1,14 @@
 ---
-description: Check or stop the post-work chain (work → review → discover)
+description: Check or stop the post-work chain (work -> review -> discover)
 argument-hint: stop | status
-allowed-tools: Read, Write, Glob
+allowed-tools: Read, Write, Glob, Bash
 ---
 
 # Chain Command
 
-Check or stop the automatic post-work chain that runs **work → review → discover** in sequence via the Stop hook.
+Check or stop the hookless post-work chain that runs **work -> review -> discover**.
 
-The chain is activated automatically by `/work` — no manual start needed.
+The chain is activated automatically by `/work` via the Codex runner state file.
 
 **Action:** $ARGUMENTS
 
@@ -20,11 +20,24 @@ Parse the action from `$ARGUMENTS` (default to `status` if empty).
 
 ### `stop`
 
-If `.claude/work-chain-state.local.md` exists, set `active: false`. If it doesn't exist, inform the user no chain is active.
+Run:
+
+```bash
+python3 .agents/skills/compound-engineering-commands/scripts/compound_engineering_runner.py chain-stop --json
+```
+
+Report the resulting `active` and `stage` values.
 
 ### `status`
 
-Read `.claude/work-chain-state.local.md` and report:
+Run:
+
+```bash
+python3 .agents/skills/compound-engineering-commands/scripts/compound_engineering_runner.py chain-status --json
+```
+
+Report:
 - **Active:** yes/no
 - **Stage:** idle / pending_review / pending_discover / done
-- If file doesn't exist: "No chain active. The chain starts automatically when you run `/work`."
+- **State file:** `compound-state/compound-engineering/work-chain-state.local.json`
+- If state file is missing: "No chain active. The chain starts automatically when you run `/work`."
