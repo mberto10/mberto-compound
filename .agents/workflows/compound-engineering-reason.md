@@ -35,7 +35,7 @@ Also extract optional flags:
 
 ### Step 1: LOAD
 
-Read the **reasoning-craft** skill at `plugins/compound-engineering/skills/reasoning-craft/SKILL.md`. Internalize the context assembly methodology and output format contract.
+Read the **reasoning-craft** skill at `.agents/skills/compound-engineering-reasoning-craft/SKILL.md`. Internalize the context assembly methodology and output format contract.
 
 ### Step 2: CLARIFY
 
@@ -70,7 +70,7 @@ Status: {status} | Target: {target_date}
   Priority: {priority} | Labels: {labels}
 ```
 
-5. Write the serialized context to `.claude/reason-linear-context.tmp.md`
+5. Write the serialized context to `compound-state/compound-engineering/reasoning/reason-linear-context.tmp.md`
 
 If no Linear project specified, skip this step.
 
@@ -79,13 +79,13 @@ If no Linear project specified, skip this step.
 Invoke the gather helper script:
 
 ```bash
-python3 plugins/compound-engineering/skills/reasoning-craft/helpers/gather_context.py \
+python3 .agents/skills/compound-engineering-reasoning-craft/helpers/gather_context.py \
   --question "{question}" \
   --template {template} \
   {--subsystems X,Y or --all-subsystems} \
   {--commits N} \
-  {--linear-context .claude/reason-linear-context.tmp.md} \
-  --output .claude/reason-context-output.tmp.md \
+  {--linear-context compound-state/compound-engineering/reasoning/reason-linear-context.tmp.md} \
+  --output compound-state/compound-engineering/reasoning/reason-context-output.tmp.md \
   --cwd .
 ```
 
@@ -103,7 +103,7 @@ Use the flags assembled from Steps 2-3. If commits weren't specified, use `--com
    strategic-reasoning/{timestamp}-{slug}/context.md
    ```
 
-3. Read back the generated context document from `.claude/reason-context-output.tmp.md`.
+3. Read back the generated context document from `compound-state/compound-engineering/reasoning/reason-context-output.tmp.md`.
 
 ### Step 6: PRESENT
 
@@ -119,7 +119,7 @@ Report to the user:
 2. **Audit trail location:** Path to `strategic-reasoning/{slug}/context.md`
 
 3. **Next steps:**
-   - The context has been copied to clipboard (if successful) and saved to the audit trail
+  - The context has been saved to the audit trail
    - Paste it into your reasoning model of choice (Gemini Deep Think, o3, etc.)
    - When you have the response, run `/reason transform` to convert it into actionable work
 
@@ -139,7 +139,7 @@ Obtain the reasoning model's response:
 
 - If `--input FILE` was provided, read the file
 - Otherwise, ask the user: "Please paste the reasoning model's response, or provide a file path to it."
-  - If user pastes text, save it to `.claude/reason-response.tmp.md`
+  - If user pastes text, save it to `compound-state/compound-engineering/reasoning/reason-response.tmp.md`
   - If user provides a file path, read that file
 
 ### Step 3: FIND AUDIT

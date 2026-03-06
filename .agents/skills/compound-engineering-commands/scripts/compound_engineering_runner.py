@@ -430,6 +430,7 @@ def run_harness_record(
 
     completed = state.setdefault("completed_issues", [])
     failed = state.setdefault("failed_issues", [])
+    skipped = state.setdefault("skipped_issues", [])
     friction_log = state.setdefault("friction_log", [])
 
     if not isinstance(completed, list):
@@ -438,6 +439,9 @@ def run_harness_record(
     if not isinstance(failed, list):
         failed = []
         state["failed_issues"] = failed
+    if not isinstance(skipped, list):
+        skipped = []
+        state["skipped_issues"] = skipped
     if not isinstance(friction_log, list):
         friction_log = []
         state["friction_log"] = friction_log
@@ -451,6 +455,12 @@ def run_harness_record(
     elif event == "issue_failed":
         append_unique(failed, issue_id)
         state["consecutive_failures"] = int(state.get("consecutive_failures", 0)) + 1
+        state["iteration"] = int(state.get("iteration", 1)) + 1
+        state["current_issue"] = None
+
+    elif event == "issue_skipped":
+        append_unique(skipped, issue_id)
+        state["consecutive_failures"] = 0
         state["iteration"] = int(state.get("iteration", 1)) + 1
         state["current_issue"] = None
 
@@ -483,16 +493,31 @@ def run_harness_record(
     elif event == "harness_stop":
         stop_reason = "manual_stop"
 
+    completed_count = len(completed)
+    discover_interval = int(state.get("discover_interval", 0) or 0)
+    should_discover = (
+        event == "issue_complete"
+        and discover_interval > 0
+        and completed_count > 0
+        and completed_count % discover_interval == 0
+    )
+
     state["updated_at"] = now_iso()
     save_json(state_file, state)
 
-    should_continue = bool(state.get("active", False)) and event in {"issue_complete", "issue_failed"}
+    should_continue = bool(state.get("active", False)) and event in {
+        "issue_complete",
+        "issue_failed",
+        "issue_skipped",
+    }
     payload = {
         "ok": True,
         "operation": "harness-record",
         "state_path": str(state_file),
         "message": "recorded",
         "should_continue": should_continue,
+        "should_discover": should_discover,
+        "completed_count": completed_count,
         "stop_reason": stop_reason,
         "state": state,
     }
@@ -587,7 +612,14 @@ def main() -> int:
         if not args.event:
             eprint("ERROR: --event is required for harness-record")
             return 2
-        allowed = {"issue_complete", "issue_failed", "harness_done", "harness_pause", "harness_stop"}
+        allowed = {
+            "issue_complete",
+            "issue_failed",
+            "issue_skipped",
+            "harness_done",
+            "harness_pause",
+            "harness_stop",
+        }
         if args.event not in allowed:
             eprint(f"ERROR: invalid harness event '{args.event}'. Allowed: {sorted(allowed)}")
             return 2

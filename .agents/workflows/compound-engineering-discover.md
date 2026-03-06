@@ -1,12 +1,12 @@
 ---
-description: Analyze work session to discover reusable patterns and specify appropriate components for the local project plugin
+description: Analyze work session to discover reusable patterns and specify appropriate components for the local .agents system
 argument-hint: [optional focus - what pattern you noticed or want to explore]
 allowed-tools: Read, Glob, Grep, Write, Task, AskUserQuestion
 ---
 
 # Discover Command
 
-Analyze the current work session to identify **patterns worth modularizing** and determine the right component type: **skill**, **command**, **agent**, or **hook**. Discovered components target the **local project plugin** (not this portable plugin).
+Analyze the current work session to identify **patterns worth modularizing** and determine the right component type: **skill**, **workflow**, **agent**, or **state helper**. Discovered components target the **local `.agents` system**.
 
 **User focus:** $ARGUMENTS
 
@@ -17,7 +17,7 @@ Analyze the current work session to identify **patterns worth modularizing** and
 | compound-loop | compound-engineering |
 |---------------|---------------------|
 | Generic pattern discovery | Subsystem-aware pattern detection |
-| Outputs to Linear or local files | Outputs specs for the local project plugin |
+| Outputs to Linear or local files | Outputs specs for the local `.agents` system |
 | Any context | Engineering work context with subsystem knowledge |
 
 ---
@@ -28,11 +28,11 @@ Analyze the current work session to identify **patterns worth modularizing** and
 
 Internalize:
 - The **discovery-craft** skill (component type selection, spec templates)
-- The **`references/compounding-methodology.md`** reference (philosophy, frontier model, anti-patterns)
+- The **`.agents/references/compounding-methodology.md`** reference (philosophy, frontier model, anti-patterns)
 
 Key frameworks to apply:
 - Skills-as-modules: "What procedure could be a loadable component?"
-- Component type selection: skill vs command vs agent vs hook
+- Component type selection: skill vs workflow vs agent vs state helper
 - Modularizability criteria
 
 ### 2. Session Analysis
@@ -81,9 +81,9 @@ COMPONENT ANALYSIS: [Pattern Name]
 ═══════════════════════════════════════════════════════════════
 
 [ ] Knowledge Claude should apply contextually?     → SKILL
-[ ] Action user explicitly requests?                → COMMAND
+[ ] Action user explicitly requests?                → WORKFLOW
 [ ] Autonomous work for a specialist?               → AGENT
-[ ] Should happen automatically on events?          → HOOK
+[ ] Should happen automatically on events/state?    → STATE HELPER
 
 Selected: [Component Type]
 Reasoning: [Why this type fits]
@@ -118,7 +118,7 @@ For each proposed component, determine how it connects to subsystem knowledge:
 
 ### 7. Generate Specification
 
-Based on component type, generate the full spec. The spec should target the **local project plugin** (e.g., `.claude/plugins/{project-plugin}/`).
+Based on component type, generate the full spec. The spec should target the **local `.agents` tree**.
 
 ---
 
@@ -129,7 +129,7 @@ Based on component type, generate the full spec. The spec should target the **lo
 PROPOSED SKILL: [name]
 ═══════════════════════════════════════════════════════════════
 
-Location: .claude/plugins/{project-plugin}/skills/[skill-name]/
+Location: .agents/skills/[skill-name]/
 
 ## Trigger Description
 This skill should be used when the user asks to "[trigger 1]",
@@ -155,14 +155,14 @@ This skill should be used when the user asks to "[trigger 1]",
 
 ---
 
-#### For Commands:
+#### For Workflows:
 
 ```markdown
 ═══════════════════════════════════════════════════════════════
-PROPOSED COMMAND: /[name]
+PROPOSED WORKFLOW: [name]
 ═══════════════════════════════════════════════════════════════
 
-Location: .claude/plugins/{project-plugin}/commands/[name].md
+Location: .agents/workflows/[name].md
 
 ## Frontmatter
 description: [one-line description]
@@ -195,7 +195,7 @@ allowed-tools: [tools needed]
 PROPOSED AGENT: [name]
 ═══════════════════════════════════════════════════════════════
 
-Location: .claude/plugins/{project-plugin}/agents/[name].md
+Location: .agents/agents/[name].md
 
 ## When to Use
 [Situation where this agent helps]
@@ -212,14 +212,14 @@ Location: .claude/plugins/{project-plugin}/agents/[name].md
 
 ---
 
-#### For Hooks:
+#### For State Helpers:
 
 ```markdown
 ═══════════════════════════════════════════════════════════════
-PROPOSED HOOK: [name]
+PROPOSED STATE HELPER: [name]
 ═══════════════════════════════════════════════════════════════
 
-Location: .claude/plugins/{project-plugin}/hooks/hooks.json
+Location: .agents/skills/.../scripts/ or compound-state/compound-engineering/
 
 ## Event Type
 [PreToolUse | PostToolUse | Stop | etc.]
@@ -253,13 +253,13 @@ DISCOVERY COMPLETE
 Patterns Analyzed: X
 Components Proposed:
 - Skills: Y
-- Commands: Z
+- Workflows: Z
 - Agents: W
-- Hooks: V
+- State helpers: V
 
 Top Candidate:
 [Type]: [Name] - [one-line description]
-Target Plugin: [local project plugin]
+Target: [local .agents path]
 
 Subsystem Integration:
 - [subsystem]: add to helpful_skills
@@ -299,7 +299,7 @@ If session context is thin, ask:
 
 ## Notes
 
-- Discovered components go to the **local project plugin**, not this portable plugin
+- Discovered components go to the **local `.agents` system**
 - The `helpful_skills` section in subsystem YAMLs is the bridge — `/discover` proposes skills, `/consolidate` writes them and updates the YAMLs
 - Quality over quantity — one good spec beats five vague ideas
 - Right component type matters — wrong type = wrong solution

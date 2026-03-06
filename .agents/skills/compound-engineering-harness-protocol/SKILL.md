@@ -7,7 +7,7 @@ description: This skill should be used when running the autonomous engineering h
 
 ## Purpose
 
-Provide the decision-making framework for autonomous engineering work. When the harness is running, there is no human in the loop for most decisions. This skill teaches you WHEN to proceed, WHEN to revert, WHEN to skip, and WHEN to stop and ask.
+Provide the decision-making framework for autonomous engineering work. When the harness is running, there is no human in the loop for most decisions. This skill teaches you WHEN to proceed, WHEN to recover safely, WHEN to skip, and WHEN to stop and ask.
 
 ---
 
@@ -21,14 +21,14 @@ Gates are checkpoints where work must meet criteria before proceeding. There are
 |------|------|----------|------------|
 | Invariant check | After each change group | All subsystem invariants pass | Revert group, try alternate approach once |
 | Tier0 tests | After each change group | All tier0 tests pass | Revert group, try alternate approach once |
-| Review verdict | After all groups | PASS or PASS_WITH_WARNINGS | Revert all issue commits, mark failed |
+| Review verdict | After all groups | PASS or PASS_WITH_WARNINGS | Safely revert issue commits, mark failed |
 
 **Hard gate failure protocol:**
 1. Revert the failing change group (uncommitted changes only)
 2. Analyze the failure — is it retryable? (see Failure Taxonomy below)
 3. If retryable: try ONE alternate approach. If that also fails, mark as structural.
 4. If structural: skip the change group, note in Linear comment, continue to next group.
-5. If ALL groups fail: mark issue as failed, revert any committed groups.
+5. If ALL groups fail: mark issue as failed, revert any committed groups with non-destructive git operations.
 
 ### Soft Gates (warn but proceed)
 
@@ -94,7 +94,7 @@ Then the issue is **blocked** (needs human input). Comment on it asking for clar
 
 ### One Commit Per Change Group
 
-Each change group gets its own commit. This makes reversion granular — if review fails, you can reset to before a specific group.
+Each change group gets its own commit. This makes recovery granular — if review fails, you can revert only the commits created for that issue.
 
 ### Structured Commit Messages
 
@@ -106,7 +106,7 @@ Change-Group: {N}/{total}
 Subsystems: {comma-separated subsystem names}
 Invariants: {pass_count}/{total_count} verified
 
-Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
+Co-Authored-By: OpenAI Codex <noreply@openai.com>
 ```
 
 **Type prefixes:**
