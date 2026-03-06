@@ -1,12 +1,12 @@
 ---
-description: Implement discovered patterns into the local project plugin and update subsystem knowledge
+description: Implement discovered patterns into the local .agents system and update subsystem knowledge
 argument-hint: [optional filter - e.g., "only backend skills", "from latest discover"]
 allowed-tools: Read, Write, Edit, Glob, Grep, Bash, Task, AskUserQuestion
 ---
 
 # Consolidate Command
 
-Process pending discovery artifacts and implement approved changes into the **local project plugin** and subsystem knowledge files.
+Process pending discovery artifacts and implement approved changes into the **local `.agents` system** and subsystem knowledge files.
 
 **User filter:** $ARGUMENTS
 
@@ -17,7 +17,7 @@ Process pending discovery artifacts and implement approved changes into the **lo
 | compound-loop | compound-engineering |
 |---------------|---------------------|
 | Processes reflection learnings | Processes discovery artifacts |
-| Updates any plugin | Updates local project plugin + subsystem YAMLs |
+| Updates any plugin | Updates local `.agents` assets + subsystem YAMLs |
 | Linear or local files | Local files only (portable, no Linear dependency) |
 
 ---
@@ -26,7 +26,7 @@ Process pending discovery artifacts and implement approved changes into the **lo
 
 ### 1. Load Methodology
 
-Internalize the **consolidation-craft** skill and **`references/compounding-methodology.md`**. Understand:
+Internalize the **consolidation-craft** skill and **`.agents/references/compounding-methodology.md`**. Understand:
 - How to review and approve discoveries
 - Change implementation patterns
 - The approval workflow (never auto-implement)
@@ -53,8 +53,8 @@ For each discovery artifact, present:
 DISCOVERY: [Name] from [date]
 ═══════════════════════════════════════════════════════════════
 
-Type: [skill | command | agent | hook]
-Target Plugin: [local project plugin path]
+Type: [skill | workflow | agent | state helper]
+Target: [local .agents path]
 
 Summary:
 > [Brief description of the component]
@@ -128,24 +128,20 @@ Only edit after explicit confirmation.
 
 ### 6. Implementation Patterns
 
-**For Skills → Create in local plugin:**
-- Create `skills/{skill-name}/SKILL.md` in the local project plugin
+**For Skills → Create in local `.agents`:**
+- Create `.agents/skills/{skill-name}/SKILL.md`
 - Follow the skill structure: Purpose, Core Concepts, Workflow, Examples
-- Update `plugin.json` to register the new skill
 
-**For Commands → Create in local plugin:**
-- Create `commands/{command-name}.md` in the local project plugin
-- Include proper frontmatter (description, argument-hint, allowed-tools)
-- Update `plugin.json` to register the new command
+**For Workflows → Create in local `.agents`:**
+- Create `.agents/workflows/{command-name}.md`
+- Include proper frontmatter and Codex-native guidance
 
-**For Agents → Create in local plugin:**
-- Create `agents/{agent-name}.md` in the local project plugin
-- Include proper frontmatter (description, model, tools)
-- Update `plugin.json` to register the new agent
+**For Agents → Create in local `.agents`:**
+- Create `.agents/agents/{agent-name}.md` if a bounded specialist is warranted
 
-**For Hooks → Update local plugin:**
-- Add to `hooks/hooks.json` in the local project plugin
-- Create any supporting scripts in `hooks/scripts/`
+**For State Helpers → Update local `.agents`:**
+- Extend `.agents/skills/.../scripts/`
+- Persist any durable state under `compound-state/compound-engineering/`
 
 ### 7. Update Subsystem Knowledge
 
@@ -196,7 +192,7 @@ Subsystem YAMLs Updated:
 Suggested Commit Message:
 compound: implement discoveries from [date range]
 
-- [plugin]: create [component type] [name]
+- [.agents]: create [component type] [name]
 - [subsystem]: update helpful_skills
 - [subsystem]: address GAP-XXX
 
@@ -212,7 +208,7 @@ Follow-up Actions:
 
 - **Never auto-implement** — always show change and get confirmation
 - **Provide reasoning** for each recommendation
-- **Components go to the local project plugin** — never modify this portable plugin
+- **Components go to the local `.agents` system**
 - **Subsystem YAMLs are updated** — the `helpful_skills` section is the bridge
 - **Quality over speed** — better to implement fewer discoveries well
-- This command should run in the project where subsystem knowledge and the local plugin exist
+- This command should run in the project where subsystem knowledge and the local `.agents` system exist

@@ -91,7 +91,7 @@ feat|fix|refactor: <concise summary> (<issue-id>)
 
 <optional body with details>
 
-Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
+Co-Authored-By: OpenAI Codex <noreply@openai.com>
 ```
 
 4. Run `git status --short` after to confirm only non-task files remain unstaged

@@ -7,11 +7,11 @@ description: This skill should be used when the user invokes "/discover", asks t
 
 ## Purpose
 
-Analyze engineering work sessions to discover **modularizable patterns** and determine the right component type: **skill**, **command**, **agent**, or **hook**. This is subsystem-aware pattern extraction — grounding discovery in concrete subsystem knowledge rather than abstract observation.
+Analyze engineering work sessions to discover **modularizable patterns** and determine the right component type: **skill**, **workflow**, **agent**, or **state helper**. This is subsystem-aware pattern extraction — grounding discovery in concrete subsystem knowledge rather than abstract observation.
 
 ## Foundation
 
-Load `references/compounding-methodology.md` for the underlying philosophy — the compound loop, what makes learning worth encoding, and the frontier model.
+Load `.agents/references/compounding-methodology.md` for the underlying philosophy — the compound loop, what makes learning worth encoding, and the frontier model.
 
 ## The Skills-as-Modules Lens
 
@@ -36,16 +36,16 @@ In compound engineering, extend this to:
 
 **In engineering context:** Domain knowledge about a subsystem, design patterns used in the codebase, testing strategies for specific areas.
 
-### Commands
-**Use when:** Pattern is a user-initiated action with clear steps.
+### Workflows
+**Use when:** Pattern is a user-invoked phase or action with clear steps.
 
 **Characteristics:**
-- User explicitly invokes with `/command-name`
+- User explicitly invokes a named workflow or command phrase
 - Has defined inputs (arguments) and outputs
 - Executes a specific workflow
 - May use skills for guidance during execution
 
-**In engineering context:** Deployment procedures, migration workflows, code generation for specific patterns.
+**In engineering context:** Planning, review, migration, and shipping procedures.
 
 ### Agents
 **Use when:** Pattern requires autonomous, multi-step work that benefits from specialization.
@@ -58,27 +58,27 @@ In compound engineering, extend this to:
 
 **In engineering context:** Code review from a specific angle, dependency analysis, test generation.
 
-### Hooks
-**Use when:** Pattern should happen automatically in response to events.
+### State Helpers
+**Use when:** Pattern should happen automatically or durably in Codex without relying on Claude hook infrastructure.
 
 **Characteristics:**
-- Event-driven (PreToolUse, PostToolUse, Stop, etc.)
-- No user invocation — triggers on system events
-- For validation, logging, guardrails, automation
-- Can block actions or modify behavior
+- Backed by scripts or persistent local state
+- No user invocation required after activation
+- Used for validation, routing, cadence, and recovery
+- Replaces Claude hook behavior when needed
 
-**In engineering context:** Pre-commit checks, invariant validation, file change guards.
+**In engineering context:** Harness state progression, post-work chaining, periodic discovery triggers.
 
 ## Decision Matrix
 
 | Pattern Characteristic | Component |
 |------------------------|-----------|
 | Knowledge Claude should know | **Skill** |
-| Action user explicitly requests | **Command** |
+| Action user explicitly requests | **Workflow** |
 | Autonomous specialized subtask | **Agent** |
-| Should happen on every X event | **Hook** |
-| Combines knowledge + action | **Command** + **Skill** |
-| Complex workflow with subspecialties | **Command** + **Agents** |
+| Should happen on every X event or state change | **State helper** |
+| Combines knowledge + action | **Workflow** + **Skill** |
+| Complex workflow with subspecialties | **Workflow** + **Agents** |
 
 ## Subsystem-Aware Pattern Discovery
 
@@ -116,13 +116,13 @@ Apply the decision matrix:
     → Yes: SKILL (add to subsystem helpful_skills)
 
 [ ] Is this an action users explicitly request?
-    → Yes: COMMAND (add to local project plugin)
+    → Yes: WORKFLOW (add to local `.agents/workflows`)
 
 [ ] Is this autonomous work for a specialist?
-    → Yes: AGENT (add to local project plugin)
+    → Yes: AGENT (add to the local `.agents` system)
 
 [ ] Should this happen automatically on events?
-    → Yes: HOOK (add to local project plugin)
+    → Yes: STATE HELPER (add to local scripts or runner state)
 
 [ ] Multiple apply?
     → Design combination
@@ -163,7 +163,7 @@ Don't over-specialize. Look for the general capability.
 ```markdown
 ## Proposed Skill: [name]
 
-**Location:** .claude/plugins/{project-plugin}/skills/[skill-name]/
+**Location:** .agents/skills/[skill-name]/
 
 ### Trigger Description
 This skill should be used when [triggers].
@@ -180,12 +180,12 @@ This skill should be used when [triggers].
 - SKILL.md: ~[X] words
 ```
 
-### Command Specification
+### Workflow Specification
 
 ```markdown
-## Proposed Command: /[name]
+## Proposed Workflow: [name]
 
-**Location:** .claude/plugins/{project-plugin}/commands/[name].md
+**Location:** .agents/workflows/[name].md
 
 ### Frontmatter
 description: [one-line description]
@@ -206,7 +206,7 @@ allowed-tools: [tools needed]
 ```markdown
 ## Proposed Agent: [name]
 
-**Location:** .claude/plugins/{project-plugin}/agents/[name].md
+**Location:** .agents/agents/[name].md
 
 ### When to Use
 [Situation where this agent helps]
@@ -218,12 +218,12 @@ allowed-tools: [tools needed]
 - [Tool]: [why]
 ```
 
-### Hook Specification
+### State Helper Specification
 
 ```markdown
-## Proposed Hook: [name]
+## Proposed State Helper: [name]
 
-**Location:** .claude/plugins/{project-plugin}/hooks/hooks.json
+**Location:** .agents/skills/.../scripts/ or compound-state/compound-engineering/
 
 ### Event Type
 [PreToolUse | PostToolUse | Stop | etc.]
@@ -254,4 +254,4 @@ allowed-tools: [tools needed]
 
 ## Output
 
-Discovery produces component specifications ready for implementation via `/consolidate`. Each spec should be complete enough to build from.
+Discovery produces component specifications ready for implementation via `/consolidate`. Each spec should be complete enough to build into the local `.agents` system.

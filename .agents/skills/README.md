@@ -1,28 +1,23 @@
-# Codex Skills
+# Local `.agents` Skills
 
-Local Codex skill library for install via the official skill installer.
+These skills are workspace-local and are meant to be consumed directly from `.agents/skills/`.
 
-## Layout
+## Structure
 
-```
-codex-skills/
-  skill-name/
-    SKILL.md
-    references/
-    scripts/
-    assets/
-```
+Each skill may contain:
 
-## Install
+- `SKILL.md`
+- `references/`
+- `scripts/`
+- `templates/`
+- `assets/`
 
-```bash
-python3 ~/.codex/skills/.system/skill-installer/scripts/install-skill-from-github.py \
-  --repo mberto10/mberto-compound \
-  --path codex-skills/skill-name
-```
+## Source Of Truth
 
-Multiple skills can be installed by repeating `--path`.
+For compound-engineering behavior in this repo, prefer the local skill directories here over older global `~/.codex/skills/*` copies. The local versions are the ones paired with the local workflows and runner state model.
 
-## Template
+## Shared Reference
 
-`skill-template/` is a starter you can copy and rename.
+Compound-engineering skills that need the core methodology should use:
+
+`/Users/bruhn/.codex/worktrees/a7a7/mberto-compound/.agents/references/compounding-methodology.md`

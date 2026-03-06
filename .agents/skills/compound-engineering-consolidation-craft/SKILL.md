@@ -7,11 +7,11 @@ description: This skill should be used when the user invokes "/consolidate", ask
 
 ## Purpose
 
-Process pending discovery artifacts and implement approved changes into the local project plugin and subsystem knowledge. Consolidation is the second half of the compound loop — where discovered patterns become permanent improvements.
+Process pending discovery artifacts and implement approved changes into the local `.agents` system and subsystem knowledge. Consolidation is the second half of the compound loop — where discovered patterns become permanent improvements.
 
 ## Foundation
 
-Load `references/compounding-methodology.md` for the underlying philosophy — where learnings land, the heuristics format, and anti-patterns to avoid.
+Load `.agents/references/compounding-methodology.md` for the underlying philosophy — where learnings land, the heuristics format, and anti-patterns to avoid.
 
 ## Consolidation Workflow
 
@@ -29,7 +29,7 @@ If user provides filter text, focus on matching discoveries.
 
 For each discovery, present:
 - Component type and name
-- Target location (local project plugin)
+- Target location (local `.agents` workflow, skill, agent, or helper)
 - Summary of what it provides
 - Subsystem integration points
 - Recommendation with reasoning
@@ -66,23 +66,20 @@ Wait for explicit approval before making changes. Never auto-implement.
 
 Based on component type:
 
-**Skill → Create in local plugin:**
-- Create `skills/{skill-name}/SKILL.md` with proper frontmatter
-- Register in `plugin.json`
+**Skill → Create in local `.agents`:**
+- Create `.agents/skills/{skill-name}/SKILL.md` with proper frontmatter
 - Follow structure: Purpose, Core Concepts, Workflow, Examples
 
-**Command → Create in local plugin:**
-- Create `commands/{name}.md` with proper frontmatter
-- Register in `plugin.json`
-- Include description, argument-hint, allowed-tools
+**Workflow → Create in local `.agents`:**
+- Create `.agents/workflows/{name}.md`
+- Include description, argument-hint, and Codex-native execution guidance
 
-**Agent → Create in local plugin:**
-- Create `agents/{name}.md` with proper frontmatter
-- Register in `plugin.json`
+**Agent → Create in local `.agents`:**
+- Create `.agents/agents/{name}.md` when a bounded specialist is needed
 
-**Hook → Update local plugin:**
-- Add to `hooks/hooks.json`
-- Create supporting scripts if needed
+**State helper → Update local `.agents`:**
+- Extend `.agents/skills/.../scripts/`
+- Persist machine-local state under `compound-state/compound-engineering/` when needed
 
 ### 6. Update Subsystem Knowledge
 
@@ -114,7 +111,7 @@ gaps:
 
 After changes:
 - Confirm files were created correctly
-- Verify plugin.json is valid
+- Verify any updated JSON or script entrypoints still load
 - Note if testing is needed
 - Suggest follow-up if changes need validation
 
@@ -181,7 +178,7 @@ When changes are ready to commit:
 ```
 compound: implement discoveries from [date range]
 
-- [plugin]: create [component type] [name]
+- [.agents]: create [component type] [name]
 - [subsystem]: update helpful_skills
 - [subsystem]: address GAP-XXX
 ```
