@@ -9,6 +9,7 @@ actions/
 ├── parallel/     # Parallel Web Systems API (parallel.ai)
 ├── perplexity/   # Perplexity AI API
 ├── exa/          # Exa AI API
+├── youtrack/     # YouTrack Reporting und KW-Workflow
 ├── eodhd/        # Unified EODHD actions (core + bundles)
 │   ├── core/
 │   └── bundles/
@@ -54,6 +55,25 @@ Neural search engine for finding articles and documents.
 | `batch-search.js` | Multiple searches with article excerpts |
 
 **Auth:** API key header (`apikey`)
+
+---
+
+### [YouTrack](./youtrack/)
+
+Actions fuer Projektstatus, Epic-Reviews und KW-Reporting in fazit YouTrack.
+
+| Action | Description |
+|--------|-------------|
+| `search-issues.js` | Issues per YouTrack-Query suchen |
+| `get-issue.js` | Einzelnes Issue mit Feldern und Beschreibung lesen |
+| `get-comments.js` | Kommentare lesen, optional nur KW-Kommentare |
+| `add-comment.js` | Kommentar auf einem Issue erstellen |
+| `update-comment.js` | Bestehenden Kommentar aktualisieren |
+| `find-epic.js` | Passendes Epic zu einem Projektnamen finden |
+| `get-weekly-kw-updates.js` | KW-Kommentare aktiver Epics sammeln und parsen |
+| `health-check-epics.js` | Aktive Epics auf SOP-Luecken pruefen |
+
+**Auth:** Bearer token (`apiKey`)
 
 ---
 
