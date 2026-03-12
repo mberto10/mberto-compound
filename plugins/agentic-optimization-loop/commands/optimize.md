@@ -17,6 +17,9 @@ arguments:
   - name: max-levers
     description: Maximum levers allowed when lever-mode=multi (1..5)
     required: false
+  - name: max-iterations
+    description: Maximum optimization iterations before the loop must graduate or stop. For `run` action only.
+    required: false
   - name: until
     description: Optional phase to stop after (e.g., `hypothesize`). Useful for partial runs or debugging.
     required: false
@@ -42,10 +45,11 @@ Run one optimization loop with persistent journal state and strict contract pref
 
 ### Step 1: Resolve Inputs
 
-Determine `agent`, `lever_mode` (default `single`), and `max_levers`.
+Determine `agent`, `lever_mode` (default `single`), `max_levers`, and `max_iterations` (default `10`).
 - `single` => force `max_levers=1`
 - `multi` => default `max_levers=3`
 - hard validation: `1 <= max_levers <= 5`
+- hard validation: `max_iterations >= 1`
 If validation fails, stop.
 
 ### Step 2: Contract Preflight (Required)
@@ -80,7 +84,7 @@ meta:
     frozen: ["<paths>"]
 ```
 
-Backward-compatible defaults for old journals: `loop.lever_mode: single`, `loop.max_levers: 1`.
+Backward-compatible defaults for old journals: `loop.lever_mode: single`, `loop.max_levers: 1`, `loop.max_iterations: 10`.
 
 ### Step 4: Execute Iteration
 
@@ -133,6 +137,7 @@ ANALYZE
 COMPOUND
   → execute keep or rollback per user decision
   → persist compounded block to journal
+  → if current_iteration >= loop.max_iterations: force decision=graduate or stop safely
   → if decision=continue: set current_phase=hypothesize (next iteration)
   → if decision=graduate: set current_phase=graduated
   → DONE — output final iteration summary
@@ -161,6 +166,7 @@ Phase: <current_phase>
 Iteration: <N>
 Lever mode: <single|multi>
 Max levers: <N>
+Max iterations: <N>
 Target: <summary>
 Guard status: <summary>
 Next action: <summary>

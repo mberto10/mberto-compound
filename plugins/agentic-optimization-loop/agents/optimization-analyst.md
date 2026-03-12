@@ -68,13 +68,19 @@ failures:
 
 **1.3 Fetch human annotation comments**
 
-**Critical:** Before diving into trace investigation, fetch ALL human annotation comments. Comments contain the "why" behind scores and often reveal issues invisible in metrics.
+**Critical when available:** Before diving into trace investigation, fetch ALL human annotation comments. Comments contain the "why" behind scores and often reveal issues invisible in metrics.
 
 ```bash
-# Get all scores with comments
-python3 ${LANGFUSE_ANALYZER_ROOT}/skills/annotation-manager/helpers/annotation_manager.py \
-  list-scores --name "<score_name>" --limit 100
+# Get all scores with comments when langfuse-analyzer is installed
+ANNOTATION_HELPER="${LANGFUSE_ANALYZER_ROOT:-}/skills/annotation-manager/helpers/annotation_manager.py"
+if [ -n "${LANGFUSE_ANALYZER_ROOT:-}" ] && [ -f "$ANNOTATION_HELPER" ]; then
+  python3 "$ANNOTATION_HELPER" list-scores --name "<score_name>" --limit 100
+else
+  echo "Annotation helper unavailable; continue without human comments and note this limitation."
+fi
 ```
+
+If the helper is unavailable, do not fail the analysis. Record that human annotation comments were skipped because `LANGFUSE_ANALYZER_ROOT` or the helper path was unavailable, then continue with trace-based analysis.
 
 **Categorize comments by theme:**
 1. Scan all comments for repeated keywords/phrases

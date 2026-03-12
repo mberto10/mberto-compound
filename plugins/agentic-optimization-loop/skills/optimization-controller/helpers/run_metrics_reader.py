@@ -75,8 +75,9 @@ def cmd_compare(args: argparse.Namespace) -> int:
         name = dim.get("name")
         if not name:
             continue
-        b_mean = _mean(baseline_scores.get(name, []))
-        c_mean = _mean(candidate_scores.get(name, []))
+        signal = dim.get("signal") or name
+        b_mean = _mean(baseline_scores.get(signal, baseline_scores.get(name, [])))
+        c_mean = _mean(candidate_scores.get(signal, candidate_scores.get(name, [])))
         if b_mean is None and c_mean is None:
             continue
         delta = None
@@ -89,6 +90,7 @@ def cmd_compare(args: argparse.Namespace) -> int:
         rows.append(
             {
                 "dimension": name,
+                "signal": signal,
                 "baseline_mean": b_mean,
                 "candidate_mean": c_mean,
                 "delta": delta,

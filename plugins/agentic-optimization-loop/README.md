@@ -14,7 +14,7 @@ The plugin is structured around three key layers: **Commands**, **Skills**, and 
 
 2. **Skills (The Cognitive Framework)**
    - Files like `skills/optimization-controller/SKILL.md` hold the actual "brains" of the loop.
-   - When the `optimize` command runs, it instructs the LLM to follow the constraints, constraints, and multi-phase loop format (Init -> Hypothesize -> Experiment -> Analyze -> Compound) defined in the skill. The skill dictates the *logic* of the optimization.
+   - When the `optimize` command runs, it instructs the LLM to follow the constraints and the multi-phase loop format (Init -> Hypothesize -> Experiment -> Analyze -> Compound) defined in the skill. The skill dictates the *logic* of the optimization.
 
 3. **Helpers (The Deterministic Execution)**
    - Python scripts in `skills/optimization-controller/helpers/` (e.g., `contract_resolver.py`, `trace_retriever.py`, `run_metrics_reader.py`).
@@ -62,7 +62,7 @@ Decision policy is unchanged across both modes (same strict guards and rollback 
 
 Unified entry point supporting execution, status monitoring, and cloud prompting:
 
-- `action=run` (default): Executes the optimization loop locally. Supports `--lever-mode` (`single|multi`) and `--max-levers`.
+- `action=run` (default): Executes the optimization loop locally. Supports `--lever-mode` (`single|multi`), `--max-levers`, and `--max-iterations`.
 - `action=status`: Output a read-only journal progress dump, showing phase, lever strategy, and targets.
 - `action=cloud`: Generate cloud execution prompts with explicit lever cardinality policy and strict guard instructions.
 
@@ -77,7 +77,7 @@ This plugin operates with only two files:
 2. **Optimization state (read/write):**
    - `.claude/optimization-loops/<agent>/journal.yaml`
 
-Target definition and lever scope are stored directly in `journal.yaml` under `meta.target` and `meta.levers`. No separate `target.yaml` is required. Additional fields include lever limits (`loop.lever_mode`, `loop.max_levers`) and iteration history (`lever_set_size`, `attribution_confidence`).
+Target definition and lever scope are stored directly in `journal.yaml` under `meta.target` and `meta.levers`. No separate `target.yaml` is required. Additional fields include loop limits (`loop.lever_mode`, `loop.max_levers`, `loop.max_iterations`) and iteration history (`lever_set_size`, `attribution_confidence`).
 
 ## Local Langfuse Helper Surface
 

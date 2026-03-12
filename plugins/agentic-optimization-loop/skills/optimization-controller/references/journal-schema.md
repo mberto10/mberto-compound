@@ -107,6 +107,7 @@ current_iteration: number         # 0 = pre-first-iteration, 1+ = iteration numb
 loop:
   lever_mode: enum                # single | multi
   max_levers: number              # 1..5
+  max_iterations: number          # Hard stop after this many iterations
 
 # ══════════════════════════════════════════════════════════════════
 # ITERATIONS - One entry per optimization cycle
@@ -339,7 +340,7 @@ def determine_resume_point(journal):
     iteration = journal['current_iteration']
 
     if phase == 'init':
-        return 'initialize', 'start'
+        return 'init', 'start'
 
     if phase == 'hypothesize':
         current = get_current_iteration(journal)
@@ -405,6 +406,10 @@ meta:
 
 current_phase: "compound"
 current_iteration: 2
+loop:
+  lever_mode: "single"
+  max_levers: 1
+  max_iterations: 10
 
 iterations:
   - id: 1

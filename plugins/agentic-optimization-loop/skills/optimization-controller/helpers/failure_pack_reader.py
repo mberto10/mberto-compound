@@ -13,6 +13,12 @@ from contract_resolver import validate_contract_shape
 from trace_retriever import retrieve_dataset_run_scores
 
 
+def _matches_slice(metadata: Dict[str, Any], slice_key: Optional[str], slice_value: Optional[str]) -> bool:
+    if not slice_key:
+        return True
+    return str(metadata.get(slice_key)) == str(slice_value)
+
+
 def cmd_failures(args: argparse.Namespace) -> int:
     path = _resolve_snapshot_path(args.agent, args.path)
     raw = load_snapshot(path)
@@ -29,16 +35,24 @@ def cmd_failures(args: argparse.Namespace) -> int:
         return 3
 
     dimension = args.dimension or dimensions[0].get("name")
-    dim_obj = next((d for d in dimensions if d.get("name") == dimension), None)
+    dim_obj = next(
+        (d for d in dimensions if d.get("name") == dimension or d.get("signal") == dimension),
+        None,
+    )
     if not dim_obj:
         print(json.dumps({"status": "error", "error": f"unknown dimension: {dimension}"}, indent=2))
         return 4
 
     threshold = normalize_score(args.threshold) if args.threshold is not None else normalize_score(dim_obj.get("threshold", 0.8))
+    score_name = dim_obj.get("signal") or dim_obj.get("name")
 
     dataset_name = _as_dict(contract.get("dataset")).get("name")
 
-    result = retrieve_dataset_run_scores(dataset_name, args.run_name)
+    result = retrieve_dataset_run_scores(
+        dataset_name,
+        args.run_name,
+        include_metadata=bool(args.slice_key),
+    )
     if not result or not result.get("items"):
         print(json.dumps({"status": "error", "error": f"no items found for run '{args.run_name}' in dataset '{dataset_name}'"}, indent=2))
         return 5
@@ -46,10 +60,14 @@ def cmd_failures(args: argparse.Namespace) -> int:
     failures: List[Dict[str, Any]] = []
 
     for item in result.get("items", []):
+        metadata = item.get("metadata") or {}
+        if not _matches_slice(metadata, args.slice_key, args.slice_value):
+            continue
+
         # Find score for the target dimension
         score_value: Optional[float] = None
         for s in item.get("scores", []):
-            if s.get("name") == dimension:
+            if s.get("name") in {score_name, dimension}:
                 v = s.get("value")
                 if isinstance(v, (int, float)):
                     score_value = normalize_score(v)
@@ -62,7 +80,8 @@ def cmd_failures(args: argparse.Namespace) -> int:
             {
                 "item_id": item.get("dataset_item_id"),
                 "trace_id": item.get("trace_id"),
-                "dimension": dimension,
+                "dimension": dim_obj.get("name") or dimension,
+                "signal": score_name,
                 "score": score_value,
                 "threshold": threshold,
             }
@@ -75,8 +94,10 @@ def cmd_failures(args: argparse.Namespace) -> int:
         "status": "ok",
         "dataset": dataset_name,
         "run_name": args.run_name,
-        "dimension": dimension,
+        "dimension": dim_obj.get("name") or dimension,
+        "signal": score_name,
         "threshold": threshold,
+        "slice": {"key": args.slice_key, "value": args.slice_value} if args.slice_key else None,
         "count": len(failures),
         "failures": failures,
     }

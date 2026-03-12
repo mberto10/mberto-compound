@@ -13,10 +13,11 @@ MODES:
     full     - Everything including costs, tokens, metadata
 
 RETRIEVAL:
-    --trace-id ID     Single trace by ID
-    --last N          Last N traces (default: 1)
-    --case ID         Filter by case_id metadata
-    --tags TAG...     Filter by tags
+    --trace-id ID         Single trace by ID
+    --last N              Last N traces (default: 1)
+    --filter-field NAME   Filter by metadata field
+    --filter-value VALUE  Value to match for the metadata field
+    --tags TAG...         Filter by tags
     --dataset-run NAME    All scores for a dataset run (requires --dataset)
     --dataset NAME        Dataset name, used with --dataset-run
 
@@ -28,16 +29,17 @@ ENVIRONMENT:
 EXAMPLES:
     python trace_retriever.py --last 2
     python trace_retriever.py --trace-id abc123 --mode prompts
-    python trace_retriever.py --last 5 --case 0001 --mode flow
+    python trace_retriever.py --last 5 --filter-field case_id --filter-value 0001 --mode flow
     python trace_retriever.py --dataset-run baseline-v1 --dataset my_eval
 """
 
 import argparse
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
 import os
 import sys
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 sys.path.insert(0, str(Path(__file__).parent))
 from langfuse_client import get_langfuse_client
@@ -49,6 +51,32 @@ from langfuse_client import get_langfuse_client
 
 # Default timeout for SDK operations (seconds)
 SDK_TIMEOUT = int(os.getenv("LANGFUSE_SDK_TIMEOUT", "30"))
+TIMEOUT_SENTINEL = object()
+
+
+def _to_dict(obj: Any) -> Dict[str, Any]:
+    if obj is None:
+        return {}
+    if hasattr(obj, "model_dump"):
+        return obj.model_dump()
+    if hasattr(obj, "dict"):
+        return obj.dict()
+    try:
+        return dict(obj)
+    except Exception:
+        return {}
+
+
+def _run_with_timeout(func: Callable[..., Any], *args: Any, timeout: int = SDK_TIMEOUT, **kwargs: Any) -> Any:
+    executor = ThreadPoolExecutor(max_workers=1)
+    future = executor.submit(func, *args, **kwargs)
+    try:
+        return future.result(timeout=timeout)
+    except FutureTimeoutError:
+        future.cancel()
+        return TIMEOUT_SENTINEL
+    finally:
+        executor.shutdown(wait=False, cancel_futures=True)
 
 
 def _get_httpx_client():
@@ -211,21 +239,99 @@ def get_trace_score(trace_id: str, score_name: str) -> Optional[float]:
     Returns:
         The score value if found, None otherwise
     """
-    client = get_langfuse_client()
+    client = _get_httpx_client()
+    if not client:
+        return None
     try:
-        response = client.api.scores.get_many(trace_id=trace_id)
-        if hasattr(response, "data") and response.data:
-            for score in response.data:
-                score_dict = score.dict() if hasattr(score, "dict") else dict(score)
-                if score_dict.get("name") == score_name:
-                    return score_dict.get("value")
+        response = client.get(f"/api/public/traces/{trace_id}")
+        response.raise_for_status()
+        trace_payload = response.json()
+        for score in trace_payload.get("scores", []):
+            if score.get("name") == score_name:
+                return score.get("value")
         return None
     except Exception as e:
         print(f"Warning: Could not fetch scores for {trace_id}: {e}", file=sys.stderr)
         return None
+    finally:
+        client.close()
 
 
-def retrieve_dataset_run_scores(dataset_name: str, run_name: str) -> Dict:
+def _fetch_scores_for_trace_ids(
+    trace_ids: List[str],
+    score_name: str,
+    from_timestamp: datetime,
+    to_timestamp: datetime,
+    tags: Optional[List[str]] = None,
+) -> Dict[str, Dict[str, Any]]:
+    if not trace_ids:
+        return {}
+
+    client = get_langfuse_client()
+    trace_id_set = set(trace_ids)
+    scores_by_trace: Dict[str, Dict[str, Any]] = {}
+    page = 1
+
+    while len(scores_by_trace) < len(trace_id_set):
+        response = _run_with_timeout(
+            client.api.score_v_2.get,
+            page=page,
+            limit=100,
+            name=score_name,
+            from_timestamp=from_timestamp,
+            to_timestamp=to_timestamp,
+            trace_tags=tags,
+        )
+        if response is TIMEOUT_SENTINEL:
+            print("SDK timeout while fetching scores; falling back to per-trace score lookup", file=sys.stderr)
+            break
+
+        data = getattr(response, "data", None) or []
+        if not data:
+            break
+
+        for score in data:
+            score_dict = _to_dict(score)
+            trace_id = score_dict.get("trace_id") or _to_dict(score_dict.get("trace")).get("id")
+            value = score_dict.get("value")
+            if trace_id not in trace_id_set or not isinstance(value, (int, float)):
+                continue
+            scores_by_trace[trace_id] = {
+                "name": score_dict.get("name") or score_name,
+                "value": float(value),
+            }
+
+        if len(data) < 100:
+            break
+        page += 1
+
+    if len(scores_by_trace) == len(trace_id_set):
+        return scores_by_trace
+
+    for trace_id in trace_id_set - set(scores_by_trace):
+        value = get_trace_score(trace_id, score_name)
+        if value is None:
+            continue
+        scores_by_trace[trace_id] = {"name": score_name, "value": value}
+
+    return scores_by_trace
+
+
+def _extract_item_metadata(item: Dict[str, Any], trace_payload: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    candidates = [
+        item.get("metadata"),
+        item.get("datasetItemMetadata"),
+        item.get("dataset_item_metadata"),
+        _to_dict(item.get("datasetItem")).get("metadata"),
+        _to_dict(trace_payload).get("metadata"),
+    ]
+    for candidate in candidates:
+        if isinstance(candidate, dict) and candidate:
+            return candidate
+    return {}
+
+
+def retrieve_dataset_run_scores(dataset_name: str, run_name: str, include_metadata: bool = False) -> Dict:
     """Retrieve all items and their scores for a specific dataset run.
 
     Uses REST API directly because the SDK does not populate scores
@@ -266,27 +372,33 @@ def retrieve_dataset_run_scores(dataset_name: str, run_name: str) -> Dict:
                 break
             page += 1
 
-        # Step 3: for each item, get scores from trace (scores may not be on run-item)
+        # Step 3: for each item, get scores from trace when needed
         result_items = []
         for item in all_items:
             trace_id = item.get("traceId") or item.get("trace_id")
             scores = item.get("scores") or []
+            trace_payload: Optional[Dict[str, Any]] = None
 
-            # If no embedded scores, fetch from trace directly
-            if not scores and trace_id:
+            if trace_id and (not scores or include_metadata):
                 try:
                     trace_resp = client.get(f"/api/public/traces/{trace_id}")
                     trace_resp.raise_for_status()
-                    scores = trace_resp.json().get("scores", [])
+                    trace_payload = trace_resp.json()
+                    if not scores:
+                        scores = trace_payload.get("scores", [])
                 except Exception:
                     pass
 
-            result_items.append({
+            result_item = {
                 "dataset_item_id": item.get("datasetItemId") or item.get("id"),
                 "trace_id": trace_id,
                 "scores": [{"name": s.get("name"), "value": s.get("value")}
                            for s in scores if s.get("name") is not None],
-            })
+            }
+            if include_metadata:
+                result_item["metadata"] = _extract_item_metadata(item, trace_payload)
+
+            result_items.append(result_item)
 
         return {
             "dataset": dataset_name,
@@ -343,27 +455,12 @@ def retrieve_last_traces(
     # Try SDK first, fall back to HTTP on timeout
     raw_traces = None
     try:
-        import signal
-
-        def timeout_handler(signum, frame):
+        response = _run_with_timeout(client.api.trace.list, **params)
+        if response is TIMEOUT_SENTINEL:
             raise TimeoutError("SDK operation timed out")
 
-        # Set timeout (Unix only, graceful degradation on Windows)
-        try:
-            signal.signal(signal.SIGALRM, timeout_handler)
-            signal.alarm(SDK_TIMEOUT)
-        except (AttributeError, ValueError):
-            pass  # Windows or threading context
-
-        response = client.api.trace.list(**params)
-
-        try:
-            signal.alarm(0)  # Cancel timeout
-        except (AttributeError, ValueError):
-            pass
-
         if hasattr(response, "data") and response.data:
-            raw_traces = [t.dict() if hasattr(t, "dict") else dict(t) for t in response.data]
+            raw_traces = [_to_dict(t) for t in response.data]
 
     except (TimeoutError, Exception) as e:
         if "timeout" in str(e).lower() or isinstance(e, TimeoutError):
@@ -376,6 +473,11 @@ def retrieve_last_traces(
     if not raw_traces:
         return []
 
+    score_map: Dict[str, Dict[str, Any]] = {}
+    if raw_traces and (min_score is not None or max_score is not None):
+        trace_ids = [trace.get("id") for trace in raw_traces if trace.get("id")]
+        score_map = _fetch_scores_for_trace_ids(trace_ids, score_name, start_time, end_time, tags)
+
     # Process traces with filters
     traces = []
     for trace_dict in raw_traces:
@@ -387,7 +489,8 @@ def retrieve_last_traces(
 
         # Filter by score if specified (client-side filter)
         if min_score is not None or max_score is not None:
-            score_value = get_trace_score(trace_dict["id"], score_name)
+            score_entry = score_map.get(trace_dict["id"])
+            score_value = score_entry.get("value") if score_entry else None
             if score_value is None:
                 continue  # Skip traces without the specified score
             if min_score is not None and score_value < min_score:
@@ -395,10 +498,7 @@ def retrieve_last_traces(
             if max_score is not None and score_value > max_score:
                 continue
             # Store score in trace dict for display
-            trace_dict["_filtered_score"] = {
-                "name": score_name,
-                "value": score_value
-            }
+            trace_dict["_filtered_score"] = score_entry or {"name": score_name, "value": score_value}
 
         traces.append(trace_dict)
         if len(traces) >= limit:
@@ -421,34 +521,20 @@ def retrieve_observations_for_trace(trace_id: str) -> List[Dict]:
                 # Already switched to HTTP fallback
                 break
 
-            import signal
-
-            def timeout_handler(signum, frame):
-                raise TimeoutError("SDK operation timed out")
-
-            # Set timeout (Unix only)
-            try:
-                signal.signal(signal.SIGALRM, timeout_handler)
-                signal.alarm(SDK_TIMEOUT)
-            except (AttributeError, ValueError):
-                pass
-
-            response = client.api.observations.get_many(
+            response = _run_with_timeout(
+                client.api.observations.get_many,
                 trace_id=trace_id,
                 limit=100,
-                page=page
+                page=page,
             )
-
-            try:
-                signal.alarm(0)
-            except (AttributeError, ValueError):
-                pass
+            if response is TIMEOUT_SENTINEL:
+                raise TimeoutError("SDK operation timed out")
 
             if not hasattr(response, "data") or not response.data:
                 break
 
             for obs in response.data:
-                obs_dict = obs.dict() if hasattr(obs, "dict") else dict(obs)
+                obs_dict = _to_dict(obs)
                 all_observations.append(obs_dict)
 
             if len(response.data) < 100:

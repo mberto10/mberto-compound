@@ -10,6 +10,7 @@ import argparse
 import json
 import os
 import sys
+import warnings
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 
@@ -59,6 +60,11 @@ def normalize_score(value: Any) -> float:
         return 0.0
     if v <= 1.0:
         return v
+    warnings.warn(
+        f"Score {v} exceeds canonical 0-1 scale; normalizing. Check judge score_scale.",
+        RuntimeWarning,
+        stacklevel=2,
+    )
     if v <= 10.0:
         return v / 10.0
     return 1.0

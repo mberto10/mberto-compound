@@ -16,7 +16,7 @@ This plugin requires minimal state configuration. Do NOT create a `target.yaml` 
 All optimization targets, boundaries, and historical iterations exist strictly inside the run journal:
 `/.claude/optimization-loops/<agent>/journal.yaml`
 
-If fields are missing in an existing journal, initialize them with backward-compatible defaults (`loop.lever_mode: single`, `loop.max_levers: 1`).
+If fields are missing in an existing journal, initialize them with backward-compatible defaults (`loop.lever_mode: single`, `loop.max_levers: 1`, `loop.max_iterations: 10`).
 
 ## 2. Preflight Checks (Mandatory)
 
@@ -69,6 +69,7 @@ meta:
 loop:
   lever_mode: single|multi
   max_levers: 1..5
+  max_iterations: 1..N
 
 iterations:
   - lever_set:
@@ -84,8 +85,8 @@ iterations:
 > **Anti-pattern:** Do NOT end your turn between phases. Do NOT output "run /optimize again" or similar. Do NOT interpret "wait for confirmation" as "stop and let the user re-invoke."
 > **Correct pattern:** At each gate, use AskUserQuestion (or a direct inline prompt) to get approval, then continue to the next phase within the same conversation turn.
 
-### Phase 1: Diagnose
-Analyze failures and trends against the baseline.
+### Phase 1: Init
+Establish baseline context and diagnose failures/trends against it.
 **Goal:** Understand what is broken before changing anything.
 After completing this phase, persist to journal and **proceed immediately to Phase 2**.
 
@@ -114,11 +115,11 @@ Determine if the iteration is a KEEP or a ROLLBACK.
 - Any strict guard violation -> Immediate ROLLBACK.
 - Only KEEP if the primary target metric improved without regressing critical dimensions.
 *There is NO relaxed policy for `multi` mode.*
-After completing this phase, persist to journal. If decision=continue, **proceed immediately to Phase 2** for the next iteration (do not ask the user to re-run). If decision=graduate, output the final iteration summary with metrics journey and end.
+Before continuing, check `loop.max_iterations`. If `current_iteration >= loop.max_iterations`, do not continue into another iteration; force a safe `graduate` or stop outcome and persist it. After completing this phase, persist to journal. If decision=continue, **proceed immediately to Phase 2** for the next iteration (do not ask the user to re-run). If decision=graduate, output the final iteration summary with metrics journey and end.
 
 ## 5. Local Read-Only Diagnostic Helpers
 
-During the `Diagnose` and `Analyze` phases, use these provided local read-only scripts to explore the latest metrics and traces:
+During the `Init` and `Analyze` phases, use these provided local read-only scripts to explore the latest metrics and traces:
 
 ```bash
 # Compare baseline vs candidate run metrics

@@ -52,7 +52,7 @@ Frozen scope:
 
 For each iteration:
 
-1. DIAGNOSE
+1. INIT
 - identify top failure patterns and prioritized target pattern
 
 2. HYPOTHESIZE
@@ -69,20 +69,19 @@ For each iteration:
 - compare vs previous/baseline
 - report deltas on canonical 0-1 scale
 
-5. COMPOUND / DECIDE
+5. COMPOUND
 - KEEP if improved and all guards pass
 - ROLLBACK otherwise
-- choose CONTINUE / GRADUATE / STOP
+- record the decision (`CONTINUE` / `GRADUATE` / `STOP`) inside the COMPOUND phase
 
 ## Required Output Sections
 
 Per iteration:
-- `[DIAGNOSE]`
+- `[INIT]`
 - `[HYPOTHESIZE]`
 - `[EXPERIMENT]`
 - `[ANALYZE]`
 - `[COMPOUND]`
-- `[DECIDE]`
 
 In `[HYPOTHESIZE]`, always include:
 - `lever_set`
